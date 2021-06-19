@@ -1,0 +1,28 @@
+syntax = "proto3";
+package scanner;
+
+option go_package = "/scanner";
+
+message Scanner {
+    string hosts = 1;
+    string ports = 2;
+    string protocol = 3;
+}
+
+message Port {
+    string host = 1;
+    string id = 2;
+    string protocol = 3;
+    string state = 4;
+    string service_name = 5;
+}
+
+message ReturnAllPorts {
+    repeated Port port = 1;
+}
+
+// Service to manage list of scanners
+service ScannerService {
+    // Create new scanner
+    rpc Scan(Scanner) returns (ReturnAllPorts);
+}
