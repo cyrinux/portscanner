@@ -2,16 +2,24 @@ package scanner
 
 import (
 	"fmt"
-	"golang.org/x/net/context"
 	"log"
 	"time"
+
+	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/rs/xid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/net/context"
 )
 
 type Server struct {
 }
 
+// Scan function prepare a nmap scan
 func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error) {
 	createdDate := time.Now()
+	scanId := xid.New()
+
 	if in.Timeout < 10 {
 		in.Timeout = 60 * 5
 	}
@@ -19,15 +27,16 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 	log.Printf("Starting scan of host: %s, port: %s, timeout: %v", in.Hosts, in.Ports, in.Timeout)
 
 	portList := []*Port{}
-	allScanResults := []*ScanResult{}
+	allScanResults := []*HostResult{}
+	totalPorts := 0
 
 	result, err := StartNmapScan(in)
 	if err != nil {
-		return &AllScanResults{Scanresult: nil}, err
+		return &AllScanResults{HostResult: nil}, err
 	}
 
 	for _, host := range result.Hosts {
-		var osversion string = "unknown"
+		osversion := "unknown"
 		if len(host.Ports) == 0 || len(host.Addresses) == 0 {
 			continue
 		}
@@ -35,24 +44,44 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 			fp := host.OS.Matches[0]
 			osversion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
 		}
-		hostResult := &Host{Address: host.Addresses[0].Addr, OsVersion: &osversion}
-
+		address := host.Addresses[0].Addr
+		hostResult := &Host{
+			Address:   address,
+			OsVersion: &osversion,
+		}
 		for _, p := range host.Ports {
-			port := &Port{
-				Host:        hostResult,
-				Number:      fmt.Sprintf("%v", p.ID),
-				ServiceName: string(p.Service.Name),
-				Protocol:    string(p.Protocol),
-				State:       p.State.State,
+			version := &PortVersion{
+				ExtraInfos:  &p.Service.ExtraInfo,
+				LowVersion:  &p.Service.LowVersion,
+				HighVersion: &p.Service.HighVersion,
+				Product:     &p.Service.Product,
 			}
-			portList = append(portList, port)
+			newPort := &Port{
+				PortId:      uint32(p.ID),
+				ServiceName: p.Service.Name,
+				Protocol:    p.Protocol,
+				State:       p.State.State,
+				Version:     version,
+			}
+			portList = append(portList, newPort)
+		}
+		totalPorts += len(portList)
+
+		scanResult := &HostResult{
+			Host:        hostResult,
+			Ports:       portList,
+			CreatedDate: time.Now().String(),
 		}
 
-		var scanResult = &ScanResult{Port: portList, Host: hostResult}
 		allScanResults = append(allScanResults, scanResult)
+		mongoRow := bson.D{primitive.E{
+			Key:   scanId.String(),
+			Value: scanResult,
+		}}
+		_, err = database.InsertResult(&mongoRow)
 	}
 
-	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", len(result.Hosts), len(portList), result.Stats.Finished.Elapsed)
+	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
 
-	return &AllScanResults{Scanresult: allScanResults, CreatedDate: createdDate.String()}, nil
+	return &AllScanResults{HostResult: allScanResults, CreatedDate: createdDate.String()}, nil
 }

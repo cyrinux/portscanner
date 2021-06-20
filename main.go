@@ -1,25 +1,30 @@
 package main
 
 import (
-	"fmt"
-
 	"flag"
+	// "fmt"
 	grpc "github.com/cyrinux/grpcnmapscanner/grpcserver"
+	// "github.com/cyrinux/grpcnmapscanner/tasks"
 )
 
 func main() {
 
-	isServer := flag.Bool("server", false, "enable server service")
-	isWorker := flag.Bool("worker", false, "enable worker service")
+	// isTasksServer := flag.Bool("tasksserver", false, "start tasks server")
+	isGRPCServer := flag.Bool("grpc", false, "start gRPC server")
+	// isWorker := flag.Bool("worker", false, "start a tasks worker")
+
 	flag.Parse()
 
-	if *isWorker {
-		fmt.Println("I'm a worker")
+	// if *isWorker {
+	// 	fmt.Print("I'm a worker")
+	// }
 
-	}
-
-	if *isServer {
+	if *isGRPCServer {
 		grpc.StartServer()
+
 	}
+	// if *isTasksServer {
+	// 	tasks.StartServer()
+	// }
 
 }

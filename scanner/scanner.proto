@@ -6,36 +6,43 @@ option go_package = "/scanner";
 message Scanner {
     string hosts = 1;
     string ports = 2;
-    oneof scan_mode {
-        bool with_aggressive_scan = 3;
-        bool with_null_scan = 4;
-    }
+    optional bool with_aggressive_scan = 3;
+    optional bool with_syn_scan = 4;
+    optional bool with_null_scan = 5;
     bool service_version_detection = 6;
     bool service_os_detection = 7;
-    int32 timeout = 8;
+    bool service_default_scripts = 8;
+    int32 timeout = 9;
 }
-
 
 message Host {
     string address = 1;
     optional string os_version = 2;
 }
 
-message Port {
-    Host host = 1;
-    string number = 2;
-    string protocol = 3;
-    string state = 4;
-    string service_name = 5;
+message PortVersion {
+   optional string low_version = 1;
+   optional string high_version = 2;
+   optional string extra_infos = 3;
+   optional string product = 4;
 }
 
-message ScanResult {
+message Port {
+    uint32 port_id = 1;
+    string protocol = 2;
+    string state = 3;
+    string service_name = 4;
+    PortVersion version = 5;
+}
+
+message HostResult {
     Host host = 1;
-    repeated Port port = 2;
+    repeated Port ports = 2;
+    string created_date = 3;
 }
 
 message AllScanResults {
-    repeated ScanResult scanresult = 1;
+    repeated HostResult host_result = 1;
     string created_date = 2;
 }
 

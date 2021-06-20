@@ -12,7 +12,7 @@ import (
 
 // StartServer start the gRPC server
 func StartServer() {
-	fmt.Println("Go gRPC NMAP Scanner!")
+	log.Println("I'm a gRPC server")
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 9000))
 	if err != nil {

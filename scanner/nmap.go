@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// StartNmapScan start a nmap scan
 func StartNmapScan(s *Scanner) (*nmap.Run, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.Timeout)*time.Second)
 	defer cancel()
@@ -20,7 +21,6 @@ func StartNmapScan(s *Scanner) (*nmap.Run, error) {
 		nmap.WithTargets(hosts...),
 		nmap.WithPorts(ports...),
 		nmap.WithUDPScan(),
-		nmap.WithSYNScan(),
 	}
 
 	if s.GetServiceOsDetection() {
@@ -29,6 +29,9 @@ func StartNmapScan(s *Scanner) (*nmap.Run, error) {
 
 	if s.GetServiceVersionDetection() {
 		options = append(options, nmap.WithServiceInfo())
+	}
+
+	if s.GetServiceDefaultScripts() {
 		options = append(options, nmap.WithDefaultScript())
 	}
 
@@ -36,6 +39,8 @@ func StartNmapScan(s *Scanner) (*nmap.Run, error) {
 		options = append(options, nmap.WithAggressiveScan())
 	} else if s.GetWithNullScan() {
 		options = append(options, nmap.WithTCPNullScan())
+	} else if s.GetWithSynScan() {
+		options = append(options, nmap.WithSYNScan())
 	}
 
 	scanner, err := nmap.NewScanner(options...)

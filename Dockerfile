@@ -10,4 +10,4 @@ RUN apk --no-cache add ca-certificates nmap nmap-scripts
 WORKDIR /app
 COPY --from=builder /app/grpcnmapscanner /app/grpcnmapscanner
 EXPOSE 9000
-CMD ["/app/grpcnmapscanner"]
+CMD ["/app/grpcnmapscanner", "-grpc"]
