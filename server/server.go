@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-func main() {
-
+// StartServer start the gRPC server
+func StartServer() {
 	fmt.Println("Go gRPC NMAP Scanner!")
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 9000))
@@ -27,5 +27,4 @@ func main() {
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
-
 }

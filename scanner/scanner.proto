@@ -6,23 +6,41 @@ option go_package = "/scanner";
 message Scanner {
     string hosts = 1;
     string ports = 2;
-    string protocol = 3;
+    oneof scan_mode {
+        bool with_aggressive_scan = 3;
+        bool with_null_scan = 4;
+    }
+    bool service_version_detection = 6;
+    bool service_os_detection = 7;
+    int32 timeout = 8;
+}
+
+
+message Host {
+    string address = 1;
+    optional string os_version = 2;
 }
 
 message Port {
-    string host = 1;
-    string id = 2;
+    Host host = 1;
+    string number = 2;
     string protocol = 3;
     string state = 4;
     string service_name = 5;
 }
 
-message ReturnAllPorts {
-    repeated Port port = 1;
+message ScanResult {
+    Host host = 1;
+    repeated Port port = 2;
+}
+
+message AllScanResults {
+    repeated ScanResult scanresult = 1;
+    string created_date = 2;
 }
 
 // Service to manage list of scanners
 service ScannerService {
     // Create new scanner
-    rpc Scan(Scanner) returns (ReturnAllPorts);
+    rpc Scan(Scanner) returns (AllScanResults);
 }
