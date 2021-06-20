@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"flag"
-	"github.com/cyrinux/grpcnmapscanner/server"
+	grpc "github.com/cyrinux/grpcnmapscanner/grpcserver"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 	}
 
 	if *isServer {
-		server.StartServer()
+		grpc.StartServer()
 	}
 
 }
