@@ -7,7 +7,6 @@ import (
 
 	"github.com/rs/xid"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/net/context"
 )
 
@@ -15,13 +14,14 @@ type Server struct {
 }
 
 func (s *Server) GetScan(ctx context.Context, in *Task) (*AllScanResults, error) {
-	resultBytes, err := GetTaskResult(in)
-	for r := range resultBytes {
-		log.Printf("%+v\n\n", r)
+	doc, err := GetTaskResult(in)
+	if err != nil {
+		return nil, err
 	}
-	err = bson.Unmarshal(resultBytes, &AllScanResults{})
 
-	return &AllScanResults{}, err
+	log.Printf("%+v\n\n", doc)
+
+	return doc, err
 }
 
 // Scan function prepare a nmap scan
@@ -87,11 +87,8 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 		}
 
 		allScanResults = append(allScanResults, scanResult)
-		mongoRow := bson.D{primitive.E{
-			Key:   scanId.String(),
-			Value: scanResult,
-		}}
-		_, err = InsertDbResult(&mongoRow)
+		mongoTask := bson.M{"_id": scanId.String(), "result": scanResult}
+		_, err = InsertDbResult(&mongoTask)
 	}
 
 	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)

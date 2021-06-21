@@ -2,15 +2,21 @@ package scanner
 
 import (
 	"context"
+	"log"
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
-	"time"
 )
 
-func GetTaskResult(t *Task) ([]byte, error) {
+type MongoTask struct {
+	ID     primitive.ObjectID `bson:"_id" json:"id,omitempty"`
+	Result *AllScanResults    `json:"result"`
+}
+
+func GetTaskResult(t *Task) (*AllScanResults, error) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://admin:secret@localhost:27017/?authSource=admin"))
 	if err != nil {
 		log.Fatal(err)
@@ -26,29 +32,17 @@ func GetTaskResult(t *Task) ([]byte, error) {
 	scannerDatabase := client.Database("scanner")
 	resultsCollection := scannerDatabase.Collection("results")
 
-	mongoRow := bson.D{primitive.E{
-		Key: t.Id,
-	}}
-
-	cursor, err := resultsCollection.Find(ctx, mongoRow)
+	var allScanResults *AllScanResults
+	// search the document
+	err = resultsCollection.FindOne(ctx, &bson.M{"_id": t.Id}).Decode(&allScanResults)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	var results bson.D
-
-	if err = cursor.All(ctx, &results); err != nil {
-		log.Fatal(err)
-	}
-	log.Println(results)
-
-	resultBytes, err := bson.Marshal(results)
-
-	return resultBytes, err
-
+	log.Printf("%v", allScanResults)
+	return allScanResults, err
 }
 
-func InsertDbResult(r *bson.D) (*mongo.InsertOneResult, error) {
+func InsertDbResult(r *bson.M) (*mongo.InsertOneResult, error) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://admin:secret@localhost:27017/?authSource=admin"))
 	if err != nil {
 		log.Fatal(err)
