@@ -14,14 +14,20 @@ type Server struct {
 }
 
 func (s *Server) GetScan(ctx context.Context, in *Task) (*AllScanResults, error) {
-	doc, err := GetTaskResult(in)
+	allScanResults, err := GetTaskResult(in)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("%v\n", allScanResults)
+	fmt.Printf("%+v\n", &allScanResults)
+	fmt.Printf("%v\n", &allScanResults)
 
-	log.Printf("%+v\n\n", doc)
+	return &AllScanResults{
 
-	return doc, err
+		HostResult:  allScanResults.HostResult,
+		CreatedDate: allScanResults.CreatedDate,
+		Guid:        allScanResults.Guid,
+	}, nil
 }
 
 // Scan function prepare a nmap scan
@@ -88,7 +94,10 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 
 		allScanResults = append(allScanResults, scanResult)
 		mongoTask := bson.M{"_id": scanId.String(), "result": scanResult}
-		_, err = InsertDbResult(&mongoTask)
+		if _, err = InsertDbResult(&mongoTask); err != nil {
+			return nil, err
+		}
+
 	}
 
 	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
