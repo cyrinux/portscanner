@@ -15,19 +15,29 @@ type Server struct {
 
 func (s *Server) GetScan(ctx context.Context, in *Task) (*AllScanResults, error) {
 	allScanResults, err := GetTaskResult(in)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("%v\n", allScanResults)
-	fmt.Printf("%+v\n", &allScanResults)
-	fmt.Printf("%v\n", &allScanResults)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if allScanResults != nil {
+	// 	log.Printf("%v\n", allScanResults)
+	// 	log.Printf("%v\n", allScanResults)
+	// 	log.Printf("%+v\n", &allScanResults)
+	// 	log.Printf("%v\n", &allScanResults)
+	// } else {
+	// 	log.Printf("%v\n", allScanResults)
+	// 	log.Printf("%v\n", allScanResults)
+	// 	log.Printf("%+v\n", &allScanResults)
+	// 	log.Printf("%v\n", &allScanResults)
+	// 	log.Print("NUL !")
+	// 	log.Printf("%v\n", &allScanResults)
+	// }
+	return allScanResults, err
 
-	return &AllScanResults{
-
-		HostResult:  allScanResults.HostResult,
-		CreatedDate: allScanResults.CreatedDate,
-		Guid:        allScanResults.Guid,
-	}, nil
+	// return &AllScanResults{
+	// 	HostResult:  allScanResults.HostResult,
+	// 	CreatedDate: allScanResults.CreatedDate,
+	// 	Guid:        allScanResults.Guid,
+	// }, nil
 }
 
 // Scan function prepare a nmap scan

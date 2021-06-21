@@ -13,7 +13,6 @@ message Scanner {
     bool service_os_detection = 7;
     bool service_default_scripts = 8;
     int32 timeout = 9;
-    bool run_async = 10;
 }
 
 message Task {
