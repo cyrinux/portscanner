@@ -6,13 +6,18 @@ option go_package = "/scanner";
 message Scanner {
     string hosts = 1;
     string ports = 2;
-    optional bool with_aggressive_scan = 3;
-    optional bool with_syn_scan = 4;
-    optional bool with_null_scan = 5;
+    bool with_aggressive_scan = 3;
+    bool with_syn_scan = 4;
+    bool with_null_scan = 5;
     bool service_version_detection = 6;
     bool service_os_detection = 7;
     bool service_default_scripts = 8;
     int32 timeout = 9;
+    bool run_async = 10;
+}
+
+message Task {
+    string id = 1;
 }
 
 message Host {
@@ -28,7 +33,7 @@ message PortVersion {
 }
 
 message Port {
-    uint32 port_id = 1;
+    string port_id = 1;
     string protocol = 2;
     string state = 3;
     string service_name = 4;
@@ -44,10 +49,13 @@ message HostResult {
 message AllScanResults {
     repeated HostResult host_result = 1;
     string created_date = 2;
+    string guid = 3;
 }
 
 // Service to manage list of scanners
 service ScannerService {
     // Create new scanner
     rpc Scan(Scanner) returns (AllScanResults);
+    // Fetch a previous scan result
+    rpc GetScan(Task) returns (AllScanResults);
 }

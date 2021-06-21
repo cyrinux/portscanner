@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/rs/xid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -13,6 +12,16 @@ import (
 )
 
 type Server struct {
+}
+
+func (s *Server) GetScan(ctx context.Context, in *Task) (*AllScanResults, error) {
+	resultBytes, err := GetTaskResult(in)
+	for r := range resultBytes {
+		log.Printf("%+v\n\n", r)
+	}
+	err = bson.Unmarshal(resultBytes, &AllScanResults{})
+
+	return &AllScanResults{}, err
 }
 
 // Scan function prepare a nmap scan
@@ -31,8 +40,12 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 	totalPorts := 0
 
 	result, err := StartNmapScan(in)
-	if err != nil {
-		return &AllScanResults{HostResult: nil}, err
+	if err != nil || result == nil {
+		return &AllScanResults{
+			HostResult:  nil,
+			CreatedDate: createdDate.String(),
+			Guid:        scanId.String(),
+		}, err
 	}
 
 	for _, host := range result.Hosts {
@@ -57,7 +70,7 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 				Product:     &p.Service.Product,
 			}
 			newPort := &Port{
-				PortId:      uint32(p.ID),
+				PortId:      fmt.Sprintf("%v", p.ID),
 				ServiceName: p.Service.Name,
 				Protocol:    p.Protocol,
 				State:       p.State.State,
@@ -78,10 +91,14 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 			Key:   scanId.String(),
 			Value: scanResult,
 		}}
-		_, err = database.InsertResult(&mongoRow)
+		_, err = InsertDbResult(&mongoRow)
 	}
 
 	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
 
-	return &AllScanResults{HostResult: allScanResults, CreatedDate: createdDate.String()}, nil
+	return &AllScanResults{
+		HostResult:  allScanResults,
+		CreatedDate: createdDate.String(),
+		Guid:        scanId.String(),
+	}, nil
 }
