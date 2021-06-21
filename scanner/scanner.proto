@@ -2,6 +2,9 @@ syntax = "proto3";
 package scanner;
 option go_package = "/scanner";
 
+
+import "protoc-gen-gotag/tagger/tagger.proto";
+
 message Scanner {
     string hosts = 1;
     string ports = 2;
@@ -43,8 +46,12 @@ message HostResult {
     repeated Port ports = 2;
 }
 
+// ScanResult is what is return when i Nmap scan, and- maybe - what
+// i put in the database
+// and i would like to return the same with GetScan
 message ScanResult {
-    repeated HostResult host_result = 1;
+    bytes id = 1 [(tagger.tags) = "bson:\"_id,omitempty\"" ];
+    repeated HostResult host_result = 2;
 }
 
 // Service to manage list of scanners
@@ -52,5 +59,6 @@ service ScannerService {
     // Create new scanner
     rpc Scan(Scanner) returns (ScanResult);
     // Fetch a previous scan result
-    rpc GetScan(Task) returns (HostResult);
+    // We are trying to fix this implem
+    rpc GetScan(Task) returns (ScanResult);
 }

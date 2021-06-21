@@ -12,13 +12,12 @@ import (
 type Server struct {
 }
 
-func (s *Server) GetScan(ctx context.Context, in *Task) (*HostResult, error) {
-	hostResult := &HostResult{}
-	hostResult, err := GetTaskResult(in)
+func (s *Server) GetScan(ctx context.Context, in *Task) (*ScanResult, error) {
+	scanResult, err := GetTaskResult(in)
 	if err != nil {
 		return nil, err
 	}
-	return hostResult, err
+	return scanResult, err
 }
 
 // Scan function prepare a nmap scan

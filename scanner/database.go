@@ -11,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func GetTaskResult(t *Task) (*HostResult, error) {
+func GetTaskResult(t *Task) (*ScanResult, error) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://admin:secret@localhost:27017/?authSource=admin"))
 	if err != nil {
 		log.Fatal(err)
@@ -27,13 +27,27 @@ func GetTaskResult(t *Task) (*HostResult, error) {
 	scannerDatabase := client.Database("scanner")
 	resultsCollection := scannerDatabase.Collection("results")
 
-	var hostResult *HostResult
-	err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}, options.FindOne().SetProjection(bson.M{"_id": 0})).Decode(&hostResult)
-	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&hostResult)
+	// var hostResult HostResult
+	var scanResult ScanResult
+	// var doc bson.M
+	err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&scanResult)
 	if err != nil {
 		log.Print(err)
 	}
-	return hostResult, err
+	log.Printf("%#v", scanResult)
+	// cursor, err := resultsCollection.Find(ctx, bson.M{})
+	// if err != nil {
+	// 	log.Print(err)
+	// }
+	// for cursor.Next(context.Background()) {
+	// 	// Decode the data at the current pointer and write it to data
+	// 	err := cursor.Decode(&doc)
+	// 	if err != nil {
+	// 		log.Print(err)
+	// 	}
+	// 	log.Printf("%#v", doc)
+	// }
+	return &scanResult, err
 }
 
 func InsertDbResult(r *bson.M) (*mongo.InsertOneResult, error) {
