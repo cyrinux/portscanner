@@ -13,10 +13,10 @@ import (
 
 // type MongoTask struct {
 // 	ID             primitive.ObjectID `bson:"_id" json:"id,omitempty"`
-// 	AllScanResults `bson:"result" json:"result"`
+// 	ScanResults `bson:"result" json:"result"`
 // }
 
-func GetTaskResult(t *Task) (*AllScanResults, error) {
+func GetTaskResult(t *Task) (*ScanResults, error) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://admin:secret@localhost:27017/?authSource=admin"))
 	if err != nil {
 		log.Fatal(err)
@@ -32,17 +32,19 @@ func GetTaskResult(t *Task) (*AllScanResults, error) {
 	scannerDatabase := client.Database("scanner")
 	resultsCollection := scannerDatabase.Collection("results")
 
-	// var result bson.M
-	var allScanResults AllScanResults
+	var result bson.M
+	var scanResults ScanResults
 	// var mongoTask *MongoTask
-	err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}, options.FindOne().SetProjection(bson.M{"_id": t.Id})).Decode(&allScanResults)
+	err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}, options.FindOne().SetProjection(bson.M{"_id": 0})).Decode(&scanResults)
+	log.Printf("%v", result["result"])
+	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}, options.FindOne().SetProjection(bson.M{"_id": t.Id})).Decode(&scanResults)
 	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&result)
-	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&allScanResults)
+	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&scanResults)
 	if err != nil {
 		log.Print(err)
 	}
-	// log.Printf("Result 1: %v\n", &allScanResults)
-	// log.Printf("Result 1: %v\n", allScanResults)
+	// log.Printf("Result 1: %v\n", &scanResults)
+	// log.Printf("Result 1: %v\n", scanResults)
 
 	// for cursor.Next(ctx) {
 	// 	var results bson.M
@@ -65,8 +67,11 @@ func GetTaskResult(t *Task) (*AllScanResults, error) {
 	// cursor.Close(ctx)
 	// log.Printf("MongoTask 1: %+v\n", mongoTask)
 	// log.Printf("MongoTask 2: %+v\n", mongoTask.Result.GetHostResult())
-	// var allScanResults &AllScanResults
-	return &allScanResults, err
+	// var scanResults &ScanResults
+	// log.Printf("MongoTask 1: %v\n", &scanResults)
+	// log.Printf("MongoTask 1: %v\n", &result)
+	// return result["result"], err
+	return nil, nil
 }
 
 func InsertDbResult(r *bson.M) (*mongo.InsertOneResult, error) {

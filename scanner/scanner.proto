@@ -42,19 +42,16 @@ message Port {
 message HostResult {
     Host host = 1;
     repeated Port ports = 2;
-    string created_date = 3;
 }
 
-message AllScanResults {
+message ScanResults {
     repeated HostResult host_result = 1;
-    string created_date = 2;
-    string guid = 3;
 }
 
 // Service to manage list of scanners
 service ScannerService {
     // Create new scanner
-    rpc Scan(Scanner) returns (AllScanResults);
+    rpc Scan(Scanner) returns (ScanResults);
     // Fetch a previous scan result
-    rpc GetScan(Task) returns (AllScanResults);
+    rpc GetScan(Task) returns (ScanResults);
 }

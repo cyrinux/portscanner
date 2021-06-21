@@ -3,7 +3,6 @@ package scanner
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/rs/xid"
 	"go.mongodb.org/mongo-driver/bson"
@@ -13,36 +12,37 @@ import (
 type Server struct {
 }
 
-func (s *Server) GetScan(ctx context.Context, in *Task) (*AllScanResults, error) {
-	allScanResults, err := GetTaskResult(in)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if allScanResults != nil {
-	// 	log.Printf("%v\n", allScanResults)
-	// 	log.Printf("%v\n", allScanResults)
-	// 	log.Printf("%+v\n", &allScanResults)
-	// 	log.Printf("%v\n", &allScanResults)
+func (s *Server) GetScan(ctx context.Context, in *Task) (*ScanResults, error) {
+	scanResults, err := GetTaskResult(in)
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+	// if scanResults != nil {
+	// 	log.Printf("%v\n", scanResults)
+	// 	log.Printf("%v\n", scanResults)
+	// 	log.Printf("%+v\n", &scanResults)
+	// 	log.Printf("%v\n", &scanResults)
 	// } else {
-	// 	log.Printf("%v\n", allScanResults)
-	// 	log.Printf("%v\n", allScanResults)
-	// 	log.Printf("%+v\n", &allScanResults)
-	// 	log.Printf("%v\n", &allScanResults)
+	// 	log.Printf("%v\n", scanResults)
+	// 	log.Printf("%v\n", scanResults)
+	// 	log.Printf("%+v\n", &scanResults)
+	// 	log.Printf("%v\n", &allScanResrint
 	// 	log.Print("NUL !")
-	// 	log.Printf("%v\n", &allScanResults)
+	log.Printf("%v\n", &*scanResults)
+	// 	log.Printf("%v\n", &scanResults)
 	// }
-	return allScanResults, err
+	return scanResults, err
 
-	// return &AllScanResults{
-	// 	HostResult:  allScanResults.HostResult,
-	// 	CreatedDate: allScanResults.CreatedDate,
-	// 	Guid:        allScanResults.Guid,
+	// return &ScanResults{
+	// 	HostResult:  scanResults.HostResult,
+	// 	CreatedDate: scanResults.CreatedDate,
+	// 	Guid:        scanResults.Guid,
 	// }, nil
 }
 
 // Scan function prepare a nmap scan
-func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error) {
-	createdDate := time.Now()
+func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResults, error) {
 	scanId := xid.New()
 
 	if in.Timeout < 10 {
@@ -52,15 +52,14 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 	log.Printf("Starting scan of host: %s, port: %s, timeout: %v", in.Hosts, in.Ports, in.Timeout)
 
 	portList := []*Port{}
-	allScanResults := []*HostResult{}
+	scanResults := []*HostResult{}
 	totalPorts := 0
 
 	result, err := StartNmapScan(in)
 	if err != nil || result == nil {
-		return &AllScanResults{
-			HostResult:  nil,
-			CreatedDate: createdDate.String(),
-			Guid:        scanId.String(),
+		return &ScanResults{
+			HostResult: nil,
+			Guid:       scanId.String(),
 		}, err
 	}
 
@@ -97,12 +96,11 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 		totalPorts += len(portList)
 
 		scanResult := &HostResult{
-			Host:        hostResult,
-			Ports:       portList,
-			CreatedDate: time.Now().String(),
+			Host:  hostResult,
+			Ports: portList,
 		}
 
-		allScanResults = append(allScanResults, scanResult)
+		scanResults = append(scanResults, scanResult)
 		mongoTask := bson.M{"_id": scanId.String(), "result": scanResult}
 		if _, err = InsertDbResult(&mongoTask); err != nil {
 			return nil, err
@@ -112,9 +110,8 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*AllScanResults, error)
 
 	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
 
-	return &AllScanResults{
-		HostResult:  allScanResults,
-		CreatedDate: createdDate.String(),
-		Guid:        scanId.String(),
+	return &ScanResults{
+		HostResult: scanResults,
+		Guid:       scanId.String(),
 	}, nil
 }
