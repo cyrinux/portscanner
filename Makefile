@@ -13,8 +13,8 @@ build-docker: proto
 	docker build -t grpcnmapscanner .
 
 server:
-	./grpcnmapscanner &
+	sudo ./grpcnmapscanner -grpc
 
 testscan:
-	grpc_cli call 127.0.0.1:9000 scanner.ScannerService.Scan "hosts:'1.1.1.1,8.8.8.8',ports:'80,53,443,22,T:8040-8080'"
-	grpc_cli call 127.0.0.1:9000 scanner.ScannerService.Scan "hosts:'scanme.nmap.org',ports:'53,500',protocol:'udp'"
+	grpc_cli call 127.0.0.1:9000 scanner.ScannerService.Scan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
+	grpc_cli call 127.0.0.1:9000 scanner.ScannerService.Scan "hosts:'scanme.nmap.org',ports:'U:53,U:500'"
