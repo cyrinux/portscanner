@@ -1,6 +1,5 @@
 syntax = "proto3";
 package scanner;
-
 option go_package = "/scanner";
 
 message Scanner {
@@ -44,14 +43,14 @@ message HostResult {
     repeated Port ports = 2;
 }
 
-message ScanResults {
+message ScanResult {
     repeated HostResult host_result = 1;
 }
 
 // Service to manage list of scanners
 service ScannerService {
     // Create new scanner
-    rpc Scan(Scanner) returns (ScanResults);
+    rpc Scan(Scanner) returns (ScanResult);
     // Fetch a previous scan result
-    rpc GetScan(Task) returns (ScanResults);
+    rpc GetScan(Task) returns (HostResult);
 }

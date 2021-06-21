@@ -11,12 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// type MongoTask struct {
-// 	ID             primitive.ObjectID `bson:"_id" json:"id,omitempty"`
-// 	ScanResults `bson:"result" json:"result"`
-// }
-
-func GetTaskResult(t *Task) (*ScanResults, error) {
+func GetTaskResult(t *Task) (*HostResult, error) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://admin:secret@localhost:27017/?authSource=admin"))
 	if err != nil {
 		log.Fatal(err)
@@ -32,46 +27,13 @@ func GetTaskResult(t *Task) (*ScanResults, error) {
 	scannerDatabase := client.Database("scanner")
 	resultsCollection := scannerDatabase.Collection("results")
 
-	var result bson.M
-	var scanResults ScanResults
-	// var mongoTask *MongoTask
-	err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}, options.FindOne().SetProjection(bson.M{"_id": 0})).Decode(&scanResults)
-	log.Printf("%v", result["result"])
-	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}, options.FindOne().SetProjection(bson.M{"_id": t.Id})).Decode(&scanResults)
-	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&result)
-	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&scanResults)
+	var hostResult *HostResult
+	err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}, options.FindOne().SetProjection(bson.M{"_id": 0})).Decode(&hostResult)
+	// err = resultsCollection.FindOne(ctx, bson.M{"_id": t.Id}).Decode(&hostResult)
 	if err != nil {
 		log.Print(err)
 	}
-	// log.Printf("Result 1: %v\n", &scanResults)
-	// log.Printf("Result 1: %v\n", scanResults)
-
-	// for cursor.Next(ctx) {
-	// 	var results bson.M
-	// 	if err = cursor.Decode(&results); err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// log.Printf("%+v", result)
-	// }
-
-	// bsonBytes, err := bson.Marshal(&result)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// err = bson.Unmarshal(bsonBytes, &mongoTask)
-	// if err != nil {
-	// 	log.Print("tototototo")
-	// 	log.Fatal(err)
-	// }
-
-	// cursor.Close(ctx)
-	// log.Printf("MongoTask 1: %+v\n", mongoTask)
-	// log.Printf("MongoTask 2: %+v\n", mongoTask.Result.GetHostResult())
-	// var scanResults &ScanResults
-	// log.Printf("MongoTask 1: %v\n", &scanResults)
-	// log.Printf("MongoTask 1: %v\n", &result)
-	// return result["result"], err
-	return nil, nil
+	return hostResult, err
 }
 
 func InsertDbResult(r *bson.M) (*mongo.InsertOneResult, error) {

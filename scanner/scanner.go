@@ -12,37 +12,17 @@ import (
 type Server struct {
 }
 
-func (s *Server) GetScan(ctx context.Context, in *Task) (*ScanResults, error) {
-	scanResults, err := GetTaskResult(in)
+func (s *Server) GetScan(ctx context.Context, in *Task) (*HostResult, error) {
+	hostResult := &HostResult{}
+	hostResult, err := GetTaskResult(in)
 	if err != nil {
-		log.Print(err)
 		return nil, err
 	}
-	// if scanResults != nil {
-	// 	log.Printf("%v\n", scanResults)
-	// 	log.Printf("%v\n", scanResults)
-	// 	log.Printf("%+v\n", &scanResults)
-	// 	log.Printf("%v\n", &scanResults)
-	// } else {
-	// 	log.Printf("%v\n", scanResults)
-	// 	log.Printf("%v\n", scanResults)
-	// 	log.Printf("%+v\n", &scanResults)
-	// 	log.Printf("%v\n", &allScanResrint
-	// 	log.Print("NUL !")
-	log.Printf("%v\n", &*scanResults)
-	// 	log.Printf("%v\n", &scanResults)
-	// }
-	return scanResults, err
-
-	// return &ScanResults{
-	// 	HostResult:  scanResults.HostResult,
-	// 	CreatedDate: scanResults.CreatedDate,
-	// 	Guid:        scanResults.Guid,
-	// }, nil
+	return hostResult, err
 }
 
 // Scan function prepare a nmap scan
-func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResults, error) {
+func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResult, error) {
 	scanId := xid.New()
 
 	if in.Timeout < 10 {
@@ -52,14 +32,13 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResults, error) {
 	log.Printf("Starting scan of host: %s, port: %s, timeout: %v", in.Hosts, in.Ports, in.Timeout)
 
 	portList := []*Port{}
-	scanResults := []*HostResult{}
+	scanResult := []*HostResult{}
 	totalPorts := 0
 
 	result, err := StartNmapScan(in)
 	if err != nil || result == nil {
-		return &ScanResults{
+		return &ScanResult{
 			HostResult: nil,
-			Guid:       scanId.String(),
 		}, err
 	}
 
@@ -95,12 +74,12 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResults, error) {
 		}
 		totalPorts += len(portList)
 
-		scanResult := &HostResult{
+		scan := &HostResult{
 			Host:  hostResult,
 			Ports: portList,
 		}
 
-		scanResults = append(scanResults, scanResult)
+		scanResult = append(scanResult, scan)
 		mongoTask := bson.M{"_id": scanId.String(), "result": scanResult}
 		if _, err = InsertDbResult(&mongoTask); err != nil {
 			return nil, err
@@ -110,8 +89,7 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResults, error) {
 
 	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
 
-	return &ScanResults{
-		HostResult: scanResults,
-		Guid:       scanId.String(),
+	return &ScanResult{
+		HostResult: scanResult,
 	}, nil
 }
