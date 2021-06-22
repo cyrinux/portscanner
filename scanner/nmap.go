@@ -94,6 +94,12 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (*nmap.Run, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, tb := range result.TaskBegin {
+		log.Printf("%v", tb.Time)
+	}
+	for _, te := range result.TaskEnd {
+		log.Printf("%v", te.Time)
+	}
 
 	if warnings != nil {
 		log.Printf("warnings: %v", warnings)

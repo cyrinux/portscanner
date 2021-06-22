@@ -10,31 +10,23 @@ import (
 	"time"
 )
 
-type Server struct{}
+type Server struct {
+	db database.Database
+}
+
+func NewServer(db database.Database) *Server {
+	return &Server{db}
+}
 
 func (s *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
-	databaseImplementation := "redis"
-
-	db, err := database.Factory(databaseImplementation)
-	if err != nil {
-		return generateResponse("", nil, err)
-	}
-	_, err = db.Delete(in.Key)
+	_, err := s.db.Delete(in.Key)
 	return generateResponse(in.Key, nil, err)
-
 }
 
 func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
 	var scannerResponse proto.ScannerResponse
 
-	var db database.Database
-	databaseImplementation := "redis"
-	db, err := database.Factory(databaseImplementation)
-	if err != nil {
-		return generateResponse("", nil, err)
-	}
-
-	scanResult, err := db.Get(in.Key)
+	scanResult, err := s.db.Get(in.Key)
 	if err != nil {
 		return generateResponse(in.Key, nil, err)
 	}
@@ -49,13 +41,6 @@ func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*pro
 
 // Scan function prepare a nmap scan
 func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
-	var db database.Database
-
-	databaseImplementation := "redis"
-	db, err := database.Factory(databaseImplementation)
-	if err != nil {
-		panic(err)
-	}
 
 	guid := xid.New()
 
@@ -113,12 +98,18 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 		scanResult = append(scanResult, scan)
 	}
 
-	scannerResponse := &proto.ScannerResponse{HostResult: scanResult}
+	scannerResponse := &proto.ScannerResponse{
+		HostResult: scanResult,
+		// StartTime:  fmt.Sprintf("%v", &result.TaskBegin[1]),
+		// EndTime:    fmt.Sprintf("%v", &result.TaskEnd[1]),
+	}
+	// fmt.Print(result.TaskBegin[0])
+	// fmt.Print(result.TaskEnd[0])
 	scanResultJSON, err := json.Marshal(scannerResponse)
 	if err != nil {
 		return generateResponse("", nil, err)
 	}
-	_, err = db.Set(guid.String(), string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
+	_, err = s.db.Set(guid.String(), string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
 	if err != nil {
 		return generateResponse("", nil, err)
 	}
