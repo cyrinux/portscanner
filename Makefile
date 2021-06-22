@@ -3,6 +3,7 @@ all: build
 build:
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o grpcnmapscanner .
 
+.PHONY: proto
 proto:
 	docker run -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -l go
 	sudo chown -R $(shell id -u):$(shell id -g) ./gen

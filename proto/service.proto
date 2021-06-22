@@ -31,19 +31,20 @@ message ScannerResponse {
     repeated HostResult host_result = 1;
 }
 
-message SetScannerRequest {
+message ParamsScannerRequest {
     string hosts = 1;
     string ports = 2;
     bool with_aggressive_scan = 3;
     bool with_syn_scan = 4;
     bool with_null_scan = 5;
     bool service_version_detection = 6;
-    bool service_os_detection = 7;
+    bool os_detection = 7;
     bool service_default_scripts = 8;
     int32 timeout = 9;
+    bool ping_only = 10;
 }
 
-message GetScannerResponse {
+message GetScannerRequest {
     string key = 1;
 }
 
@@ -56,6 +57,7 @@ message ServerResponse{
 
 // Server ScannerService
 service ScannerService {
-    rpc StartScan(SetScannerRequest) returns (ServerResponse);
-    rpc GetScan(GetScannerResponse) returns (ServerResponse);
+    rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
+    rpc GetScan(GetScannerRequest) returns (ServerResponse);
+    rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
 }

@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -10,13 +9,24 @@ import (
 	"golang.org/x/net/context"
 )
 
-type Server struct {
+type Server struct{}
+
+func (s *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
+	databaseImplementation := "redis"
+
+	db, err := database.Factory(databaseImplementation)
+	if err != nil {
+		return generateResponse("", nil, err)
+	}
+	_, err = db.Delete(in.Key)
+	return generateResponse(in.Key, nil, err)
+
 }
 
-func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerResponse) (*proto.ServerResponse, error) {
-	var db database.Database
+func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
 	var scannerResponse proto.ScannerResponse
 
+	var db database.Database
 	databaseImplementation := "redis"
 	db, err := database.Factory(databaseImplementation)
 	if err != nil {
@@ -37,7 +47,7 @@ func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerResponse) (*pr
 }
 
 // Scan function prepare a nmap scan
-func (s *Server) StartScan(ctx context.Context, in *proto.SetScannerRequest) (*proto.ServerResponse, error) {
+func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
 	var db database.Database
 
 	databaseImplementation := "redis"
@@ -119,10 +129,4 @@ func generateResponse(key string, value *proto.ScannerResponse, err error) (*pro
 		return &proto.ServerResponse{Success: false, Key: "", Value: value, Error: err.Error()}, nil
 	}
 	return &proto.ServerResponse{Success: true, Key: key, Value: value, Error: ""}, nil
-}
-
-func prettyprint(b []byte) (string, error) {
-	var out bytes.Buffer
-	err := json.Indent(&out, b, "", "  ")
-	return string(out.Bytes()), err
 }

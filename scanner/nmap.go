@@ -10,7 +10,7 @@ import (
 )
 
 // StartNmapScan start a nmap scan
-func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
+func StartNmapScan(s *proto.ParamsScannerRequest) (*nmap.Run, error) {
 	timeout := time.Duration(s.Timeout) * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -22,10 +22,12 @@ func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
 		nmap.WithTargets(hosts...),
 	}
 
-	if len(ports) == 0 {
-		ports = "T:1-65535,U:1-65535"
-	}
 	portsList := strings.Split(ports, ",")
+	if len(ports) == 0 && !s.GetPingOnly() {
+		ports = "T:1-65535,U:1-65535"
+	} else {
+		portsList = strings.Split(ports, ",")
+	}
 	options = append(options, nmap.WithPorts(portsList...))
 
 	isUDPScan := strings.Contains(ports, "U:")
@@ -45,7 +47,7 @@ func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
 		options = append(options, nmap.WithSCTPInitScan())
 	}
 
-	if s.GetServiceOsDetection() {
+	if s.GetOsDetection() {
 		options = append(options, nmap.WithOSDetection())
 	}
 
@@ -59,6 +61,8 @@ func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
 
 	if s.GetWithAggressiveScan() {
 		options = append(options, nmap.WithAggressiveScan())
+	} else if s.GetPingOnly() {
+		options = append(options, nmap.WithPingScan())
 	} else if s.GetWithNullScan() {
 		options = append(options, nmap.WithTCPNullScan())
 	} else if s.GetWithSynScan() {
@@ -78,7 +82,7 @@ func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
 	}
 
 	if warnings != nil {
-		log.Printf("warnings:\n %v", warnings)
+		log.Printf("warnings: %v", warnings)
 	}
 
 	log.Printf("Nmap done: %d/%d hosts up scanned in %3f seconds\n",
