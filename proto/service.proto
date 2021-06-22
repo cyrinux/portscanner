@@ -49,8 +49,9 @@ message GetScannerResponse {
 
 message ServerResponse{
     bool success = 1;
-    string value = 2;
-    string error = 3;
+    string key = 2;
+    string value = 3;
+    string error = 4;
 }
 
 // Server ScannerService
