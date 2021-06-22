@@ -17,12 +17,13 @@ type Server struct {
 
 var DB database.Database
 
-func main() {
+func main() database.Database {
 	databaseImplementation := "redis"
 	DB, err := database.Factory(databaseImplementation)
 	if err != nil {
 		panic(err)
 	}
+	return DB
 }
 
 func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerResponse) (*proto.ServerResponse, error) {
@@ -92,18 +93,21 @@ func (s *Server) StartScan(ctx context.Context, in *proto.SetScannerRequest) (*p
 		scanResult = append(scanResult, scan)
 	}
 
-	scanJson, err := json.Marshal(scanResult)
+	scannerResponse := &proto.ScannerResponse{HostResult: scanResult}
+
+	scanResultJSON, err := json.Marshal(scannerResponse)
+	prettyprint(scanResultJSON)
 	if err != nil {
 		return generateResponse("Can't convert as json", err)
 	}
-	_, err = DB.Set(scanId.String(), string(scanJson))
+	_, err = DB.Set(scanId.String(), string(scanResultJSON))
 	if err != nil {
 		return generateResponse("Can't store in redis", err)
 	}
 
 	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
 
-	return generateResponse(string(scanJson), err)
+	return generateResponse(string(scanResultJSON), err)
 }
 
 func generateResponse(value string, err error) (*proto.ServerResponse, error) {
@@ -116,5 +120,6 @@ func generateResponse(value string, err error) (*proto.ServerResponse, error) {
 func prettyprint(b []byte) ([]byte, error) {
 	var out bytes.Buffer
 	err := json.Indent(&out, b, "", "  ")
+	fmt.Printf("%#v", string(out.Bytes()))
 	return out.Bytes(), err
 }

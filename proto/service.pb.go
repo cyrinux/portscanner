@@ -816,10 +816,7 @@ const _ = grpc.SupportPackageIsVersion6
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type ScannerServiceClient interface {
-	// Create new scanner
 	StartScan(ctx context.Context, in *SetScannerRequest, opts ...grpc.CallOption) (*ServerResponse, error)
-	// Fetch a previous scan result
-	// We are trying to fix this implem
 	GetScan(ctx context.Context, in *GetScannerResponse, opts ...grpc.CallOption) (*ServerResponse, error)
 }
 
@@ -851,10 +848,7 @@ func (c *scannerServiceClient) GetScan(ctx context.Context, in *GetScannerRespon
 
 // ScannerServiceServer is the server API for ScannerService service.
 type ScannerServiceServer interface {
-	// Create new scanner
 	StartScan(context.Context, *SetScannerRequest) (*ServerResponse, error)
-	// Fetch a previous scan result
-	// We are trying to fix this implem
 	GetScan(context.Context, *GetScannerResponse) (*ServerResponse, error)
 }
 
