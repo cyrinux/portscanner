@@ -38,7 +38,7 @@ func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
 	}
 
 	if isTCPScan {
-		options = append(options, nmap.WithTCPXmasScan())
+		options = append(options, nmap.WithSYNScan())
 	}
 
 	if isSCTPScan {
