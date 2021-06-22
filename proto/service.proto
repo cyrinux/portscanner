@@ -5,6 +5,7 @@ option go_package = "/proto";
 message Host {
     string address = 1;
     optional string os_version = 2;
+    optional string state = 3;
 }
 
 message PortVersion {
@@ -29,6 +30,9 @@ message HostResult {
 
 message ScannerResponse {
     repeated HostResult host_result = 1;
+    string start_time = 2;
+    string end_time = 3;
+    string expiration_time = 4;
 }
 
 message ParamsScannerRequest {
@@ -42,6 +46,8 @@ message ParamsScannerRequest {
     bool service_default_scripts = 8;
     int32 timeout = 9;
     bool ping_only = 10;
+    int32 retention_time = 11;
+    bool fast_mode = 12;
 }
 
 message GetScannerRequest {

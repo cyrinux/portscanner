@@ -7,6 +7,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
+	"time"
 )
 
 type Server struct{}
@@ -56,7 +57,7 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 		panic(err)
 	}
 
-	scanID := xid.New()
+	guid := xid.New()
 
 	if in.Timeout < 10 {
 		in.Timeout = 60 * 5
@@ -72,8 +73,8 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	}
 
 	for _, host := range result.Hosts {
-		osversion := "unknown"
-		if len(host.Ports) == 0 || len(host.Addresses) == 0 {
+		var osversion string
+		if len(host.Addresses) == 0 {
 			continue
 		}
 		if len(host.OS.Matches) > 0 {
@@ -84,6 +85,7 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 		hostResult := &proto.Host{
 			Address:   address,
 			OsVersion: &osversion,
+			State:     &host.Status.Reason,
 		}
 		for _, p := range host.Ports {
 			version := &proto.PortVersion{
@@ -96,7 +98,7 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 				PortId:      fmt.Sprintf("%v", p.ID),
 				ServiceName: p.Service.Name,
 				Protocol:    p.Protocol,
-				State:       p.State.State,
+				State:       p.State.Reason,
 				Version:     version,
 			}
 			portList = append(portList, newPort)
@@ -116,12 +118,12 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	if err != nil {
 		return generateResponse("", nil, err)
 	}
-	_, err = db.Set(scanID.String(), string(scanResultJSON))
+	_, err = db.Set(guid.String(), string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
 	if err != nil {
 		return generateResponse("", nil, err)
 	}
 
-	return generateResponse(scanID.String(), scannerResponse, err)
+	return generateResponse(guid.String(), scannerResponse, err)
 }
 
 func generateResponse(key string, value *proto.ScannerResponse, err error) (*proto.ServerResponse, error) {

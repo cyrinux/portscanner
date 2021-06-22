@@ -1,8 +1,10 @@
 package database
 
+import "time"
+
 // Database abstraction
 type Database interface {
-	Set(key string, value string) (string, error)
+	Set(key string, value string, retention time.Duration) (string, error)
 	Get(key string) (string, error)
 	Delete(key string) (string, error)
 }

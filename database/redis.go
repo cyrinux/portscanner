@@ -1,6 +1,7 @@
 package database
 
 import "github.com/go-redis/redis"
+import "time"
 
 type redisDatabase struct {
 	client *redis.Client
@@ -20,8 +21,8 @@ func createRedisDatabase() (Database, error) {
 	return &redisDatabase{client: client}, nil
 }
 
-func (r *redisDatabase) Set(key string, value string) (string, error) {
-	_, err := r.client.Set(key, value, 0).Result()
+func (r *redisDatabase) Set(key string, value string, retention time.Duration) (string, error) {
+	_, err := r.client.Set(key, value, retention).Result()
 	if err != nil {
 		return generateError("set", err)
 	}

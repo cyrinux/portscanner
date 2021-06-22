@@ -1,0 +1,9 @@
+#!/bin/sh
+grpc_cli ls 127.0.0.1:9000 proto.ScannerService
+
+if [ $# -eq 0 ]; then
+    exit 1
+fi
+action=$1
+shift
+grpc_cli call 127.0.0.1:9000 proto.ScannerService.$action $@
