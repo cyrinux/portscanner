@@ -1,30 +1,27 @@
 package main
 
 import (
-	"flag"
-	// "fmt"
-	grpc "github.com/cyrinux/grpcnmapscanner/grpcserver"
-	// "github.com/cyrinux/grpcnmapscanner/tasks"
+	"fmt"
+	"github.com/cyrinux/grpcnmapscanner/proto"
+	"github.com/cyrinux/grpcnmapscanner/scanner"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"net"
 )
 
 func main() {
+	fmt.Println("Prepare to serve")
 
-	// isTasksServer := flag.Bool("tasksserver", false, "start tasks server")
-	isGRPCServer := flag.Bool("grpc", false, "start gRPC server")
-	// isWorker := flag.Bool("worker", false, "start a tasks worker")
-
-	flag.Parse()
-
-	// if *isWorker {
-	// 	fmt.Print("I'm a worker")
-	// }
-
-	if *isGRPCServer {
-		grpc.StartServer()
-
+	listener, err := net.Listen("tcp", ":9000")
+	if err != nil {
+		panic(err) // The port may be on use
 	}
-	// if *isTasksServer {
-	// 	tasks.StartServer()
-	// }
+	grpcServer := grpc.NewServer()
+
+	reflection.Register(grpcServer)
+	proto.RegisterScannerServiceServer(grpcServer, &scanner.Server{})
+	if e := grpcServer.Serve(listener); e != nil {
+		panic(err)
+	}
 
 }

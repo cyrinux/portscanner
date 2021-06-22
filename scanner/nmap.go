@@ -3,13 +3,14 @@ package scanner
 import (
 	"context"
 	nmap "github.com/Ullaakut/nmap/v2"
+	"github.com/cyrinux/grpcnmapscanner/proto"
 	"log"
 	"strings"
 	"time"
 )
 
 // StartNmapScan start a nmap scan
-func StartNmapScan(s *Scanner) (*nmap.Run, error) {
+func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.Timeout)*time.Second)
 	defer cancel()
 

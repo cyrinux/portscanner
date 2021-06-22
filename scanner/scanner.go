@@ -4,24 +4,37 @@ import (
 	"fmt"
 	"log"
 
+	"bytes"
+	"encoding/json"
+	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/rs/xid"
-	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/net/context"
 )
 
 type Server struct {
 }
 
-func (s *Server) GetScan(ctx context.Context, in *Task) (*ScanResult, error) {
-	scanResult, err := GetTaskResult(in)
+var DB database.Database
+
+func main() {
+	databaseImplementation := "redis"
+	DB, err := database.Factory(databaseImplementation)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return scanResult, err
+}
+
+func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerResponse) (*proto.ServerResponse, error) {
+	// scanResult, err := db.Get(in)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	return generateResponse("", nil)
 }
 
 // Scan function prepare a nmap scan
-func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResult, error) {
+func (s *Server) StartScan(ctx context.Context, in *proto.SetScannerRequest) (*proto.ServerResponse, error) {
 	scanId := xid.New()
 
 	if in.Timeout < 10 {
@@ -30,15 +43,13 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResult, error) {
 
 	log.Printf("Starting scan of host: %s, port: %s, timeout: %v", in.Hosts, in.Ports, in.Timeout)
 
-	portList := []*Port{}
-	scanResult := []*HostResult{}
+	portList := []*proto.Port{}
+	scanResult := []*proto.HostResult{}
 	totalPorts := 0
 
 	result, err := StartNmapScan(in)
 	if err != nil || result == nil {
-		return &ScanResult{
-			HostResult: nil,
-		}, err
+		return generateResponse("empty scan", err)
 	}
 
 	for _, host := range result.Hosts {
@@ -51,18 +62,18 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResult, error) {
 			osversion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
 		}
 		address := host.Addresses[0].Addr
-		hostResult := &Host{
+		hostResult := &proto.Host{
 			Address:   address,
 			OsVersion: &osversion,
 		}
 		for _, p := range host.Ports {
-			version := &PortVersion{
+			version := &proto.PortVersion{
 				ExtraInfos:  &p.Service.ExtraInfo,
 				LowVersion:  &p.Service.LowVersion,
 				HighVersion: &p.Service.HighVersion,
 				Product:     &p.Service.Product,
 			}
-			newPort := &Port{
+			newPort := &proto.Port{
 				PortId:      fmt.Sprintf("%v", p.ID),
 				ServiceName: p.Service.Name,
 				Protocol:    p.Protocol,
@@ -73,22 +84,37 @@ func (s *Server) Scan(ctx context.Context, in *Scanner) (*ScanResult, error) {
 		}
 		totalPorts += len(portList)
 
-		scan := &HostResult{
+		scan := &proto.HostResult{
 			Host:  hostResult,
 			Ports: portList,
 		}
 
 		scanResult = append(scanResult, scan)
-		mongoTask := bson.M{"_id": scanId.String(), "result": scanResult}
-		if _, err = InsertDbResult(&mongoTask); err != nil {
-			return nil, err
-		}
+	}
 
+	scanJson, err := json.Marshal(scanResult)
+	if err != nil {
+		return generateResponse("Can't convert as json", err)
+	}
+	_, err = DB.Set(scanId.String(), string(scanJson))
+	if err != nil {
+		return generateResponse("Can't store in redis", err)
 	}
 
 	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
 
-	return &ScanResult{
-		HostResult: scanResult,
-	}, nil
+	return generateResponse(string(scanJson), err)
+}
+
+func generateResponse(value string, err error) (*proto.ServerResponse, error) {
+	if err != nil {
+		return &proto.ServerResponse{Success: false, Value: value, Error: err.Error()}, nil
+	}
+	return &proto.ServerResponse{Success: true, Value: value, Error: ""}, nil
+}
+
+func prettyprint(b []byte) ([]byte, error) {
+	var out bytes.Buffer
+	err := json.Indent(&out, b, "", "  ")
+	return out.Bytes(), err
 }

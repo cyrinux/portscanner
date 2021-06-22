@@ -1,0 +1,60 @@
+syntax = "proto3";
+package proto;
+option go_package = "/proto";
+
+message Host {
+    string address = 1;
+    optional string os_version = 2;
+}
+
+message PortVersion {
+   optional string low_version = 1;
+   optional string high_version = 2;
+   optional string extra_infos = 3;
+   optional string product = 4;
+}
+
+message Port {
+    string port_id = 1;
+    string protocol = 2;
+    string state = 3;
+    string service_name = 4;
+    PortVersion version = 5;
+}
+
+message HostResult {
+    Host host = 1;
+    repeated Port ports = 2;
+}
+
+message ScannerResponse {
+    repeated HostResult host_result = 1;
+}
+
+message SetScannerRequest {
+    string hosts = 1;
+    string ports = 2;
+    bool with_aggressive_scan = 3;
+    bool with_syn_scan = 4;
+    bool with_null_scan = 5;
+    bool service_version_detection = 6;
+    bool service_os_detection = 7;
+    bool service_default_scripts = 8;
+    int32 timeout = 9;
+}
+
+message GetScannerResponse {
+    string key = 1;
+}
+
+message ServerResponse{
+    bool success = 1;
+    string value = 2;
+    string error = 3;
+}
+
+// Server ScannerService
+service ScannerService {
+    rpc StartScan(SetScannerRequest) returns (ServerResponse);
+    rpc GetScan(GetScannerResponse) returns (ServerResponse);
+}

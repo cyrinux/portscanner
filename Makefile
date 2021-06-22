@@ -4,9 +4,9 @@ build:
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o grpcnmapscanner .
 
 proto:
-	docker run -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f scanner/scanner.proto -l go
+	docker run -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -l go
 	sudo chown -R $(shell id -u):$(shell id -g) ./gen
-	mv gen/pb-go/scanner/scanner.pb.go ./scanner
+	mv gen/pb-go/proto/service.pb.go ./proto
 	rm ./gen -rf
 
 build-docker: proto
