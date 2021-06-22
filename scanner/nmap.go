@@ -11,21 +11,27 @@ import (
 
 // StartNmapScan start a nmap scan
 func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.Timeout)*time.Second)
+	timeout := time.Duration(s.Timeout) * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	hosts := strings.Split(s.Hosts, ",")
-	ports := strings.Split(s.Ports, ",")
-	isUDPScan := strings.Contains(s.Ports, "U:")
-	isSCTPScan := strings.Contains(s.Ports, "S:")
-	isTCPScan := strings.Contains(s.Ports, "T:")
-	isTCPScan = !strings.Contains(s.Ports, ":")
+	ports := s.Ports
 
-	var options = []nmap.Option{
-		nmap.WithContext(ctx),
+	var options = []nmap.Option{nmap.WithContext(ctx),
 		nmap.WithTargets(hosts...),
-		nmap.WithPorts(ports...),
 	}
+
+	if len(ports) == 0 {
+		ports = "T:1-65535,U:1-65535"
+	}
+	portsList := strings.Split(ports, ",")
+	options = append(options, nmap.WithPorts(portsList...))
+
+	isUDPScan := strings.Contains(ports, "U:")
+	isSCTPScan := strings.Contains(ports, "S:")
+	isTCPScan := strings.Contains(ports, "T:")
+	isTCPScan = !strings.Contains(ports, ":")
 
 	if isUDPScan {
 		options = append(options, nmap.WithUDPScan())
@@ -58,16 +64,28 @@ func StartNmapScan(s *proto.SetScannerRequest) (*nmap.Run, error) {
 	} else if s.GetWithSynScan() {
 		options = append(options, nmap.WithSYNScan())
 	}
+
 	scanner, err := nmap.NewScanner(options...)
 	if err != nil {
-		log.Printf("unable to create nmap scanner: %v", err)
+		return nil, err
 	}
+
+	log.Printf("Starting scan of host: %s, port: %s, timeout: %v", hosts, ports, timeout)
+
 	result, warnings, err := scanner.Run()
 	if err != nil {
-		log.Printf("unable to run nmap scan: %v", err)
+		return nil, err
 	}
+
 	if warnings != nil {
-		log.Printf("warnings: \n %v", warnings)
+		log.Printf("warnings:\n %v", warnings)
 	}
+
+	log.Printf("Nmap done: %d/%d hosts up scanned in %3f seconds\n",
+		result.Stats.Hosts.Up,
+		result.Stats.Hosts.Total,
+		result.Stats.Finished.Elapsed,
+	)
+
 	return result, err
 }

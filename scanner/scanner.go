@@ -8,42 +8,32 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
-	"log"
 )
 
 type Server struct {
 }
 
-// var DB database.Database
-
-// func main() database.Database {
-// 	databaseImplementation := "redis"
-// 	DB, err := database.Factory(databaseImplementation)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	return DB
-// }
-
 func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerResponse) (*proto.ServerResponse, error) {
 	var db database.Database
+	var scannerResponse proto.ScannerResponse
 
 	databaseImplementation := "redis"
 	db, err := database.Factory(databaseImplementation)
 	if err != nil {
-		return generateResponse("", "Can't access to the database", err)
+		return generateResponse("", nil, err)
 	}
 
 	scanResult, err := db.Get(in.Key)
 	if err != nil {
-		return generateResponse(in.Key, "", err)
+		return generateResponse(in.Key, nil, err)
 	}
 
-	prettyResult, err := prettyprint([]byte(scanResult))
+	err = json.Unmarshal([]byte(scanResult), &scannerResponse)
 	if err != nil {
-		return generateResponse(in.Key, "", err)
+		return generateResponse(in.Key, nil, err)
 	}
-	return generateResponse(in.Key, prettyResult, nil)
+
+	return generateResponse(in.Key, &scannerResponse, nil)
 }
 
 // Scan function prepare a nmap scan
@@ -62,15 +52,13 @@ func (s *Server) StartScan(ctx context.Context, in *proto.SetScannerRequest) (*p
 		in.Timeout = 60 * 5
 	}
 
-	log.Printf("Starting scan of host: %s, port: %s, timeout: %v", in.Hosts, in.Ports, in.Timeout)
-
 	portList := []*proto.Port{}
 	scanResult := []*proto.HostResult{}
 	totalPorts := 0
 
 	result, err := StartNmapScan(in)
 	if err != nil || result == nil {
-		return generateResponse("", "Error while scanning or empty scan", err)
+		return generateResponse("", nil, err)
 	}
 
 	for _, host := range result.Hosts {
@@ -116,19 +104,17 @@ func (s *Server) StartScan(ctx context.Context, in *proto.SetScannerRequest) (*p
 	scannerResponse := &proto.ScannerResponse{HostResult: scanResult}
 	scanResultJSON, err := json.Marshal(scannerResponse)
 	if err != nil {
-		return generateResponse("", "Can't convert as json", err)
+		return generateResponse("", nil, err)
 	}
 	_, err = db.Set(scanID.String(), string(scanResultJSON))
 	if err != nil {
-		return generateResponse("", "Can't store in redis", err)
+		return generateResponse("", nil, err)
 	}
 
-	log.Printf("Nmap done: %d hosts up scanned for %d ports in %3f seconds\n", result.Stats.Hosts.Up, totalPorts, result.Stats.Finished.Elapsed)
-
-	return generateResponse(scanID.String(), string(scanResultJSON), err)
+	return generateResponse(scanID.String(), scannerResponse, err)
 }
 
-func generateResponse(key string, value string, err error) (*proto.ServerResponse, error) {
+func generateResponse(key string, value *proto.ScannerResponse, err error) (*proto.ServerResponse, error) {
 	if err != nil {
 		return &proto.ServerResponse{Success: false, Key: "", Value: value, Error: err.Error()}, nil
 	}
