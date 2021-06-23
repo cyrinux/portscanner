@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-type Config struct {
+type DBConfig struct {
 	DBDriver string
 	DBName   string
 	DBServer string
@@ -18,11 +18,11 @@ type Database interface {
 }
 
 // Factory looks up acording to the databaseName the database implementation
-func Factory(databaseName string) (Database, error) {
-	switch databaseName {
+func Factory(config DBConfig) (Database, error) {
+	switch config.DBDriver {
 	case "redis":
-		return createRedisDatabase()
+		return createRedisDatabase(config)
 	default:
-		return nil, &NotImplementedDatabaseError{databaseName}
+		return nil, &NotImplementedDatabaseError{config.DBDriver}
 	}
 }
