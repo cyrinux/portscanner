@@ -16,7 +16,7 @@ import (
 const (
 	prefetchLimit = 1000
 	pollDuration  = 100 * time.Millisecond
-	numConsumers  = 5
+	numConsumers  = 2
 
 	reportBatchSize = 10000
 	consumeDuration = time.Millisecond

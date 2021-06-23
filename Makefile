@@ -12,8 +12,7 @@ proto:
 	@rm ./gen -rf
 
 build-docker: proto
-	docker build -t grpcnmapscanner:server docker/server.Dockerfile
-	docker build -t grpcnmapscanner:worker docker/worker.Dockerfile
+	docker-compose build
 
 .PHONY: server
 server:
@@ -24,9 +23,12 @@ worker:
 	./grpcnmapscanner -worker
 
 testscan:
-	docker run -d  --name mongo-scanner  -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=secret mongo
-	grpc_cli call 127.0.0.1:9000 scanner.ScannerService.Scan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
-	grpc_cli call 127.0.0.1:9000 scanner.ScannerService.Scan "hosts:'scanme.nmap.org',ports:'U:53,U:500'"
+	docker-compose up -d
+	docker-compose run --rm client grpc_cli ls server:9000
+	docker-compose run --rm client grpc_cli call server:9000 scanner.ScannerService.StartScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
+	docker-compose run --rm client grpc_cli call server:9000 scanner.ScannerService.StartAsyncScan "hosts:'scanme.nmap.org',fast_mode:true'"
+	docker-compose run --rm client grpc_cli call server:9000 scanner.ScannerService.StartAsyncScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
+	docker-compose logs -f --tail=50
 
 graphviz:
 	protodot -src proto/service.proto -output graphviz
