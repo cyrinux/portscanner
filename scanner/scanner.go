@@ -36,6 +36,7 @@ func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*pro
 	var scannerResponse proto.ScannerResponse
 
 	scanResult, err := s.config.DB.Get(in.Key)
+	log.Printf("%v", scanResult)
 	if err != nil {
 		return generateResponse(in.Key, nil, err)
 	}

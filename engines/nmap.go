@@ -85,6 +85,9 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
 
 	// parse all input options
 	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(s)
+	if err != nil {
+		return s.Key, nil, err
+	}
 
 	// add context to nmap options
 	options = append(options, nmap.WithContext(ctx))
@@ -98,7 +101,7 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
 	log.Printf("Starting scan of host: %s, port: %s, options: %v, timeout: %v, retention: %v",
 		hosts,
 		ports,
-		options,
+		&options,
 		timeout,
 		retention,
 	)

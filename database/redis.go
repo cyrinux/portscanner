@@ -1,7 +1,9 @@
 package database
 
 import (
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis"
+	"log"
 	"os"
 	"time"
 )
@@ -11,9 +13,9 @@ type redisDatabase struct {
 }
 
 // CreateRedisDatabase creates the redis database
-func createRedisDatabase() (Database, error) {
+func createRedisDatabase(config config.Config) (Database, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     os.ExpandEnv("$DB_SERVER"),
+		Addr:     config.DBServer,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -34,6 +36,7 @@ func (r *redisDatabase) Set(key string, value string, retention time.Duration) (
 
 func (r *redisDatabase) Get(key string) (string, error) {
 	value, err := r.client.Get(key).Result()
+	log.Printf("DEBUG %v - %v - %v", key, value, err)
 	if err != nil {
 		return generateError("get", err)
 	}

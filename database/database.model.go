@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+type Config struct {
+	DBDriver string
+	DBName   string
+	DBServer string
+}
+
 // Database abstraction
 type Database interface {
 	Set(key string, value string, retention time.Duration) (string, error)
