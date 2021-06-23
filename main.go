@@ -25,15 +25,16 @@ func main() {
 		dbDriver = "redis"
 	}
 
+	db, err := database.Factory(dbDriver)
+	if err != nil {
+		panic(err)
+	}
+
 	if *isServer {
-		fmt.Print("Prepare to serve the gRPC api")
+		fmt.Println("Prepare to serve the gRPC api")
 		listener, err := net.Listen("tcp", ":9000")
 		if err != nil {
 			panic(err) // The port may be on use
-		}
-		db, err := database.Factory(dbDriver)
-		if err != nil {
-			panic(err)
 		}
 		srv := grpc.NewServer()
 
@@ -45,8 +46,8 @@ func main() {
 	}
 
 	if *isWorker {
-		fmt.Print("I'm a scanner worker")
-		worker.StartWorker()
+		fmt.Printf("I'm a scanner worker")
+		worker.NewWorker(db).StartWorker()
 	}
 
 }

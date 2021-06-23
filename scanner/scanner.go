@@ -60,7 +60,7 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	guid := xid.New()
 
 	if in.Timeout < 10 {
-		in.Timeout = 60 * 5
+		in.Timeout = 60 * 60 // 1h
 	}
 
 	result, err := engines.StartNmapScan(in)

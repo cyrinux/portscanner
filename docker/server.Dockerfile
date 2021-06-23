@@ -3,7 +3,7 @@
 FROM golang:1.16 as builder
 WORKDIR /app
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o grpcnmapscanner .
+RUN make build
 
 FROM alpine:latest as server
 MAINTAINER  Cyril Levis <grpcnmapscanner@levis.name>

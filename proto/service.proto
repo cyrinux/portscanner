@@ -48,6 +48,7 @@ message ParamsScannerRequest {
     bool ping_only = 10;
     int32 retention_time = 11;
     bool fast_mode = 12;
+    string key = 13;
 }
 
 message GetScannerRequest {

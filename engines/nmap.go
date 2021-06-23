@@ -119,6 +119,10 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 	portList := []*proto.Port{}
 	scanResult := []*proto.HostResult{}
 	totalPorts := 0
+	if len(result.Hosts) == 0 || result == nil {
+		log.Println("Scan timeout.")
+		return nil, nil
+	}
 	for _, host := range result.Hosts {
 		var osversion string
 		if len(host.Addresses) == 0 {
