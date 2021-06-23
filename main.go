@@ -15,14 +15,14 @@ import (
 
 func main() {
 
-	var dbType = os.Getenv("ENV")
+	var dbType = os.Getenv("DB_TYPE")
 
 	isServer := flag.Bool("server", false, "start the gRPC server")
 	isWorker := flag.Bool("worker", false, "start the worker")
 	flag.Parse()
 
 	if *isServer {
-		fmt.Println("Prepare to serve")
+		fmt.Println("Prepare to serve the gRPC api")
 		listener, err := net.Listen("tcp", ":9000")
 		if err != nil {
 			panic(err) // The port may be on use
@@ -41,7 +41,7 @@ func main() {
 	}
 
 	if *isWorker {
-		fmt.Print("I'm a worker")
+		fmt.Println("I'm a scanner worker")
 		worker.StartWorker()
 	}
 
