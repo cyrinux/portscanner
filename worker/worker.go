@@ -9,7 +9,6 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engines"
 	"github.com/cyrinux/grpcnmapscanner/proto"
-	"github.com/rs/xid"
 	"log"
 	"os"
 	"os/signal"
@@ -129,7 +128,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	if err != nil {
 		log.Printf("failed to parse result: %s", err)
 	}
-	_, err = consumer.config.DB.Set(xid.New().String(), string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
+	_, err = consumer.config.DB.Set(key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
 	if err != nil {
 		log.Printf("failed to insert result: %s", err)
 	}

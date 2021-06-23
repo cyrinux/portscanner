@@ -79,7 +79,7 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	}
 
 	// and write the response to the database
-	_, err = s.config.DB.Set(scannerResponse.Key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
+	_, err = s.config.DB.Set(key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
 	if err != nil {
 		return generateResponse("", nil, err)
 	}
@@ -95,7 +95,11 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	connection, err := rmq.OpenConnection(s.config.RmqDbName, "tcp", s.config.RmqServer, 1, errChan)
 	taskQueue, err := connection.OpenQueue("tasks")
 
+	// if the Key is not forced, we generate one unique
 	guid := xid.New()
+	if in.Key == "" {
+		in.Key = guid.String()
+	}
 
 	if in.Timeout < 10 {
 		in.Timeout = 60 * 5
@@ -112,27 +116,6 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	}
 
 	return generateResponse(guid.String(), nil, err)
-
-	// result, err := StartNmapScan(in)
-	// if err != nil || result == nil {
-	// 	return generateResponse("", nil, err)
-	// }
-
-	// scanResult, _ := ParseScanResult(result)
-
-	// scannerResponse := &proto.ScannerResponse{
-	// 	HostResult: scanResult,
-	// }
-	// scanResultJSON, err := json.Marshal(scannerResponse)
-	// if err != nil {
-	// 	return generateResponse("", nil, err)
-	// }
-	// _, err = s.db.Set(guid.String(), string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
-	// if err != nil {
-	// 	return generateResponse("", nil, err)
-	// }
-
-	// return generateResponse(guid.String(), nil, err)
 }
 
 // generateResponse generate the response for the grpc return

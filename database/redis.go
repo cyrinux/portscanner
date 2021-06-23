@@ -2,7 +2,6 @@ package database
 
 import (
 	"github.com/go-redis/redis"
-	"log"
 	"time"
 )
 
@@ -25,8 +24,7 @@ func createRedisDatabase(config DBConfig) (Database, error) {
 }
 
 func (r *redisDatabase) Set(key string, value string, retention time.Duration) (string, error) {
-	status, err := r.client.Set(key, value, retention).Result()
-	log.Printf("DEBUG %v - %v - %v", status, value, err)
+	_, err := r.client.Set(key, value, retention).Result()
 	if err != nil {
 		return generateError("set", err)
 	}
@@ -35,7 +33,6 @@ func (r *redisDatabase) Set(key string, value string, retention time.Duration) (
 
 func (r *redisDatabase) Get(key string) (string, error) {
 	value, err := r.client.Get(key).Result()
-	log.Printf("DEBUG %v - %v - %v", key, value, err)
 	if err != nil {
 		return generateError("get", err)
 	}
