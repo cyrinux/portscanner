@@ -6,14 +6,17 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/scanner"
+	"github.com/cyrinux/grpcnmapscanner/worker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
 	"net"
 )
 
 func main() {
 
-	isServer := flag.Bool("server", false, "Enable the gRPC server")
+	isServer := flag.Bool("server", false, "start the gRPC server")
+	isWorker := flag.Bool("worker", false, "start the worker")
 	flag.Parse()
 
 	if *isServer {
@@ -33,6 +36,11 @@ func main() {
 		if e := srv.Serve(listener); e != nil {
 			panic(err)
 		}
+	}
+
+	if *isWorker {
+		fmt.Print("I'm a worker")
+		worker.StartWorker()
 	}
 
 }

@@ -1,7 +1,8 @@
-package scanner
+package engines
 
 import (
 	"context"
+	"fmt"
 	nmap "github.com/Ullaakut/nmap/v2"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"log"
@@ -112,4 +113,51 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (*nmap.Run, error) {
 	)
 
 	return result, err
+}
+
+func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
+	portList := []*proto.Port{}
+	scanResult := []*proto.HostResult{}
+	totalPorts := 0
+	for _, host := range result.Hosts {
+		var osversion string
+		if len(host.Addresses) == 0 {
+			continue
+		}
+		if len(host.OS.Matches) > 0 {
+			fp := host.OS.Matches[0]
+			osversion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
+		}
+		address := host.Addresses[0].Addr
+		hostResult := &proto.Host{
+			Address:   address,
+			OsVersion: &osversion,
+			State:     &host.Status.Reason,
+		}
+		for _, p := range host.Ports {
+			version := &proto.PortVersion{
+				ExtraInfos:  &p.Service.ExtraInfo,
+				LowVersion:  &p.Service.LowVersion,
+				HighVersion: &p.Service.HighVersion,
+				Product:     &p.Service.Product,
+			}
+			newPort := &proto.Port{
+				PortId:      fmt.Sprintf("%v", p.ID),
+				ServiceName: p.Service.Name,
+				Protocol:    p.Protocol,
+				State:       p.State.Reason,
+				Version:     version,
+			}
+			portList = append(portList, newPort)
+		}
+		totalPorts += len(portList)
+
+		scan := &proto.HostResult{
+			Host:  hostResult,
+			Ports: portList,
+		}
+
+		scanResult = append(scanResult, scan)
+	}
+	return scanResult, nil
 }

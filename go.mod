@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/Ullaakut/nmap/v2 v2.1.1
+	github.com/adjust/rmq/v3 v3.0.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/golang/protobuf v1.5.2 // indirect

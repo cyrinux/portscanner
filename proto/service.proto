@@ -63,6 +63,7 @@ message ServerResponse{
 
 // Server ScannerService
 service ScannerService {
+    rpc StartAsyncScan(ParamsScannerRequest) returns (ServerResponse);
     rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
     rpc GetScan(GetScannerRequest) returns (ServerResponse);
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
