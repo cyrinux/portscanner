@@ -5,6 +5,10 @@ networks:
     external:
       name: my-network
 
+volumes:
+  redis_data:
+    driver: local
+
 services:
   client:
     image: namely/grpc-cli
@@ -14,7 +18,7 @@ services:
       - backend
     depends_on:
       - server
-    command: "grpc_cli ls redis:9000"
+    command: "ls redis:9000 proto.ScannerService"
 
   server:
     hostname: server
@@ -24,14 +28,16 @@ services:
     image: grpcscanner:server
     environment:
       - TZ=Europe/Paris
-      - REDIS_SERVER=redis:6379
+      - DB_TYPE="redis"
+      - DB_SERVER="redis:6379"
+      - RMQ_DB_SERVER="redis:6379"
     cap_add:
       - NET_ADMIN
     restart: always
     depends_on:
       - redis
     ports:
-      - "9000:9000"
+      - "127.0.0.1:9000:9000"
     networks:
       - backend
 
@@ -41,8 +47,10 @@ services:
       dockerfile: docker/worker.Dockerfile
     image: grpcscanner:worker
     environment:
-      - TZ=Europe/Paris
-      - REDIS_SERVER=redis:6379
+      - TZ="Europe/Paris"
+      - DB_TYPE="redis"
+      - DB_SERVER="redis:6379"
+      - RMQ_DB_SERVER="redis:6379"
     restart: always
     cap_add:
       - NET_ADMIN
@@ -56,5 +64,7 @@ services:
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     restart: always
+    volumes:
+      - "redis_data:/bitnami/redis/data"
     networks:
       - backend

@@ -17,7 +17,10 @@ const (
 	shouldLog = true
 )
 
-var redisServer = os.Getenv("REDIS_SERVER")
+var (
+	rmqServer = os.Getenv("RMQ_DB_SERVER")
+	rmqDbName = os.Getenv("RMQ_DB_NAME")
+)
 
 type Server struct {
 	db database.Database
@@ -87,7 +90,7 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
-	connection, err := rmq.OpenConnection("scannerqueue", "tcp", redisServer, 1, errChan)
+	connection, err := rmq.OpenConnection(rmqDbName, "tcp", rmqServer, 1, errChan)
 	taskQueue, err := connection.OpenQueue("tasks")
 
 	guid := xid.New()

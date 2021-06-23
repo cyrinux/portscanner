@@ -10,7 +10,7 @@ type redisDatabase struct {
 	client *redis.Client
 }
 
-var redisServer = os.Getenv("REDIS_SERVER")
+var redisServer = os.Getenv("DB_SERVER")
 
 // CreateRedisDatabase creates the redis database
 func createRedisDatabase() (Database, error) {

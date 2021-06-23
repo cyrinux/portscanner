@@ -1,6 +1,8 @@
 package database
 
-import "time"
+import (
+	"time"
+)
 
 // Database abstraction
 type Database interface {

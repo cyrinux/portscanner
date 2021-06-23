@@ -23,7 +23,10 @@ const (
 	shouldLog       = true
 )
 
-var redisServer = os.Getenv("REDIS_SERVER")
+var (
+	rmqServer = os.Getenv("RMQ_DB_SERVER")
+	rmqDbName = os.Getenv("RMQ_DB_NAME")
+)
 
 // StartWorker start a scanner worker
 func StartWorker() {
@@ -31,7 +34,7 @@ func StartWorker() {
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
-	connection, err := rmq.OpenConnection("scannerqueue", "tcp", redisServer, 1, errChan)
+	connection, err := rmq.OpenConnection(rmqDbName, "tcp", rmqServer, 1, errChan)
 	if err != nil {
 		panic(err)
 	}
