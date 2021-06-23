@@ -5,16 +5,23 @@ build:
 
 .PHONY: proto
 proto:
-	docker run -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -l go
-	sudo chown -R $(shell id -u):$(shell id -g) ./gen
-	mv gen/pb-go/proto/service.pb.go ./proto
-	rm ./gen -rf
+	echo Generating protobuf code from docker
+	@docker run -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -l go
+	@sudo chown -R $(shell id -u):$(shell id -g) ./gen
+	@mv gen/pb-go/proto/service.pb.go ./proto
+	@rm ./gen -rf
 
 build-docker: proto
-	docker build -t grpcnmapscanner .
+	docker build -t grpcnmapscanner:server docker/server.Dockerfile
+	docker build -t grpcnmapscanner:worker docker/worker.Dockerfile
 
+.PHONY: server
 server:
-	./grpcnmapscanner -grpc
+	./grpcnmapscanner -server
+
+.PHONY: worker
+worker:
+	./grpcnmapscanner -worker
 
 testscan:
 	docker run -d  --name mongo-scanner  -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=secret mongo

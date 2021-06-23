@@ -1,0 +1,59 @@
+version: "3.7"
+
+networks:
+  backend:
+    external:
+      name: my-network
+
+services:
+  client:
+    image: namely/grpc-cli
+    environment:
+      - TZ=Europe/Paris
+    networks:
+      - backend
+
+  server:
+    hostname: server
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        buildno: server
+    image: grpcscanner:server
+    # ports:
+    # - "9000:9000"
+    environment:
+      - TZ=Europe/Paris
+      - REDIS_SERVER=redis:6379
+    restart: always
+    depends_on:
+      - "redis"
+    networks:
+      - backend
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        buildno: worker
+    image: grpcscanner:worker
+    environment:
+      - TZ=Europe/Paris
+      - REDIS_SERVER=redis:6379
+    restart: always
+    depends_on:
+      - "redis"
+    networks:
+      - backend
+
+  redis:
+    image: "bitnami/redis:latest"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - backend

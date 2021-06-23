@@ -1,16 +1,21 @@
 package database
 
-import "github.com/go-redis/redis"
-import "time"
+import (
+	"github.com/go-redis/redis"
+	"os"
+	"time"
+)
 
 type redisDatabase struct {
 	client *redis.Client
 }
 
+var redisServer = os.Getenv("REDIS_SERVER")
+
 // CreateRedisDatabase creates the redis database
 func createRedisDatabase() (Database, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
+		Addr:     redisServer,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})

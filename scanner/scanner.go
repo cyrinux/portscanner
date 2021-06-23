@@ -9,12 +9,15 @@ import (
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
 	"log"
+	"os"
 	"time"
 )
 
 const (
 	shouldLog = true
 )
+
+var redisServer = os.Getenv("REDIS_SERVER")
 
 type Server struct {
 	db database.Database
@@ -84,7 +87,7 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
-	connection, err := rmq.OpenConnection("scannerqueue", "tcp", "localhost:6379", 1, errChan)
+	connection, err := rmq.OpenConnection("scannerqueue", "tcp", redisServer, 1, errChan)
 	taskQueue, err := connection.OpenQueue("tasks")
 
 	guid := xid.New()

@@ -23,13 +23,15 @@ const (
 	shouldLog       = true
 )
 
+var redisServer = os.Getenv("REDIS_SERVER")
+
 // StartWorker start a scanner worker
 func StartWorker() {
 
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
-	connection, err := rmq.OpenConnection("scannerqueue", "tcp", "localhost:6379", 1, errChan)
+	connection, err := rmq.OpenConnection("scannerqueue", "tcp", redisServer, 1, errChan)
 	if err != nil {
 		panic(err)
 	}
@@ -70,8 +72,9 @@ type Consumer struct {
 }
 
 func NewConsumer(tag int) *Consumer {
+	name, _ := os.Hostname()
 	return &Consumer{
-		name:   fmt.Sprintf("consumer%d", tag),
+		name:   fmt.Sprintf("consumer-%s-%d", name, tag),
 		count:  0,
 		before: time.Now(),
 	}
