@@ -10,12 +10,10 @@ type redisDatabase struct {
 	client *redis.Client
 }
 
-var redisServer = os.Getenv("DB_SERVER")
-
 // CreateRedisDatabase creates the redis database
 func createRedisDatabase() (Database, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     redisServer,
+		Addr:     os.ExpandEnv("$DB_SERVER"),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})

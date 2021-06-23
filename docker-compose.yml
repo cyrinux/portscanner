@@ -28,10 +28,10 @@ services:
     image: grpcscanner:server
     environment:
       - TZ=Europe/Paris
-      - DB_TYPE="redis"
-      - DB_SERVER="redis:6379"
-      - RMQ_DB_SERVER="redis:6379"
-      - RMQ_DB_NAME="scanner"
+      - DB_TYPE=redis
+      - DB_SERVER=redis:6379
+      - RMQ_DB_SERVER=redis:6379
+      - RMQ_DB_NAME=scanner
     cap_add:
       - NET_ADMIN
     restart: always
@@ -49,10 +49,10 @@ services:
     image: grpcscanner:worker
     environment:
       - TZ="Europe/Paris"
-      - DB_TYPE="redis"
-      - DB_SERVER="redis:6379"
-      - RMQ_DB_SERVER="redis:6379"
-      - RMQ_DB_NAME="scanner"
+      - DB_TYPE=redis
+      - DB_SERVER=redis:6379
+      - RMQ_DB_SERVER=redis:6379
+      - RMQ_DB_NAME=scanner
     restart: always
     cap_add:
       - NET_ADMIN

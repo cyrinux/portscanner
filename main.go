@@ -15,19 +15,23 @@ import (
 
 func main() {
 
-	var dbType = os.Getenv("DB_TYPE")
-
 	isServer := flag.Bool("server", false, "start the gRPC server")
 	isWorker := flag.Bool("worker", false, "start the worker")
 	flag.Parse()
 
+	dbDriver, ok := os.LookupEnv("DB_DRIVER")
+	if !ok {
+		fmt.Println("DB_DRIVER is not present, fallback on redis")
+		dbDriver = "redis"
+	}
+
 	if *isServer {
-		fmt.Println("Prepare to serve the gRPC api")
+		fmt.Print("Prepare to serve the gRPC api")
 		listener, err := net.Listen("tcp", ":9000")
 		if err != nil {
 			panic(err) // The port may be on use
 		}
-		db, err := database.Factory(dbType)
+		db, err := database.Factory(dbDriver)
 		if err != nil {
 			panic(err)
 		}
@@ -41,7 +45,7 @@ func main() {
 	}
 
 	if *isWorker {
-		fmt.Println("I'm a scanner worker")
+		fmt.Print("I'm a scanner worker")
 		worker.StartWorker()
 	}
 
