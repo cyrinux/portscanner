@@ -2,9 +2,14 @@
 
 # Requirement
 
-- golang
-- nmap
-- grpc_cli
+- docker-compose
+- docker
+
+# Architecture
+
+## gRPC
+
+![](graphviz.svg)
 
 # Build
 
@@ -17,14 +22,7 @@ $ make
 Start the server as root with
 
 ```bash
-$ sudo make server
-```
-
-or with docker
-
-```bash
-$ docker build -t grpcnmapscanner:latest .
-$ docker run --cap-add=NET_RAW --rm -p 127.0.0.1:9000:9000 -ti grpcnmapscanner:latest
+$ make
 ```
 
 # Client

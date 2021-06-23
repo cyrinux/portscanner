@@ -36,7 +36,7 @@ testscan: up
 
 graphviz:
 	protodot -src proto/service.proto -output graphviz
-	dot -Tpng /home/cyril/protodot/generated/graphviz.dot -o graphviz.png
-	dot -Tsvg /home/cyril/protodot/generated/graphviz.dot -o graphviz.svg
+	dot -Tpng ~/protodot/generated/graphviz.dot -o graphviz.png
+	dot -Tsvg ~/protodot/generated/graphviz.dot -o graphviz.svg
 	xdg-open graphviz.png
 
