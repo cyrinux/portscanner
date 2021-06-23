@@ -33,6 +33,7 @@ message ScannerResponse {
     string start_time = 2;
     string end_time = 3;
     string expiration_time = 4;
+    string key = 5;
 }
 
 message ParamsScannerRequest {

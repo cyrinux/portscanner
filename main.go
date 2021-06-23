@@ -3,14 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/scanner"
 	"github.com/cyrinux/grpcnmapscanner/worker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
-	"os"
 )
 
 func main() {
@@ -19,16 +18,7 @@ func main() {
 	isWorker := flag.Bool("worker", false, "start the worker")
 	flag.Parse()
 
-	dbDriver, ok := os.LookupEnv("DB_DRIVER")
-	if !ok {
-		fmt.Println("DB_DRIVER is not present, fallback on redis")
-		dbDriver = "redis"
-	}
-
-	db, err := database.Factory(dbDriver)
-	if err != nil {
-		panic(err)
-	}
+	config := config.GetConfig()
 
 	if *isServer {
 		fmt.Println("Prepare to serve the gRPC api")
@@ -39,7 +29,7 @@ func main() {
 		srv := grpc.NewServer()
 
 		reflection.Register(srv)
-		proto.RegisterScannerServiceServer(srv, scanner.NewServer(db))
+		proto.RegisterScannerServiceServer(srv, scanner.NewServer(config))
 		if e := srv.Serve(listener); e != nil {
 			panic(err)
 		}
@@ -47,7 +37,7 @@ func main() {
 
 	if *isWorker {
 		fmt.Printf("I'm a scanner worker")
-		worker.NewWorker(db).StartWorker()
+		worker.NewWorker(config).StartWorker()
 	}
 
 }

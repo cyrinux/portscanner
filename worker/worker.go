@@ -6,7 +6,7 @@ import (
 
 	"fmt"
 	rmq "github.com/adjust/rmq/v3"
-	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engines"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/rs/xid"
@@ -27,30 +27,24 @@ const (
 )
 
 type Worker struct {
-	db database.Database
+	config config.Config
 }
 
 // NewWorker create a new worker and init the database connection
-func NewWorker(db database.Database) *Worker {
-	return &Worker{db}
+func NewWorker(config config.Config) *Worker {
+	return &Worker{config}
 }
 
 // StartWorker start a scanner worker
 func (w *Worker) StartWorker() {
-	var (
-		numConsumers = os.Getenv("RMQ_CONSUMERS")
-		rmqServer    = os.Getenv("RMQ_DB_SERVER")
-		rmqDbName    = os.Getenv("RMQ_DB_NAME")
-	)
-
-	numConsumersInt, err := strconv.ParseInt(numConsumers, 10, 0)
+	numConsumersInt, err := strconv.ParseInt(w.config.NumConsumers, 10, 0)
 	if err != nil {
 		panic(err)
 	}
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
-	connection, err := rmq.OpenConnection(rmqDbName, "tcp", rmqServer, 1, errChan)
+	connection, err := rmq.OpenConnection(w.config.RmqDbName, "tcp", w.config.RmqServer, 1, errChan)
 	if err != nil {
 		panic(err)
 	}
@@ -66,7 +60,7 @@ func (w *Worker) StartWorker() {
 
 	for i := 0; i < int(numConsumersInt); i++ {
 		name := fmt.Sprintf("consumer %d", i)
-		if _, err := queue.AddConsumer(name, NewConsumer(i, w.db)); err != nil {
+		if _, err := queue.AddConsumer(name, NewConsumer(i, w.config)); err != nil {
 			panic(err)
 		}
 	}
@@ -88,16 +82,16 @@ type Consumer struct {
 	name   string
 	count  int
 	before time.Time
-	db     database.Database
+	config config.Config
 }
 
-func NewConsumer(tag int, db database.Database) *Consumer {
+func NewConsumer(tag int, config config.Config) *Consumer {
 	name, _ := os.Hostname()
 	return &Consumer{
 		name:   fmt.Sprintf("consumer-%s-%d", name, tag),
 		count:  0,
 		before: time.Now(),
-		db:     db,
+		config: config,
 	}
 }
 
@@ -121,12 +115,12 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		in.Timeout = 60 * 5
 	}
 
-	result, err := engines.StartNmapScan(in)
+	key, result, err := engines.StartNmapScan(in)
 	if err != nil {
 		log.Printf("%v: %v", result, err)
 	}
 
-	scanResult, _ := engines.ParseScanResult(result)
+	key, scanResult, _ := engines.ParseScanResult(key, result)
 
 	scannerResponse := &proto.ScannerResponse{
 		HostResult: scanResult,
@@ -135,7 +129,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	if err != nil {
 		log.Printf("failed to parse result: %s", err)
 	}
-	_, err = consumer.db.Set(xid.New().String(), string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
+	_, err = consumer.config.DB.Set(xid.New().String(), string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
 	if err != nil {
 		log.Printf("failed to insert result: %s", err)
 	}

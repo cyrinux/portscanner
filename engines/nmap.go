@@ -10,19 +10,12 @@ import (
 	"time"
 )
 
-// StartNmapScan start a nmap scan
-func StartNmapScan(s *proto.ParamsScannerRequest) (*nmap.Run, error) {
-	timeout := time.Duration(s.Timeout) * time.Second
-	retention := time.Duration(s.RetentionTime) * time.Second
+func parseParamsScannerRequestNmapOptions(s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	hosts := strings.Split(s.Hosts, ",")
+	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports
-
-	var options = []nmap.Option{nmap.WithContext(ctx),
-		nmap.WithTargets(hosts...),
+	var options = []nmap.Option{
+		nmap.WithTargets(hostsList...),
 	}
 
 	portsList := strings.Split(ports, ",")
@@ -79,27 +72,47 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (*nmap.Run, error) {
 		}
 	}
 
+	return hostsList, portsList, options, nil
+}
+
+// StartNmapScan start a nmap scan
+func StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
+	timeout := time.Duration(s.Timeout) * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	retention := time.Duration(s.RetentionTime) * time.Second
+
+	// parse all input options
+	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(s)
+
+	// add context to nmap options
+	options = append(options, nmap.WithContext(ctx))
+
+	// create a nmap scanner
 	scanner, err := nmap.NewScanner(options...)
 	if err != nil {
-		return nil, err
+		return s.Key, nil, err
 	}
 
-	log.Printf("Starting scan of host: %s, port: %s, timeout: %v, retention: %v",
+	log.Printf("Starting scan of host: %s, port: %s, options: %v, timeout: %v, retention: %v",
 		hosts,
 		ports,
+		options,
 		timeout,
 		retention,
 	)
 
 	result, warnings, err := scanner.Run()
 	if err != nil {
-		return nil, err
+		return s.Key, nil, err
 	}
+
 	for _, tb := range result.TaskBegin {
-		log.Printf("%v", tb.Time)
+		log.Printf("Task begin: %v", tb.Time)
 	}
 	for _, te := range result.TaskEnd {
-		log.Printf("%v", te.Time)
+		log.Printf("Task end: %v", te.Time)
 	}
 
 	if warnings != nil {
@@ -112,16 +125,17 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (*nmap.Run, error) {
 		result.Stats.Finished.Elapsed,
 	)
 
-	return result, err
+	return s.Key, result, err
 }
 
-func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
+// ParseScanResult parse the nmap result and create the expected output
+func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult, error) {
 	portList := []*proto.Port{}
 	scanResult := []*proto.HostResult{}
 	totalPorts := 0
 	if len(result.Hosts) == 0 || result == nil {
-		log.Println("Scan timeout.")
-		return nil, nil
+		log.Println("Scan timeout or no result")
+		return key, nil, nil
 	}
 	for _, host := range result.Hosts {
 		var osversion string
@@ -163,5 +177,5 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 
 		scanResult = append(scanResult, scan)
 	}
-	return scanResult, nil
+	return key, scanResult, nil
 }

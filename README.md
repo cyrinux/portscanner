@@ -1,5 +1,7 @@
 # gRPC nmap scanner
 
+It's a distributed scanner
+
 # Requirement
 
 - docker-compose
@@ -10,6 +12,12 @@
 ## gRPC
 
 ![](graphviz.svg)
+
+- 1 server that can run sync scan task
+- 1 redis (or 2) (ideally clusters) acting as a message broker and database storage
+- x worker that can run y consumers (async scan tasks)
+
+All scan results are stored in the database (redis only for the moment)
 
 # Build
 
