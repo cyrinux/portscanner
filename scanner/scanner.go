@@ -9,6 +9,7 @@ import (
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -61,6 +62,9 @@ func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.Param
 	if request.Timeout < 30 {
 		request.Timeout = 60 * 60
 	}
+
+	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
+	request.Ports = strings.ReplaceAll(request.Ports, " ", "")
 
 	return request
 }

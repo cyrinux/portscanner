@@ -6,6 +6,7 @@ message Host {
     string address = 1;
     string os_version = 2;
     string state = 3;
+    string fqdn = 4;
 }
 
 message PortVersion {

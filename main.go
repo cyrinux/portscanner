@@ -36,7 +36,6 @@ func main() {
 	}
 
 	if *isWorker {
-		fmt.Printf("I'm a scanner worker")
 		worker.NewWorker(config).StartWorker()
 	}
 

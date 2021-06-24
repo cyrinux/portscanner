@@ -18,7 +18,9 @@ services:
       - backend
     depends_on:
       - server
-    command: "ls redis:9000 proto.ScannerService"
+      - worker
+      - redis
+    command: "ls redis:9000 proto.ScannerService -l"
 
   server:
     hostname: server

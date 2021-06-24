@@ -113,16 +113,27 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 	// add context to nmap options
 	options = append(options, nmap.WithContext(ctx))
 
+	// Filter out hosts that don't have any open ports
+	options = append(options, nmap.WithFilterHost(func(h nmap.Host) bool {
+		// Filter out hosts with no open ports.
+		for idx := range h.Ports {
+			if h.Ports[idx].Status() == "open" {
+				return true
+			}
+		}
+
+		return false
+	}))
+
 	// create a nmap scanner
 	scanner, err := nmap.NewScanner(options...)
 	if err != nil {
 		return s.Key, nil, err
 	}
 
-	log.Printf("Starting scan of host: %s, port: %s, options: %v, timeout: %v, retention: %v",
+	log.Printf("Starting scan of host: %s, port: %s, timeout: %v, retention: %v",
 		hosts,
 		ports,
-		options,
 		timeout,
 		retention,
 	)
@@ -172,7 +183,8 @@ func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult,
 		}
 		address := host.Addresses[0].Addr
 		hostResult := &proto.Host{
-			Address:   address,
+			Address: address,
+			// Fqdn:      fqdn,
 			OsVersion: osversion,
 			State:     host.Status.Reason,
 		}

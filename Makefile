@@ -14,7 +14,7 @@ vendor:
 .PHONY: proto
 proto:
 	@echo Generating protobuf code from docker
-	@docker run -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -l go
+	@docker run --rm -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -l go
 	@sudo chown -R $(shell id -u):$(shell id -g) ./gen
 	@mv gen/pb-go/proto/service.pb.go ./proto
 	@rm ./gen -rf

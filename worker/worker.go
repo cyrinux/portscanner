@@ -86,9 +86,11 @@ type Consumer struct {
 }
 
 func NewConsumer(tag int, config config.Config) *Consumer {
-	name, _ := os.Hostname()
+	hostname, _ := os.Hostname()
+	name := fmt.Sprintf("consumer-%s-%d", hostname, tag)
+	fmt.Printf("New consumer: %s\n", name)
 	return &Consumer{
-		name:   fmt.Sprintf("consumer-%s-%d", name, tag),
+		name:   name,
 		count:  0,
 		before: time.Now(),
 		ctx:    context.TODO(),
