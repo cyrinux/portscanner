@@ -1,16 +1,27 @@
-package engines
+package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	nmap "github.com/Ullaakut/nmap/v2"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"log"
 	"strings"
 	"time"
 )
 
-func parseParamsScannerRequestNmapOptions(s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
+type Engine struct {
+	config config.Config
+}
+
+// NewEngine create a new nmap engine and init the database connection
+func NewEngine(config config.Config) *Engine {
+	return &Engine{config}
+}
+
+func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
 
 	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports
@@ -76,7 +87,14 @@ func parseParamsScannerRequestNmapOptions(s *proto.ParamsScannerRequest) ([]stri
 }
 
 // StartNmapScan start a nmap scan
-func StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
+func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
+
+	scannerResponse := &proto.ScannerResponse{
+		Status: proto.ScannerResponse_RUNNING,
+	}
+
+	scanResultJSON, err := json.Marshal(scannerResponse)
+	_, err = e.config.DB.Set(s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
 
 	// int32s in seconds
 	timeout := time.Duration(s.Timeout) * time.Second
@@ -87,7 +105,7 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
 	defer cancel()
 
 	// parse all input options
-	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(s)
+	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(ctx, s)
 	if err != nil {
 		return s.Key, nil, err
 	}

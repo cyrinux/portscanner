@@ -1,17 +1,17 @@
 package worker
 
 import (
+	"context"
 	"encoding/json"
-	"strconv"
-
 	"fmt"
 	rmq "github.com/adjust/rmq/v3"
 	"github.com/cyrinux/grpcnmapscanner/config"
-	"github.com/cyrinux/grpcnmapscanner/engines"
+	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -81,6 +81,7 @@ type Consumer struct {
 	name   string
 	count  int
 	before time.Time
+	ctx    context.Context
 	config config.Config
 }
 
@@ -90,6 +91,7 @@ func NewConsumer(tag int, config config.Config) *Consumer {
 		name:   fmt.Sprintf("consumer-%s-%d", name, tag),
 		count:  0,
 		before: time.Now(),
+		ctx:    context.TODO(),
 		config: config,
 	}
 }
@@ -111,12 +113,13 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	var in *proto.ParamsScannerRequest
 	json.Unmarshal([]byte(payload), &in)
 
-	key, result, err := engines.StartNmapScan(in)
+	newEngine := engine.NewEngine(consumer.config)
+	key, result, err := newEngine.StartNmapScan(consumer.ctx, in)
 	if err != nil {
 		log.Printf("%v: %v", result, err)
 	}
 
-	key, scanResult, _ := engines.ParseScanResult(key, result)
+	key, scanResult, _ := engine.ParseScanResult(key, result)
 
 	scannerResponse := &proto.ScannerResponse{
 		HostResult: scanResult,

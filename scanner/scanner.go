@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	rmq "github.com/adjust/rmq/v3"
 	"github.com/cyrinux/grpcnmapscanner/config"
-	"github.com/cyrinux/grpcnmapscanner/engines"
+	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
@@ -71,27 +71,35 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	in = parseParamsScannerRequest(in)
 
 	// we start the scan
-	key, scanResult, err := engines.StartNmapScan(in)
-	if err != nil || scanResult == nil {
-		return generateResponse("", nil, err)
-	}
-	key, scanParsedResult, _ := engines.ParseScanResult(key, scanResult)
+	newEngine := engine.NewEngine(s.config)
 
-	scannerResponse := &proto.ScannerResponse{
-		HostResult: scanParsedResult,
+	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
+
+	key, scanResult, err := newEngine.StartNmapScan(ctx, in)
+	if err != nil || scanResult == nil {
+		// and write the response to the database
+		return generateResponse(key, nil, err)
 	}
-	scanResultJSON, err := json.Marshal(scannerResponse)
+
+	key, scanParsedResult, err := engine.ParseScanResult(key, scanResult)
 	if err != nil {
-		return generateResponse("", nil, err)
+		// and write the response to the database
+		return generateResponse(key, nil, err)
 	}
+
+	scanResultJSON, _ := json.Marshal(scanParsedResult)
 
 	// and write the response to the database
 	_, err = s.config.DB.Set(key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
 	if err != nil {
-		return generateResponse("", nil, err)
+		return generateResponse(key, &scannerResponse, err)
 	}
 
-	return generateResponse(key, scannerResponse, err)
+	scannerResponse = proto.ScannerResponse{
+		HostResult: scanParsedResult,
+		Status:     proto.ScannerResponse_OK,
+	}
+	return generateResponse(key, &scannerResponse, err)
 }
 
 // Scan function prepare a nmap scan
@@ -103,11 +111,6 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	taskQueue, err := connection.OpenQueue("tasks")
 
 	in = parseParamsScannerRequest(in)
-
-	// _, err = s.config.DB.Set(in.Key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
-	// if err != nil {
-	// 	return generateResponse("", nil, err)
-	// }
 
 	// create scan task
 	taskScanBytes, err := json.Marshal(in)
@@ -150,9 +153,15 @@ func generateResponse(key string, value *proto.ScannerResponse, err error) (*pro
 	if err != nil {
 		return &proto.ServerResponse{
 			Success: false,
-			Key:     "", Value: value,
-			Error: err.Error(),
+			Key:     key,
+			Value:   value,
+			Error:   err.Error(),
 		}, nil
 	}
-	return &proto.ServerResponse{Success: true, Key: key, Value: value, Error: ""}, nil
+	return &proto.ServerResponse{
+		Success: true,
+		Key:     key,
+		Value:   value,
+		Error:   "",
+	}, nil
 }
