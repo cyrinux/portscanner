@@ -22,6 +22,10 @@ func GetConfig() Config {
 		RmqDbName:    os.Getenv("RMQ_DB_NAME"),
 	}
 
+	if config.NumConsumers == "0" {
+		config.NumConsumers = "5"
+	}
+
 	dbConfig := database.DBConfig{
 		DBServer: os.Getenv("DB_SERVER"),
 		DBDriver: os.Getenv("DB_DRIVER"),

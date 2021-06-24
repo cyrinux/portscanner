@@ -40,6 +40,7 @@ func (w *Worker) StartWorker() {
 	if err != nil {
 		panic(err)
 	}
+
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
@@ -48,18 +49,31 @@ func (w *Worker) StartWorker() {
 		panic(err)
 	}
 
-	queue, err := connection.OpenQueue("tasks")
+	incomingQueue, err := connection.OpenQueue("tasks")
 	if err != nil {
 		panic(err)
 	}
+	if err := incomingQueue.StartConsuming(prefetchLimit, pollDuration); err != nil {
+		panic(err)
+	}
 
-	if err := queue.StartConsuming(prefetchLimit, pollDuration); err != nil {
+	pushQueue, err := connection.OpenQueue("tasksPush1")
+	if err != nil {
+		panic(err)
+	}
+	incomingQueue.SetPushQueue(pushQueue)
+
+	if err := pushQueue.StartConsuming(prefetchLimit, pollDuration); err != nil {
 		panic(err)
 	}
 
 	for i := 0; i < int(numConsumersInt); i++ {
-		name := fmt.Sprintf("consumer %d", i)
-		if _, err := queue.AddConsumer(name, NewConsumer(i, w.config)); err != nil {
+		nameIncoming := fmt.Sprintf("consumer incoming %d", i)
+		if _, err := incomingQueue.AddConsumer(nameIncoming, NewConsumer(i, "incoming", w.config)); err != nil {
+			panic(err)
+		}
+		namePush := fmt.Sprintf("consumer push %d", i)
+		if _, err := pushQueue.AddConsumer(namePush, NewConsumer(i, "push", w.config)); err != nil {
 			panic(err)
 		}
 	}
@@ -85,10 +99,10 @@ type Consumer struct {
 	config config.Config
 }
 
-func NewConsumer(tag int, config config.Config) *Consumer {
+func NewConsumer(tag int, queue string, config config.Config) *Consumer {
 	hostname, _ := os.Hostname()
-	name := fmt.Sprintf("consumer-%s-%d", hostname, tag)
-	fmt.Printf("New consumer: %s\n", name)
+	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
+	log.Printf("New consumer: %s\n", name)
 	return &Consumer{
 		name:   name,
 		count:  0,
@@ -109,45 +123,55 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		consumer.before = time.Now()
 		perSecond := time.Second / (duration / reportBatchSize)
 		log.Printf("%s consumed %d %s %d", consumer.name, consumer.count, payload, perSecond)
-
 	}
 
-	var in *proto.ParamsScannerRequest
-	json.Unmarshal([]byte(payload), &in)
+	var request *proto.ParamsScannerRequest
+	json.Unmarshal([]byte(payload), &request)
 
-	newEngine := engine.NewEngine(consumer.config)
-	key, result, err := newEngine.StartNmapScan(consumer.ctx, in)
-	if err != nil {
-		log.Printf("%v: %v", result, err)
-	}
-
-	key, scanResult, _ := engine.ParseScanResult(key, result)
-
-	scannerResponse := &proto.ScannerResponse{
-		HostResult: scanResult,
-	}
-	scanResultJSON, err := json.Marshal(scannerResponse)
-	if err != nil {
-		log.Printf("failed to parse result: %s", err)
-	}
-	_, err = consumer.config.DB.Set(key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
-	if err != nil {
-		log.Printf("failed to insert result: %s", err)
-	}
-
-	if consumer.count%reportBatchSize > 0 {
-		if err := delivery.Ack(); err != nil {
-			log.Printf("failed to ack %s: %s", payload, err)
-		} else {
-			log.Printf("acked %s", payload)
-		}
-	} else { // reject one per batch
+	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
+	log.Printf("Defer Time: %v, Now: %v", deferTime, time.Now().Unix())
+	if deferTime >= time.Now().Unix() {
 		if err := delivery.Reject(); err != nil {
 			log.Printf("failed to reject %s: %s", payload, err)
 		} else {
-			log.Printf("rejected %s", payload)
+			log.Printf("rejected %s, too early", payload)
+		}
+	} else {
+		newEngine := engine.NewEngine(consumer.config)
+		key, result, err := newEngine.StartNmapScan(consumer.ctx, request)
+		if err != nil {
+			log.Printf("Scan %v %v: %v", key, result, err)
+		}
+
+		key, scanResult, _ := engine.ParseScanResult(key, result)
+
+		scannerResponse := &proto.ScannerResponse{
+			HostResult: scanResult,
+		}
+		scanResultJSON, err := json.Marshal(scannerResponse)
+		if err != nil {
+			log.Printf("failed to parse result: %s", err)
+		}
+		_, err = consumer.config.DB.Set(key, string(scanResultJSON), time.Duration(request.GetRetentionTime())*time.Second)
+		if err != nil {
+			log.Printf("failed to insert result: %s", err)
+		}
+
+		if consumer.count%reportBatchSize > 0 {
+			if err := delivery.Ack(); err != nil {
+				log.Printf("failed to ack %s: %s", payload, err)
+			} else {
+				log.Printf("acked %s", payload)
+			}
+		} else { // reject one per batch
+			if err := delivery.Reject(); err != nil {
+				log.Printf("failed to reject %s: %s", payload, err)
+			} else {
+				log.Printf("rejected %s", payload)
+			}
 		}
 	}
+
 }
 
 // RmqLogErrors display the rmq errors log

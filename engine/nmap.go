@@ -25,7 +25,9 @@ func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsSc
 
 	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports
+
 	var options = []nmap.Option{
+		nmap.WithVerbosity(3),
 		nmap.WithTargets(hostsList...),
 	}
 
@@ -113,17 +115,17 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 	// add context to nmap options
 	options = append(options, nmap.WithContext(ctx))
 
-	// Filter out hosts that don't have any open ports
-	options = append(options, nmap.WithFilterHost(func(h nmap.Host) bool {
-		// Filter out hosts with no open ports.
-		for idx := range h.Ports {
-			if h.Ports[idx].Status() == "open" {
-				return true
-			}
-		}
+	// // Filter out hosts that don't have any open ports
+	// options = append(options, nmap.WithFilterHost(func(h nmap.Host) bool {
+	// 	// Filter out hosts with no open ports.
+	// 	for idx := range h.Ports {
+	// 		if h.Ports[idx].Status() == "open" {
+	// 			return false
+	// 		}
+	// 	}
 
-		return false
-	}))
+	// 	return true
+	// }))
 
 	// create a nmap scanner
 	scanner, err := nmap.NewScanner(options...)
@@ -138,16 +140,28 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 		retention,
 	)
 
-	result, warnings, err := scanner.Run()
+	// Function to listen and print the progress
+	progress := make(chan float32, 1)
+	go func() {
+		var previous float32
+		for p := range progress {
+			previous = p
+			if p < previous {
+				continue
+			}
+			log.Printf("Running scan of host: %s, port: %s, timeout: %v, retention: %v: %v %%",
+				hosts,
+				ports,
+				timeout,
+				retention,
+				p,
+			)
+		}
+	}()
+
+	result, warnings, err := scanner.RunWithProgress(progress)
 	if err != nil {
 		return s.Key, nil, err
-	}
-
-	for _, tb := range result.TaskBegin {
-		log.Printf("Task begin: %v", tb.Time)
-	}
-	for _, te := range result.TaskEnd {
-		log.Printf("Task end: %v", te.Time)
 	}
 
 	if warnings != nil {
@@ -181,37 +195,39 @@ func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult,
 			fp := host.OS.Matches[0]
 			osversion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
 		}
-		address := host.Addresses[0].Addr
-		hostResult := &proto.Host{
-			Address: address,
-			// Fqdn:      fqdn,
-			OsVersion: osversion,
-			State:     host.Status.Reason,
-		}
-		for _, p := range host.Ports {
-			version := &proto.PortVersion{
-				ExtraInfos:  p.Service.ExtraInfo,
-				LowVersion:  p.Service.LowVersion,
-				HighVersion: p.Service.HighVersion,
-				Product:     p.Service.Product,
+		for _, adr := range host.Addresses {
+			address := adr.Addr
+			hostResult := &proto.Host{
+				Address: address,
+				// Fqdn:      fqdn,
+				OsVersion: osversion,
+				State:     host.Status.Reason,
 			}
-			newPort := &proto.Port{
-				PortId:      fmt.Sprintf("%v", p.ID),
-				ServiceName: p.Service.Name,
-				Protocol:    p.Protocol,
-				State:       p.State.Reason,
-				Version:     version,
+			for _, p := range host.Ports {
+				version := &proto.PortVersion{
+					ExtraInfos:  p.Service.ExtraInfo,
+					LowVersion:  p.Service.LowVersion,
+					HighVersion: p.Service.HighVersion,
+					Product:     p.Service.Product,
+				}
+				newPort := &proto.Port{
+					PortId:      fmt.Sprintf("%v", p.ID),
+					ServiceName: p.Service.Name,
+					Protocol:    p.Protocol,
+					State:       p.State.Reason,
+					Version:     version,
+				}
+				portList = append(portList, newPort)
 			}
-			portList = append(portList, newPort)
-		}
-		totalPorts += len(portList)
+			totalPorts += len(portList)
 
-		scan := &proto.HostResult{
-			Host:  hostResult,
-			Ports: portList,
-		}
+			scan := &proto.HostResult{
+				Host:  hostResult,
+				Ports: portList,
+			}
 
-		scanResult = append(scanResult, scan)
+			scanResult = append(scanResult, scan)
+		}
 	}
 	return key, scanResult, nil
 }

@@ -1,5 +1,7 @@
 #!/bin/sh
 grpc_cli ls 127.0.0.1:9000 proto.ScannerService
+grpc_cli ls 127.0.0.1:9000 proto.ScannerService -l
+grpc_cli type 127.0.0.1:9000 proto.ParamsScannerRequest
 
 if [ $# -eq 0 ]; then
     exit 1

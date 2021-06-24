@@ -23,7 +23,7 @@ type CreateDatabaseError struct{}
 
 // CreateDatabaseError when cannot perform set on database
 func (err *CreateDatabaseError) Error() string {
-	return "Could not create Databse"
+	return "Could not create Database"
 }
 
 // NotImplementedDatabaseError when user tries to create a not implemented database

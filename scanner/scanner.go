@@ -66,21 +66,26 @@ func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.Param
 	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
 	request.Ports = strings.ReplaceAll(request.Ports, " ", "")
 
+	deferDuration := time.Now().Add(time.Duration(request.DeferDuration) * time.Second).Unix()
+
+	request.DeferDuration = int32(deferDuration)
+
 	return request
+
 }
 
 // Scan function prepare a nmap scan
 func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
 
 	// sanitize
-	in = parseParamsScannerRequest(in)
+	request := parseParamsScannerRequest(in)
 
 	// we start the scan
 	newEngine := engine.NewEngine(s.config)
 
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 
-	key, scanResult, err := newEngine.StartNmapScan(ctx, in)
+	key, scanResult, err := newEngine.StartNmapScan(ctx, request)
 	if err != nil || scanResult == nil {
 		// and write the response to the database
 		return generateResponse(key, nil, err)
@@ -95,7 +100,7 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	scanResultJSON, _ := json.Marshal(scanParsedResult)
 
 	// and write the response to the database
-	_, err = s.config.DB.Set(key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
+	_, err = s.config.DB.Set(key, string(scanResultJSON), time.Duration(request.GetRetentionTime())*time.Second)
 	if err != nil {
 		return generateResponse(key, &scannerResponse, err)
 	}
@@ -115,22 +120,22 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	connection, err := rmq.OpenConnection(s.config.RmqDbName, "tcp", s.config.RmqServer, 1, errChan)
 	taskQueue, err := connection.OpenQueue("tasks")
 
-	in = parseParamsScannerRequest(in)
+	request := parseParamsScannerRequest(in)
 
 	// create scan task
-	taskScanBytes, err := json.Marshal(in)
+	taskScanBytes, err := json.Marshal(request)
 	if err != nil {
 		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
-		return generateResponse(in.Key, &scannerResponse, err)
+		return generateResponse(request.Key, &scannerResponse, err)
 	}
 	err = taskQueue.PublishBytes(taskScanBytes)
 	if err != nil {
 		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
-		return generateResponse(in.Key, &scannerResponse, err)
+		return generateResponse(request.Key, &scannerResponse, err)
 	}
 
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
-	return generateResponse(in.Key, &scannerResponse, err)
+	return generateResponse(request.Key, &scannerResponse, err)
 }
 
 // rmqLogErrors display the rmq errors log
