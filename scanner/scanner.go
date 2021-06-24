@@ -72,6 +72,7 @@ func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.Param
 // Scan function prepare a nmap scan
 func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
 
+	// sanitize
 	in = parseParamsScannerRequest(in)
 
 	// we start the scan

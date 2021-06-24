@@ -1,6 +1,7 @@
 all: up
 
 up: build-docker
+	docker network create my-network --subnet 10.190.33.0/24 || true
 	docker-compose up -d --build --scale worker=3
 	docker-compose logs -f --tail=50
 
