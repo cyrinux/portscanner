@@ -18,11 +18,6 @@ func parseParamsScannerRequestNmapOptions(s *proto.ParamsScannerRequest) ([]stri
 		nmap.WithTargets(hostsList...),
 	}
 
-	// If timeout < 10s, fallback to 1h
-	if s.Timeout < 30 {
-		s.Timeout = 60 * 60
-	}
-
 	portsList := strings.Split(ports, ",")
 	if len(ports) == 0 && !s.GetPingOnly() {
 		if s.GetFastMode() {
@@ -109,7 +104,7 @@ func StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
 	log.Printf("Starting scan of host: %s, port: %s, options: %v, timeout: %v, retention: %v",
 		hosts,
 		ports,
-		&options,
+		options,
 		timeout,
 		retention,
 	)

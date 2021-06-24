@@ -5,8 +5,11 @@ up: build-docker
 	docker-compose logs -f --tail=50
 
 build:
+	CGO_ENABLED=0 GOOS=linux go build -mod vendor -installsuffix cgo -o grpcnmapscanner .
+
+.PHONY: vendor
+vendor:
 	go mod vendor
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o grpcnmapscanner .
 
 .PHONY: proto
 proto:

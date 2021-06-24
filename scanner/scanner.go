@@ -49,14 +49,26 @@ func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*pro
 	return generateResponse(in.Key, &scannerResponse, nil)
 }
 
-// Scan function prepare a nmap scan
-func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
+func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.ParamsScannerRequest {
 
 	// if the Key is not forced, we generate one unique
 	guid := xid.New()
-	if in.Key == "" {
-		in.Key = guid.String()
+	if request.Key == "" {
+		request.Key = guid.String()
 	}
+
+	// If timeout < 10s, fallback to 1h
+	if request.Timeout < 30 {
+		request.Timeout = 60 * 60
+	}
+
+	return request
+}
+
+// Scan function prepare a nmap scan
+func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
+
+	in = parseParamsScannerRequest(in)
 
 	// we start the scan
 	key, scanResult, err := engines.StartNmapScan(in)
@@ -90,31 +102,27 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	connection, err := rmq.OpenConnection(s.config.RmqDbName, "tcp", s.config.RmqServer, 1, errChan)
 	taskQueue, err := connection.OpenQueue("tasks")
 
-	// if the Key is not forced, we generate one unique
-	guid := xid.New()
-	if in.Key == "" {
-		in.Key = guid.String()
-	}
+	in = parseParamsScannerRequest(in)
+
+	// _, err = s.config.DB.Set(in.Key, string(scanResultJSON), time.Duration(in.GetRetentionTime())*time.Second)
+	// if err != nil {
+	// 	return generateResponse("", nil, err)
+	// }
 
 	// create scan task
 	taskScanBytes, err := json.Marshal(in)
 	if err != nil {
-		return generateResponse(in.Key, nil, err)
+		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
+		return generateResponse(in.Key, &scannerResponse, err)
 	}
 	err = taskQueue.PublishBytes(taskScanBytes)
 	if err != nil {
-		return generateResponse(in.Key, nil, err)
+		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
+		return generateResponse(in.Key, &scannerResponse, err)
 	}
 
-	return generateResponse(in.Key, nil, err)
-}
-
-// generateResponse generate the response for the grpc return
-func generateResponse(key string, value *proto.ScannerResponse, err error) (*proto.ServerResponse, error) {
-	if err != nil {
-		return &proto.ServerResponse{Success: false, Key: "", Value: value, Error: err.Error()}, nil
-	}
-	return &proto.ServerResponse{Success: true, Key: key, Value: value, Error: ""}, nil
+	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
+	return generateResponse(in.Key, &scannerResponse, err)
 }
 
 // rmqLogErrors display the rmq errors log
@@ -135,4 +143,16 @@ func rmqLogErrors(errChan <-chan error) {
 			log.Print("other error: ", err)
 		}
 	}
+}
+
+// generateResponse generate the response for the grpc return
+func generateResponse(key string, value *proto.ScannerResponse, err error) (*proto.ServerResponse, error) {
+	if err != nil {
+		return &proto.ServerResponse{
+			Success: false,
+			Key:     "", Value: value,
+			Error: err.Error(),
+		}, nil
+	}
+	return &proto.ServerResponse{Success: true, Key: key, Value: value, Error: ""}, nil
 }

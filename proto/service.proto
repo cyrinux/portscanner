@@ -34,6 +34,14 @@ message ScannerResponse {
     string end_time = 3;
     string expiration_time = 4;
     string key = 5;
+    enum Status {
+        UNKNOWN = 0;
+        QUEUED = 1;
+        RUNNING = 2;
+        OK = 3;
+        ERROR = 4;
+      }
+    Status status = 6;
 }
 
 message ParamsScannerRequest {
@@ -61,13 +69,6 @@ message ServerResponse{
     string key = 2;
     ScannerResponse value = 3;
     string error = 4;
-    enum Status {
-        UNKNOWN = 0;
-        QUEUED = 1;
-        RUNNING = 2;
-        OK = 3;
-        ERROR = 4;
-      }
 }
 
 // Server ScannerService
