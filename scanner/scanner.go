@@ -63,12 +63,12 @@ func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.Param
 		request.Timeout = 60 * 60
 	}
 
+	// replace all whitespaces
 	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
 	request.Ports = strings.ReplaceAll(request.Ports, " ", "")
 
-	deferDuration := time.Now().Add(time.Duration(request.DeferDuration) * time.Second).Unix()
-
-	request.DeferDuration = int32(deferDuration)
+	// add the defer duration to the current unix timestamp
+	request.DeferDuration = time.Now().Add(time.Duration(request.DeferDuration) * time.Second).Unix()
 
 	return request
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	rmq "github.com/adjust/rmq/v3"
+	"github.com/amyangfei/redlock-go/v2/redlock"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
@@ -21,21 +22,30 @@ const (
 	pollDuration  = 100 * time.Millisecond
 
 	reportBatchSize = 10000
-	consumeDuration = time.Millisecond
+	consumeDuration = time.Second
 	shouldLog       = true
 )
 
 type Worker struct {
+	ctx    context.Context
 	config config.Config
 }
 
 // NewWorker create a new worker and init the database connection
 func NewWorker(config config.Config) *Worker {
-	return &Worker{config}
+	return &Worker{
+		config: config,
+		ctx:    context.Background(),
+	}
 }
 
 // StartWorker start a scanner worker
 func (w *Worker) StartWorker() {
+	lockMgr, err := redlock.NewRedLock([]string{w.config.RmqServer})
+	if err != nil {
+		log.Printf("Unable to connect redlock: %v", err)
+	}
+
 	numConsumersInt, err := strconv.ParseInt(w.config.NumConsumers, 10, 0)
 	if err != nil {
 		panic(err)
@@ -57,7 +67,7 @@ func (w *Worker) StartWorker() {
 		panic(err)
 	}
 
-	pushQueue, err := connection.OpenQueue("tasksPush1")
+	pushQueue, err := connection.OpenQueue("tasks-rejected")
 	if err != nil {
 		panic(err)
 	}
@@ -78,17 +88,26 @@ func (w *Worker) StartWorker() {
 		}
 	}
 
+	// returned messages rejected/delayed back to the incoming queue
 	go func() {
 		for {
-			returned, _ := incomingQueue.ReturnRejected(100)
+			expiry, err := lockMgr.Lock(w.ctx, "tasks_returner", 15*time.Second)
+			if err != nil {
+				log.Printf("Returner loop: %v", err)
+			} else {
+				log.Printf("Returner loop: took the lock, expiry: %v", expiry)
+			}
+			returned, _ := incomingQueue.ReturnRejected(1000)
 			if returned > 0 {
-				log.Printf("Returned reject message %v %v", returned, err)
+				log.Printf("Returned reject message %v", returned)
 
 			}
-			time.Sleep(5 * time.Second)
+			lockMgr.UnLock(w.ctx, "tasks_returner")
+			time.Sleep(1 * time.Second)
 		}
 	}()
 
+	// manage signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT)
 	defer signal.Stop(signals)
@@ -96,6 +115,7 @@ func (w *Worker) StartWorker() {
 	<-signals // wait for signal
 	go func() {
 		<-signals // hard exit on second signal (in case shutdown gets stuck)
+		lockMgr.UnLock(w.ctx, "tasks_returner")
 		os.Exit(1)
 	}()
 
@@ -140,12 +160,11 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	json.Unmarshal([]byte(payload), &request)
 
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
-	log.Printf("Defer Time: %v, Now: %v", deferTime, time.Now().Unix())
 	if deferTime >= time.Now().Unix() {
 		if err := delivery.Reject(); err != nil {
 			log.Printf("failed to reject %s: %s", payload, err)
 		} else {
-			log.Printf("rejected %s, too early", payload)
+			log.Printf("delayed %s, this is too early", payload)
 		}
 	} else {
 		newEngine := engine.NewEngine(consumer.config)
