@@ -58,11 +58,6 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 		in.Key = guid.String()
 	}
 
-	// if timeout < 30s we force it to 1h
-	if in.Timeout < 30 {
-		in.Timeout = 60 * 60 // 1h
-	}
-
 	// we start the scan
 	key, scanResult, err := engines.StartNmapScan(in)
 	if err != nil || scanResult == nil {
@@ -101,21 +96,17 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 		in.Key = guid.String()
 	}
 
-	if in.Timeout < 10 {
-		in.Timeout = 60 * 5
+	// create scan task
+	taskScanBytes, err := json.Marshal(in)
+	if err != nil {
+		return generateResponse(in.Key, nil, err)
+	}
+	err = taskQueue.PublishBytes(taskScanBytes)
+	if err != nil {
+		return generateResponse(in.Key, nil, err)
 	}
 
-	// create task
-	taskBytes, err := json.Marshal(in)
-	if err != nil {
-		return generateResponse(guid.String(), nil, err)
-	}
-	err = taskQueue.PublishBytes(taskBytes)
-	if err != nil {
-		return generateResponse(guid.String(), nil, err)
-	}
-
-	return generateResponse(guid.String(), nil, err)
+	return generateResponse(in.Key, nil, err)
 }
 
 // generateResponse generate the response for the grpc return

@@ -18,6 +18,11 @@ func parseParamsScannerRequestNmapOptions(s *proto.ParamsScannerRequest) ([]stri
 		nmap.WithTargets(hostsList...),
 	}
 
+	// If timeout < 10s, fallback to 1h
+	if s.Timeout < 30 {
+		s.Timeout = 60 * 60
+	}
+
 	portsList := strings.Split(ports, ",")
 	if len(ports) == 0 && !s.GetPingOnly() {
 		if s.GetFastMode() {
@@ -77,11 +82,14 @@ func parseParamsScannerRequestNmapOptions(s *proto.ParamsScannerRequest) ([]stri
 
 // StartNmapScan start a nmap scan
 func StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
+
+	// int32s in seconds
 	timeout := time.Duration(s.Timeout) * time.Second
+	retention := time.Duration(s.RetentionTime) * time.Second
+
+	// define scan context
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
-	retention := time.Duration(s.RetentionTime) * time.Second
 
 	// parse all input options
 	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(s)
@@ -152,15 +160,15 @@ func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult,
 		address := host.Addresses[0].Addr
 		hostResult := &proto.Host{
 			Address:   address,
-			OsVersion: &osversion,
-			State:     &host.Status.Reason,
+			OsVersion: osversion,
+			State:     host.Status.Reason,
 		}
 		for _, p := range host.Ports {
 			version := &proto.PortVersion{
-				ExtraInfos:  &p.Service.ExtraInfo,
-				LowVersion:  &p.Service.LowVersion,
-				HighVersion: &p.Service.HighVersion,
-				Product:     &p.Service.Product,
+				ExtraInfos:  p.Service.ExtraInfo,
+				LowVersion:  p.Service.LowVersion,
+				HighVersion: p.Service.HighVersion,
+				Product:     p.Service.Product,
 			}
 			newPort := &proto.Port{
 				PortId:      fmt.Sprintf("%v", p.ID),

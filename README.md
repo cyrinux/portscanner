@@ -11,7 +11,7 @@ It's a distributed scanner
 
 ## gRPC
 
-![](graphviz.svg)
+![grpc](graphviz.svg)
 
 - 1 server that can run sync scan task
 - 1 redis (or 2) (ideally clusters) acting as a message broker and database storage

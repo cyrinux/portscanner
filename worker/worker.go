@@ -110,9 +110,6 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 	var in *proto.ParamsScannerRequest
 	json.Unmarshal([]byte(payload), &in)
-	if in.Timeout < 10 {
-		in.Timeout = 60 * 5
-	}
 
 	key, result, err := engines.StartNmapScan(in)
 	if err != nil {
