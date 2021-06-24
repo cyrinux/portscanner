@@ -78,6 +78,17 @@ func (w *Worker) StartWorker() {
 		}
 	}
 
+	go func() {
+		for {
+			returned, _ := incomingQueue.ReturnRejected(100)
+			if returned > 0 {
+				log.Printf("Returned reject message %v %v", returned, err)
+
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT)
 	defer signal.Stop(signals)
