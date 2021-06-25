@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"os"
 )
@@ -14,7 +15,7 @@ type Config struct {
 	DB           database.Database
 }
 
-func GetConfig() Config {
+func GetConfig(ctx context.Context) Config {
 
 	config := Config{
 		NumConsumers: os.Getenv("RMQ_CONSUMERS"),
@@ -31,7 +32,7 @@ func GetConfig() Config {
 		DBDriver: os.Getenv("DB_DRIVER"),
 	}
 
-	db, err := database.Factory(dbConfig)
+	db, err := database.Factory(ctx, dbConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -39,4 +40,14 @@ func GetConfig() Config {
 	config.DB = db
 
 	return config
+}
+
+func GetDBConfig() database.DBConfig {
+
+	dbConfig := database.DBConfig{
+		DBServer: os.Getenv("DB_SERVER"),
+		DBDriver: os.Getenv("DB_DRIVER"),
+	}
+
+	return dbConfig
 }

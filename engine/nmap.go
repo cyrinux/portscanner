@@ -43,46 +43,46 @@ func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsSc
 	} else if len(ports) == 0 && s.GetPingOnly() {
 		options = append(options, nmap.WithPingScan())
 	} else {
-		portsList = strings.Split(ports, ",")
 		options = append(options, nmap.WithPorts(portsList...))
-		isUDPScan := strings.Contains(ports, "U:")
-		isSCTPScan := strings.Contains(ports, "S:")
-		isTCPScan := strings.Contains(ports, "T:")
+	}
 
-		if isUDPScan {
-			options = append(options, nmap.WithUDPScan())
-		}
+	isUDPScan := strings.Contains(ports, "U:")
+	isSCTPScan := strings.Contains(ports, "S:")
+	isTCPScan := strings.Contains(ports, "T:")
 
-		if isTCPScan {
-			options = append(options, nmap.WithSYNScan())
-		}
+	if isUDPScan {
+		options = append(options, nmap.WithUDPScan())
+	}
 
-		if isSCTPScan {
-			options = append(options, nmap.WithSCTPInitScan())
-		}
+	if isTCPScan {
+		options = append(options, nmap.WithSYNScan())
+	}
 
-		if s.GetOsDetection() {
-			options = append(options, nmap.WithOSDetection())
-		}
+	if isSCTPScan {
+		options = append(options, nmap.WithSCTPInitScan())
+	}
 
-		if s.GetServiceVersionDetection() {
-			options = append(options, nmap.WithServiceInfo())
-		}
+	if s.GetOsDetection() {
+		options = append(options, nmap.WithOSDetection())
+	}
 
-		if s.GetServiceDefaultScripts() {
-			options = append(options, nmap.WithDefaultScript())
-		}
+	if s.GetServiceVersionDetection() {
+		options = append(options, nmap.WithServiceInfo())
+	}
 
-		if s.GetWithAggressiveScan() {
-			options = append(options, nmap.WithTimingTemplate(nmap.TimingAggressive))
-			options = append(options, nmap.WithAggressiveScan())
-		} else if s.GetPingOnly() {
-			options = append(options, nmap.WithPingScan())
-		} else if s.GetWithNullScan() {
-			options = append(options, nmap.WithTCPNullScan())
-		} else if s.GetWithSynScan() {
-			options = append(options, nmap.WithSYNScan())
-		}
+	if s.GetServiceDefaultScripts() {
+		options = append(options, nmap.WithDefaultScript())
+	}
+
+	if s.GetWithAggressiveScan() {
+		options = append(options, nmap.WithTimingTemplate(nmap.TimingAggressive))
+		options = append(options, nmap.WithAggressiveScan())
+	} else if s.GetPingOnly() {
+		options = append(options, nmap.WithPingScan())
+	} else if s.GetWithNullScan() {
+		options = append(options, nmap.WithTCPNullScan())
+	} else if s.GetWithSynScan() {
+		options = append(options, nmap.WithSYNScan())
 	}
 
 	return hostsList, portsList, options, nil
@@ -96,7 +96,7 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 	}
 
 	scanResultJSON, err := json.Marshal(scannerResponse)
-	_, err = e.config.DB.Set(s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
+	_, err = e.config.DB.Set(ctx, s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
 
 	// int32s in seconds
 	timeout := time.Duration(s.Timeout) * time.Second
@@ -148,14 +148,16 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 			previous = p
 			if p < previous {
 				continue
+			} else {
+				log.Printf("Running scan of host: %s, port: %s, timeout: %v, retention: %v: %v %%",
+					hosts,
+					ports,
+					timeout,
+					retention,
+					p,
+				)
 			}
-			log.Printf("Running scan of host: %s, port: %s, timeout: %v, retention: %v: %v %%",
-				hosts,
-				ports,
-				timeout,
-				retention,
-				p,
-			)
+			time.Sleep(5 * time.Second)
 		}
 	}()
 

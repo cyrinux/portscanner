@@ -2,7 +2,7 @@ package scanner
 
 import (
 	"encoding/json"
-	rmq "github.com/adjust/rmq/v3"
+	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
@@ -11,10 +11,6 @@ import (
 	"log"
 	"strings"
 	"time"
-)
-
-const (
-	shouldLog = true
 )
 
 type Server struct {
@@ -28,7 +24,7 @@ func NewServer(config config.Config) *Server {
 
 // DeleteScan delelee a scan from the database
 func (s *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
-	_, err := s.config.DB.Delete(in.Key)
+	_, err := s.config.DB.Delete(ctx, in.Key)
 	return generateResponse(in.Key, nil, err)
 }
 
@@ -36,7 +32,7 @@ func (s *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*
 func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
 	var scannerResponse proto.ScannerResponse
 
-	scanResult, err := s.config.DB.Get(in.Key)
+	scanResult, err := s.config.DB.Get(ctx, in.Key)
 	log.Printf("%v", scanResult)
 	if err != nil {
 		return generateResponse(in.Key, nil, err)
@@ -100,7 +96,11 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	scanResultJSON, _ := json.Marshal(scanParsedResult)
 
 	// and write the response to the database
-	_, err = s.config.DB.Set(key, string(scanResultJSON), time.Duration(request.GetRetentionTime())*time.Second)
+	_, err = s.config.DB.Set(
+		ctx, key,
+		string(scanResultJSON),
+		time.Duration(request.GetRetentionTime())*time.Second,
+	)
 	if err != nil {
 		return generateResponse(key, &scannerResponse, err)
 	}
@@ -114,6 +114,7 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 
 // Scan function prepare a nmap scan
 func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
+
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
@@ -138,6 +139,24 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	return generateResponse(request.Key, &scannerResponse, err)
 }
 
+// generateResponse generate the response for the grpc return
+func generateResponse(key string, value *proto.ScannerResponse, err error) (*proto.ServerResponse, error) {
+	if err != nil {
+		return &proto.ServerResponse{
+			Success: false,
+			Key:     key,
+			Value:   value,
+			Error:   err.Error(),
+		}, nil
+	}
+	return &proto.ServerResponse{
+		Success: true,
+		Key:     key,
+		Value:   value,
+		Error:   "",
+	}, nil
+}
+
 // rmqLogErrors display the rmq errors log
 func rmqLogErrors(errChan <-chan error) {
 	for err := range errChan {
@@ -156,22 +175,4 @@ func rmqLogErrors(errChan <-chan error) {
 			log.Print("other error: ", err)
 		}
 	}
-}
-
-// generateResponse generate the response for the grpc return
-func generateResponse(key string, value *proto.ScannerResponse, err error) (*proto.ServerResponse, error) {
-	if err != nil {
-		return &proto.ServerResponse{
-			Success: false,
-			Key:     key,
-			Value:   value,
-			Error:   err.Error(),
-		}, nil
-	}
-	return &proto.ServerResponse{
-		Success: true,
-		Key:     key,
-		Value:   value,
-		Error:   "",
-	}, nil
 }

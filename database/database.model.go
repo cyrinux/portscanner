@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"time"
 )
 
@@ -12,16 +13,16 @@ type DBConfig struct {
 
 // Database abstraction
 type Database interface {
-	Set(key string, value string, retention time.Duration) (string, error)
-	Get(key string) (string, error)
-	Delete(key string) (string, error)
+	Set(ctx context.Context, key string, value string, retention time.Duration) (string, error)
+	Get(ctx context.Context, key string) (string, error)
+	Delete(ctx context.Context, key string) (string, error)
 }
 
 // Factory looks up acording to the databaseName the database implementation
-func Factory(config DBConfig) (Database, error) {
+func Factory(ctx context.Context, config DBConfig) (Database, error) {
 	switch config.DBDriver {
 	case "redis":
-		return createRedisDatabase(config)
+		return createRedisDatabase(ctx, config)
 	default:
 		return nil, &NotImplementedDatabaseError{config.DBDriver}
 	}

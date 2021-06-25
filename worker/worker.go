@@ -4,26 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	rmq "github.com/adjust/rmq/v3"
-	"github.com/amyangfei/redlock-go/v2/redlock"
-	"github.com/cyrinux/grpcnmapscanner/config"
-	"github.com/cyrinux/grpcnmapscanner/engine"
-	"github.com/cyrinux/grpcnmapscanner/proto"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
+
+	rmq "github.com/adjust/rmq/v3"
+	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/engine"
+	"github.com/cyrinux/grpcnmapscanner/proto"
 )
 
 const (
-	prefetchLimit = 1000
-	pollDuration  = 100 * time.Millisecond
-
-	reportBatchSize = 10000
-	consumeDuration = time.Second
-	shouldLog       = true
+	prefetchLimit      = 1000
+	pollDuration       = 100 * time.Millisecond
+	pollDurationPushed = 5000 * time.Millisecond
+	reportBatchSize    = 10000
+	consumeDuration    = time.Second
 )
 
 type Worker struct {
@@ -35,55 +35,32 @@ type Worker struct {
 func NewWorker(config config.Config) *Worker {
 	return &Worker{
 		config: config,
-		ctx:    context.Background(),
+		ctx:    context.TODO(),
 	}
 }
 
 // StartWorker start a scanner worker
 func (w *Worker) StartWorker() {
-	lockMgr, err := redlock.NewRedLock([]string{w.config.RmqServer})
-	if err != nil {
-		log.Printf("Unable to connect redlock: %v", err)
-	}
 
-	numConsumersInt, err := strconv.ParseInt(w.config.NumConsumers, 10, 0)
-	if err != nil {
-		panic(err)
-	}
+	config := w.config
 
-	errChan := make(chan error, 10)
-	go rmqLogErrors(errChan)
-
-	connection, err := rmq.OpenConnection(w.config.RmqDbName, "tcp", w.config.RmqServer, 1, errChan)
+	numConsumers, err := strconv.ParseInt(
+		config.NumConsumers, 10, 0,
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	incomingQueue, err := connection.OpenQueue("tasks")
-	if err != nil {
-		panic(err)
-	}
-	if err := incomingQueue.StartConsuming(prefetchLimit, pollDuration); err != nil {
-		panic(err)
-	}
+	// open tasks queues and connection
+	incomingQueue, pushQueue, connection := openQueues(config)
 
-	pushQueue, err := connection.OpenQueue("tasks-rejected")
-	if err != nil {
-		panic(err)
-	}
-	incomingQueue.SetPushQueue(pushQueue)
-
-	if err := pushQueue.StartConsuming(prefetchLimit, pollDuration); err != nil {
-		panic(err)
-	}
-
-	for i := 0; i < int(numConsumersInt); i++ {
-		nameIncoming := fmt.Sprintf("consumer incoming %d", i)
-		if _, err := incomingQueue.AddConsumer(nameIncoming, NewConsumer(i, "incoming", w.config)); err != nil {
+	for i := 0; i < int(numConsumers); i++ {
+		tag, consumer := NewConsumer(i, "incoming", config)
+		if _, err := incomingQueue.AddConsumer(tag, consumer); err != nil {
 			panic(err)
 		}
-		namePush := fmt.Sprintf("consumer push %d", i)
-		if _, err := pushQueue.AddConsumer(namePush, NewConsumer(i, "push", w.config)); err != nil {
+		tag, consumer = NewConsumer(i, "push", config)
+		if _, err := pushQueue.AddConsumer(tag, consumer); err != nil {
 			panic(err)
 		}
 	}
@@ -91,18 +68,10 @@ func (w *Worker) StartWorker() {
 	// returned messages rejected/delayed back to the incoming queue
 	go func() {
 		for {
-			expiry, err := lockMgr.Lock(w.ctx, "tasks_returner", 15*time.Second)
-			if err != nil {
-				log.Printf("Returner loop: %v", err)
-			} else {
-				log.Printf("Returner loop: took the lock, expiry: %v", expiry)
-			}
-			returned, _ := incomingQueue.ReturnRejected(1000)
+			returned, _ := incomingQueue.ReturnRejected(math.MaxInt64)
 			if returned > 0 {
 				log.Printf("Returned reject message %v", returned)
-
 			}
-			lockMgr.UnLock(w.ctx, "tasks_returner")
 			time.Sleep(1 * time.Second)
 		}
 	}()
@@ -115,7 +84,6 @@ func (w *Worker) StartWorker() {
 	<-signals // wait for signal
 	go func() {
 		<-signals // hard exit on second signal (in case shutdown gets stuck)
-		lockMgr.UnLock(w.ctx, "tasks_returner")
 		os.Exit(1)
 	}()
 
@@ -130,15 +98,15 @@ type Consumer struct {
 	config config.Config
 }
 
-func NewConsumer(tag int, queue string, config config.Config) *Consumer {
+func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer) {
 	hostname, _ := os.Hostname()
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Printf("New consumer: %s\n", name)
-	return &Consumer{
+	return name, &Consumer{
 		name:   name,
 		count:  0,
 		before: time.Now(),
-		ctx:    context.TODO(),
+		ctx:    context.Background(),
 		config: config,
 	}
 }
@@ -150,7 +118,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 	consumer.count++
 	if consumer.count%reportBatchSize == 0 {
-		duration := time.Now().Sub(consumer.before)
+		duration := time.Since(consumer.before)
 		consumer.before = time.Now()
 		perSecond := time.Second / (duration / reportBatchSize)
 		log.Printf("%s consumed %d %s %d", consumer.name, consumer.count, payload, perSecond)
@@ -182,7 +150,10 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		if err != nil {
 			log.Printf("failed to parse result: %s", err)
 		}
-		_, err = consumer.config.DB.Set(key, string(scanResultJSON), time.Duration(request.GetRetentionTime())*time.Second)
+		_, err = consumer.config.DB.Set(
+			consumer.ctx, key, string(scanResultJSON),
+			time.Duration(request.GetRetentionTime())*time.Second,
+		)
 		if err != nil {
 			log.Printf("failed to insert result: %s", err)
 		}
@@ -222,4 +193,37 @@ func rmqLogErrors(errChan <-chan error) {
 			log.Print("other error: ", err)
 		}
 	}
+}
+
+// openQueues open the broker queues
+func openQueues(config config.Config) (rmq.Queue, rmq.Queue, rmq.Connection) {
+	errChan := make(chan error, 10)
+	go rmqLogErrors(errChan)
+
+	connection, err := rmq.OpenConnection(
+		config.RmqDbName, "tcp", config.RmqServer, 1, errChan,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	incomingQueue, err := connection.OpenQueue("tasks")
+	if err != nil {
+		panic(err)
+	}
+	if err := incomingQueue.StartConsuming(prefetchLimit, pollDuration); err != nil {
+		panic(err)
+	}
+
+	pushQueue, err := connection.OpenQueue("tasks-rejected")
+	if err != nil {
+		panic(err)
+	}
+	incomingQueue.SetPushQueue(pushQueue)
+
+	if err := pushQueue.StartConsuming(prefetchLimit, pollDurationPushed); err != nil {
+		panic(err)
+	}
+
+	return incomingQueue, pushQueue, connection
 }
