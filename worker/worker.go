@@ -38,7 +38,7 @@ type Worker struct {
 func NewWorker(config config.Config) *Worker {
 	return &Worker{
 		config: config,
-		ctx:    context.TODO(),
+		ctx:    context.Background(),
 	}
 }
 
@@ -68,7 +68,20 @@ func (worker *Worker) StartWorker() {
 		}
 	}
 
-	startReturner(ctx, incomingQueue)
+	// Connect to redis.
+	//	there is shit inside, this crash
+	client := redis.NewClient(&redis.Options{
+		Network:  "tcp",
+		Addr:     "redis:6379",
+		Password: "",
+		DB:       0,
+	})
+	defer client.Close()
+
+	// Create a new lock client.
+	locker := redislock.New(*client)
+
+	startReturner(ctx, incomingQueue, locker)
 
 	// manage signals
 	signals := make(chan os.Signal, 1)
@@ -124,15 +137,15 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime >= time.Now().Unix() {
 		if err := delivery.Reject(); err != nil {
-			log.Printf("failed to reject %s: %s", payload, err)
+			log.Printf("%s: failed to reject %s: %s", consumer.name, payload, err)
 		} else {
-			log.Printf("delayed %s, this is too early", payload)
+			log.Printf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	} else {
 		newEngine := engine.NewEngine(consumer.config)
 		key, result, err := newEngine.StartNmapScan(consumer.ctx, request)
 		if err != nil {
-			log.Printf("Scan %v %v: %v", key, result, err)
+			log.Printf("%s: scan %v %v: %v", consumer.name, key, result, err)
 		}
 
 		key, scanResult, _ := engine.ParseScanResult(key, result)
@@ -142,27 +155,27 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		}
 		scanResultJSON, err := json.Marshal(scannerResponse)
 		if err != nil {
-			log.Printf("failed to parse result: %s", err)
+			log.Printf("%s: failed to parse result: %s", consumer.name, err)
 		}
 		_, err = consumer.config.DB.Set(
 			consumer.ctx, key, string(scanResultJSON),
 			time.Duration(request.GetRetentionTime())*time.Second,
 		)
 		if err != nil {
-			log.Printf("failed to insert result: %s", err)
+			log.Printf("%s: failed to insert result: %s", consumer.name, err)
 		}
 
 		if consumer.count%reportBatchSize > 0 {
 			if err := delivery.Ack(); err != nil {
-				log.Printf("failed to ack %s: %s", payload, err)
+				log.Printf("%s: failed to ack %s: %s", consumer.name, payload, err)
 			} else {
-				log.Printf("acked %s", payload)
+				log.Printf("%s: acked %s", consumer.name, payload)
 			}
 		} else { // reject one per batch
 			if err := delivery.Reject(); err != nil {
-				log.Printf("failed to reject %s: %s", payload, err)
+				log.Printf("%s: failed to reject %s: %s", consumer.name, payload, err)
 			} else {
-				log.Printf("rejected %s", payload)
+				log.Printf("%s: rejected %s", consumer.name, payload)
 			}
 		}
 	}
@@ -223,39 +236,28 @@ func openQueues(config config.Config) (rmq.Queue, rmq.Queue, rmq.Connection) {
 }
 
 // Locker help to lock some tasks
-func startReturner(ctx context.Context, queue rmq.Queue) {
-	ctx = context.Background()
-	// Connect to redis.
-	//	there is shit inside, this crash
-	client := redis.NewClient(&redis.Options{
-		Network:  "tcp",
-		Addr:     "redis:6379",
-		Password: "",
-		DB:       0,
-	})
-	defer client.Close()
+func startReturner(ctx context.Context, queue rmq.Queue, locker *redislock.Client) {
 
-	// Create a new lock client.
-	locker := redislock.New(client)
 	for {
-		fmt.Println("I have the returner lock!")
 		// Try to obtain lock.
-		lock, err := locker.Obtain(ctx, "returner", 10000*time.Millisecond, nil)
+		lock, err := locker.Obtain(ctx, "returner", 5*time.Second, nil)
 		if err == redislock.ErrNotObtained {
 			continue
-		} else if err != nil {
+		} else if err != nil && err != redislock.ErrNotObtained {
 			log.Fatalln(err)
 		}
 		// Sleep and check the remaining TTL.
 		if ttl, err := lock.TTL(ctx); err != nil {
 			log.Fatalln(err)
 		} else if ttl > 0 {
-			// fmt.Println("Yay, I still have my lock!")
+			// Yay, I still have my lock!
 			returned, _ := queue.ReturnRejected(math.MaxInt64)
 			if returned > 0 {
 				log.Printf("Returned reject message %v", returned)
+				lock.Release(ctx)
+			} else {
+				lock.Refresh(ctx, 1*time.Second, nil)
 			}
-			lock.Release(ctx)
 		}
 		time.Sleep(1 * time.Second)
 	}
