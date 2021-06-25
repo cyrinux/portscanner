@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/signal"
 	"strconv"
@@ -69,7 +68,6 @@ func (worker *Worker) StartWorker() {
 	}
 
 	// Connect to redis.
-	//	there is shit inside, this crash
 	client := redis.NewClient(&redis.Options{
 		Network:  "tcp",
 		Addr:     "redis:6379",
@@ -240,7 +238,7 @@ func startReturner(ctx context.Context, queue rmq.Queue, locker *redislock.Clien
 
 	for {
 		// Try to obtain lock.
-		lock, err := locker.Obtain(ctx, "returner", 5*time.Second, nil)
+		lock, err := locker.Obtain(ctx, "returner", 10*time.Second, nil)
 		if err == redislock.ErrNotObtained {
 			continue
 		} else if err != nil && err != redislock.ErrNotObtained {
@@ -251,13 +249,11 @@ func startReturner(ctx context.Context, queue rmq.Queue, locker *redislock.Clien
 			log.Fatalln(err)
 		} else if ttl > 0 {
 			// Yay, I still have my lock!
-			returned, _ := queue.ReturnRejected(math.MaxInt64)
+			returned, _ := queue.ReturnRejected(100) // max math.MaxInt64
 			if returned > 0 {
 				log.Printf("Returned reject message %v", returned)
-				lock.Release(ctx)
-			} else {
-				lock.Refresh(ctx, 1*time.Second, nil)
 			}
+			lock.Refresh(ctx, 1*time.Second, nil)
 		}
 		time.Sleep(1 * time.Second)
 	}

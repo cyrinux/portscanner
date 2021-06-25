@@ -10,17 +10,17 @@ volumes:
     driver: local
 
 services:
-  client:
-    image: namely/grpc-cli
-    environment:
-      - TZ=Europe/Paris
-    networks:
-      - backend
-    depends_on:
-      - server
-      - worker
-      - redis
-    command: "ls redis:9000 proto.ScannerService -l"
+  # client:
+  #   image: namely/grpc-cli
+  #   environment:
+  #     - TZ=Europe/Paris
+  #   networks:
+  #     - backend
+  #   depends_on:
+  #     - server
+  #     - worker
+  #     - redis
+  #   command: "ls redis:9000 proto.ScannerService -l"
 
   server:
     hostname: server
