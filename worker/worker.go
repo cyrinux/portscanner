@@ -13,9 +13,11 @@ import (
 	"time"
 
 	rmq "github.com/adjust/rmq/v3"
+	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
+	"github.com/go-redis/redis/v8"
 )
 
 const (
@@ -26,6 +28,7 @@ const (
 	consumeDuration    = time.Second
 )
 
+// Worker define the worker struct
 type Worker struct {
 	ctx    context.Context
 	config config.Config
@@ -40,9 +43,9 @@ func NewWorker(config config.Config) *Worker {
 }
 
 // StartWorker start a scanner worker
-func (w *Worker) StartWorker() {
-
-	config := w.config
+func (worker *Worker) StartWorker() {
+	config := worker.config
+	ctx := worker.ctx
 
 	numConsumers, err := strconv.ParseInt(
 		config.NumConsumers, 10, 0,
@@ -65,16 +68,7 @@ func (w *Worker) StartWorker() {
 		}
 	}
 
-	// returned messages rejected/delayed back to the incoming queue
-	go func() {
-		for {
-			returned, _ := incomingQueue.ReturnRejected(math.MaxInt64)
-			if returned > 0 {
-				log.Printf("Returned reject message %v", returned)
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}()
+	startReturner(ctx, incomingQueue)
 
 	// manage signals
 	signals := make(chan os.Signal, 1)
@@ -111,6 +105,7 @@ func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer
 	}
 }
 
+// Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
 	log.Printf("start consume %s", payload)
@@ -226,4 +221,44 @@ func openQueues(config config.Config) (rmq.Queue, rmq.Queue, rmq.Connection) {
 	}
 
 	return incomingQueue, pushQueue, connection
+}
+
+// Locker help to lock some tasks
+func startReturner(ctx context.Context, queue rmq.Queue) {
+	// Connect to redis.
+	client := redis.NewClient(&redis.Options{
+		Network: "tcp",
+		Addr:    "redis:6379",
+	})
+	defer client.Close()
+	// Create a new lock client.
+	locker := redislock.New(client)
+
+	go func() {
+		for {
+			fmt.Println("I have the returner lock!")
+			// Try to obtain lock.
+			lock, err := locker.Obtain(ctx, "returner", 2000*time.Millisecond, nil)
+			if err == redislock.ErrNotObtained {
+				fmt.Println("Could not obtain the returner lock!")
+			} else if err != nil {
+				log.Fatalln(err)
+			}
+			// Sleep and check the remaining TTL.
+			if ttl, err := lock.TTL(ctx); err != nil {
+				log.Fatalln(err)
+			} else if ttl > 0 {
+				fmt.Println("Yay, I still have my lock!")
+				returned, _ := queue.ReturnRejected(math.MaxInt64)
+				if returned > 0 {
+					log.Printf("Returned reject message %v", returned)
+					// Extend my lock.
+					if err := lock.Refresh(ctx, 2000*time.Millisecond, nil); err != nil {
+						log.Fatalln(err)
+					}
+				}
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}()
 }
