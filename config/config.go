@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"github.com/cyrinux/grpcnmapscanner/database"
+	"log"
 	"os"
 )
 
@@ -34,20 +35,10 @@ func GetConfig(ctx context.Context) Config {
 
 	db, err := database.Factory(ctx, dbConfig)
 	if err != nil {
-		panic(err)
+		log.Println(err)
 	}
 
 	config.DB = db
 
 	return config
-}
-
-func GetDBConfig() database.DBConfig {
-
-	dbConfig := database.DBConfig{
-		DBServer: os.Getenv("DB_SERVER"),
-		DBDriver: os.Getenv("DB_DRIVER"),
-	}
-
-	return dbConfig
 }

@@ -80,7 +80,6 @@ func (worker *Worker) StartWorker() {
 		<-signals // hard exit on second signal (in case shutdown gets stuck)
 		os.Exit(1)
 	}()
-
 	<-connection.StopAllConsuming() // wait for all Consume() calls to finish
 }
 
@@ -225,40 +224,39 @@ func openQueues(config config.Config) (rmq.Queue, rmq.Queue, rmq.Connection) {
 
 // Locker help to lock some tasks
 func startReturner(ctx context.Context, queue rmq.Queue) {
+	ctx = context.Background()
 	// Connect to redis.
+	//	there is shit inside, this crash
 	client := redis.NewClient(&redis.Options{
-		Network: "tcp",
-		Addr:    "redis:6379",
+		Network:  "tcp",
+		Addr:     "redis:6379",
+		Password: "",
+		DB:       0,
 	})
 	defer client.Close()
+
 	// Create a new lock client.
 	locker := redislock.New(client)
-
-	go func() {
-		for {
-			fmt.Println("I have the returner lock!")
-			// Try to obtain lock.
-			lock, err := locker.Obtain(ctx, "returner", 2000*time.Millisecond, nil)
-			if err == redislock.ErrNotObtained {
-				fmt.Println("Could not obtain the returner lock!")
-			} else if err != nil {
-				log.Fatalln(err)
-			}
-			// Sleep and check the remaining TTL.
-			if ttl, err := lock.TTL(ctx); err != nil {
-				log.Fatalln(err)
-			} else if ttl > 0 {
-				fmt.Println("Yay, I still have my lock!")
-				returned, _ := queue.ReturnRejected(math.MaxInt64)
-				if returned > 0 {
-					log.Printf("Returned reject message %v", returned)
-					// Extend my lock.
-					if err := lock.Refresh(ctx, 2000*time.Millisecond, nil); err != nil {
-						log.Fatalln(err)
-					}
-				}
-			}
-			time.Sleep(1 * time.Second)
+	for {
+		fmt.Println("I have the returner lock!")
+		// Try to obtain lock.
+		lock, err := locker.Obtain(ctx, "returner", 10000*time.Millisecond, nil)
+		if err == redislock.ErrNotObtained {
+			continue
+		} else if err != nil {
+			log.Fatalln(err)
 		}
-	}()
+		// Sleep and check the remaining TTL.
+		if ttl, err := lock.TTL(ctx); err != nil {
+			log.Fatalln(err)
+		} else if ttl > 0 {
+			// fmt.Println("Yay, I still have my lock!")
+			returned, _ := queue.ReturnRejected(math.MaxInt64)
+			if returned > 0 {
+				log.Printf("Returned reject message %v", returned)
+			}
+			lock.Release(ctx)
+		}
+		time.Sleep(1 * time.Second)
+	}
 }
