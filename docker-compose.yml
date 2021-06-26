@@ -33,6 +33,7 @@ services:
       - DB_DRIVER=redis
       - DB_SERVER=redis:6379
       - RMQ_DB_SERVER=redis:6379
+      - RMQ_DB_PASSWORD=
       - RMQ_DB_NAME=scanner
     cap_add:
       - NET_ADMIN
@@ -55,7 +56,8 @@ services:
       - DB_SERVER=redis:6379
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
-      - RMQ_CONSUMERS=50
+      - RMQ_DB_PASSWORD=
+      - RMQ_CONSUMERS=3
     restart: always
     cap_add:
       - NET_ADMIN

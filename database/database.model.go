@@ -6,9 +6,10 @@ import (
 )
 
 type DBConfig struct {
-	DBDriver string
-	DBName   string
-	DBServer string
+	DBDriver   string
+	DBName     string
+	DBServer   string
+	DBPassword string
 }
 
 // Database abstraction

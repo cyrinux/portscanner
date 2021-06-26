@@ -6,6 +6,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
+	"github.com/go-redis/redis/v8"
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
 	"log"
@@ -33,7 +34,7 @@ func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*pro
 	var scannerResponse proto.ScannerResponse
 
 	scanResult, err := s.config.DB.Get(ctx, in.Key)
-	log.Printf("%v", scanResult)
+	log.Printf("%s %v", in.Key, scanResult)
 	if err != nil {
 		return generateResponse(in.Key, nil, err)
 	}
@@ -118,10 +119,22 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
-	connection, err := rmq.OpenConnection(s.config.RmqDbName, "tcp", s.config.RmqServer, 1, errChan)
+	connection, err := rmq.OpenConnectionWithRedisClient(
+		s.config.RmqDbName,
+		redisConnect(ctx, s),
+		errChan,
+	)
 	taskQueue, err := connection.OpenQueue("tasks")
 
 	request := parseParamsScannerRequest(in)
+
+	// and write the response to the database
+	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
+	scanResponseJSON, _ := json.Marshal(&scannerResponse)
+	_, err = s.config.DB.Set(ctx, request.Key, string(scanResponseJSON), 0)
+	if err != nil {
+		log.Print(err)
+	}
 
 	// create scan task
 	taskScanBytes, err := json.Marshal(request)
@@ -135,7 +148,7 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 		return generateResponse(request.Key, &scannerResponse, err)
 	}
 
-	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
+	scannerResponse = proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
 	return generateResponse(request.Key, &scannerResponse, err)
 }
 
@@ -175,4 +188,21 @@ func rmqLogErrors(errChan <-chan error) {
 			log.Print("other error: ", err)
 		}
 	}
+}
+
+func redisConnect(ctx context.Context, s *Server) *redis.Client {
+	config := s.config
+	// Connect to redis for the locker
+	redisClient := redis.NewClient(&redis.Options{
+		Network:  "tcp",
+		Addr:     config.RmqServer,
+		Password: config.RmqDbPassword,
+		DB:       0,
+	})
+	_, err := redisClient.Ping(ctx).Result()
+	if err != nil {
+		panic(err)
+	}
+
+	return redisClient
 }

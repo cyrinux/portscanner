@@ -4,27 +4,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	rmq "github.com/adjust/rmq/v4"
+	"github.com/bsm/redislock"
+	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/engine"
+	"github.com/cyrinux/grpcnmapscanner/proto"
+	"github.com/go-redis/redis/v8"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
-
-	rmq "github.com/adjust/rmq/v3"
-	"github.com/bsm/redislock"
-	"github.com/cyrinux/grpcnmapscanner/config"
-	"github.com/cyrinux/grpcnmapscanner/engine"
-	"github.com/cyrinux/grpcnmapscanner/proto"
-	"github.com/go-redis/redis/v8"
 )
 
 const (
 	prefetchLimit      = 1000
+	returnerLimit      = 1000
 	pollDuration       = 100 * time.Millisecond
 	pollDurationPushed = 5000 * time.Millisecond
 	reportBatchSize    = 10000
-	consumeDuration    = time.Second
+	consumeDuration    = 5 * time.Second
+)
+
+var (
+	hostname, _ = os.Hostname()
 )
 
 // Worker define the worker struct
@@ -54,7 +58,11 @@ func (worker *Worker) StartWorker() {
 	}
 
 	// open tasks queues and connection
-	incomingQueue, pushQueue, connection := openQueues(config)
+	incomingQueue, pushQueue, connection := openQueues(ctx, config, worker)
+
+	// start the returner
+	locker := redislock.New(redisConnect(ctx, worker))
+	worker.startReturner(ctx, locker, incomingQueue)
 
 	for i := 0; i < int(numConsumers); i++ {
 		tag, consumer := NewConsumer(i, "incoming", config)
@@ -66,20 +74,6 @@ func (worker *Worker) StartWorker() {
 			panic(err)
 		}
 	}
-
-	// Connect to redis.
-	client := redis.NewClient(&redis.Options{
-		Network:  "tcp",
-		Addr:     "redis:6379",
-		Password: "",
-		DB:       0,
-	})
-	defer client.Close()
-
-	// Create a new lock client.
-	locker := redislock.New(*client)
-
-	startReturner(ctx, incomingQueue, locker)
 
 	// manage signals
 	signals := make(chan os.Signal, 1)
@@ -103,14 +97,13 @@ type Consumer struct {
 }
 
 func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer) {
-	hostname, _ := os.Hostname()
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Printf("New consumer: %s\n", name)
 	return name, &Consumer{
 		name:   name,
 		count:  0,
 		before: time.Now(),
-		ctx:    context.Background(),
+		ctx:    context.TODO(),
 		config: config,
 	}
 }
@@ -118,7 +111,7 @@ func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer
 // Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
-	log.Printf("start consume %s", payload)
+	log.Printf("%s: start consume %s", consumer.name, payload)
 	time.Sleep(consumeDuration)
 
 	consumer.count++
@@ -126,7 +119,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		duration := time.Since(consumer.before)
 		consumer.before = time.Now()
 		perSecond := time.Second / (duration / reportBatchSize)
-		log.Printf("%s consumed %d %s %d", consumer.name, consumer.count, payload, perSecond)
+		log.Printf("%s: consumed %d %s %d", consumer.name, consumer.count, payload, perSecond)
 	}
 
 	var request *proto.ParamsScannerRequest
@@ -200,13 +193,42 @@ func rmqLogErrors(errChan <-chan error) {
 	}
 }
 
+// Locker help to lock some tasks
+func (worker *Worker) startReturner(ctx context.Context, locker *redislock.Client, queue rmq.Queue) {
+	go func() {
+		for {
+			// Try to obtain lock.
+			lock, err := locker.Obtain(ctx, "returner", 10*time.Second, nil)
+			if err != nil && err != redislock.ErrNotObtained {
+				log.Fatalln(err)
+			} else if err != redislock.ErrNotObtained {
+				// Sleep and check the remaining TTL.
+				if ttl, err := lock.TTL(ctx); err != nil {
+					log.Fatalf("Returner error: %v: ttl: %v", err, ttl)
+				} else if ttl > 0 {
+					// Yay, I still have my lock!
+					returned, _ := queue.ReturnRejected(returnerLimit)
+					if returned > 0 {
+						log.Printf("Returned reject message %v", returned)
+					}
+					lock.Refresh(ctx, 5*time.Second, nil)
+				}
+			}
+			// cpu cooling
+			time.Sleep(1 * time.Second)
+		}
+	}()
+}
+
 // openQueues open the broker queues
-func openQueues(config config.Config) (rmq.Queue, rmq.Queue, rmq.Connection) {
+func openQueues(
+	ctx context.Context, config config.Config, worker *Worker,
+) (rmq.Queue, rmq.Queue, rmq.Connection) {
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
-	connection, err := rmq.OpenConnection(
-		config.RmqDbName, "tcp", config.RmqServer, 1, errChan,
+	connection, err := rmq.OpenConnectionWithRedisClient(
+		config.RmqDbName, redisConnect(ctx, worker), errChan,
 	)
 	if err != nil {
 		panic(err)
@@ -233,28 +255,19 @@ func openQueues(config config.Config) (rmq.Queue, rmq.Queue, rmq.Connection) {
 	return incomingQueue, pushQueue, connection
 }
 
-// Locker help to lock some tasks
-func startReturner(ctx context.Context, queue rmq.Queue, locker *redislock.Client) {
-
-	for {
-		// Try to obtain lock.
-		lock, err := locker.Obtain(ctx, "returner", 10*time.Second, nil)
-		if err == redislock.ErrNotObtained {
-			continue
-		} else if err != nil && err != redislock.ErrNotObtained {
-			log.Fatalln(err)
-		}
-		// Sleep and check the remaining TTL.
-		if ttl, err := lock.TTL(ctx); err != nil {
-			log.Fatalln(err)
-		} else if ttl > 0 {
-			// Yay, I still have my lock!
-			returned, _ := queue.ReturnRejected(100) // max math.MaxInt64
-			if returned > 0 {
-				log.Printf("Returned reject message %v", returned)
-			}
-			lock.Refresh(ctx, 1*time.Second, nil)
-		}
-		time.Sleep(1 * time.Second)
+func redisConnect(ctx context.Context, worker *Worker) *redis.Client {
+	config := worker.config
+	// Connect to redis for the locker
+	redisClient := redis.NewClient(&redis.Options{
+		Network:  "tcp",
+		Addr:     config.RmqServer,
+		Password: config.RmqDbPassword,
+		DB:       0,
+	})
+	_, err := redisClient.Ping(ctx).Result()
+	if err != nil {
+		panic(err)
 	}
+
+	return redisClient
 }

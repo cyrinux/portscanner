@@ -4,12 +4,9 @@ go 1.16
 
 require (
 	github.com/Ullaakut/nmap/v2 v2.1.1
-	github.com/adjust/rmq/v3 v3.0.0
 	github.com/adjust/rmq/v4 v4.0.1
 	github.com/bsm/redislock v0.7.1
-	github.com/go-redis/redis v6.15.9+incompatible // indirect
 	github.com/go-redis/redis/v8 v8.10.0
-	github.com/go-redsync/redsync/v4 v4.3.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/rs/xid v1.3.0
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
