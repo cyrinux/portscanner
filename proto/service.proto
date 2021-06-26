@@ -63,6 +63,17 @@ message ParamsScannerRequest {
     string crontab = 15;
 }
 
+message ScannerServiceControl {
+    enum ServiceState {
+        UNKNOWN = 0;
+        START = 1;
+        STARTED = 2;
+        STOP = 3;
+        STOPPED = 4;
+    }
+    ServiceState state = 1;
+}
+
 message GetScannerRequest {
     string key = 1;
 }
@@ -80,4 +91,6 @@ service ScannerService {
     rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
     rpc GetScan(GetScannerRequest) returns (ServerResponse);
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
+    rpc ServiceControl(ScannerServiceControl) returns (ScannerServiceControl);
 }
+

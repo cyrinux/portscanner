@@ -96,7 +96,13 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 	}
 
 	scanResultJSON, err := json.Marshal(scannerResponse)
+	if err != nil {
+		return s.Key, nil, err
+	}
 	_, err = e.config.DB.Set(ctx, s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
+	if err != nil {
+		return s.Key, nil, err
+	}
 
 	// int32s in seconds
 	timeout := time.Duration(s.Timeout) * time.Second
@@ -114,18 +120,6 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 
 	// add context to nmap options
 	options = append(options, nmap.WithContext(ctx))
-
-	// // Filter out hosts that don't have any open ports
-	// options = append(options, nmap.WithFilterHost(func(h nmap.Host) bool {
-	// 	// Filter out hosts with no open ports.
-	// 	for idx := range h.Ports {
-	// 		if h.Ports[idx].Status() == "open" {
-	// 			return false
-	// 		}
-	// 	}
-
-	// 	return true
-	// }))
 
 	// create a nmap scanner
 	scanner, err := nmap.NewScanner(options...)
@@ -160,6 +154,21 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 			time.Sleep(5 * time.Second)
 		}
 	}()
+
+	// go func() {
+	// 	select {
+	// 	case <-time.After(2 * time.Second):
+	// 		// If we receive a message after 2 seconds
+	// 		// that means the request has been processed
+	// 		// We then write this as the response
+	// 		log.Println("processing request")
+	// 	case <-ctx.Done():
+	// 		// If the request gets cancelled, log it
+	// 		// to STDERR
+	// 		log.Println("request cancelled")
+	// 	}
+
+	// }()
 
 	result, warnings, err := scanner.RunWithProgress(progress)
 	if err != nil {

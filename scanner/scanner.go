@@ -14,27 +14,60 @@ import (
 	"time"
 )
 
+// Server define the grpc server struct
 type Server struct {
-	config config.Config
+	config      config.Config
+	queue       rmq.Queue
+	err         error
+	workerState proto.ScannerServiceControl
 }
 
 // NewServer create a new server and init the database connection
 func NewServer(config config.Config) *Server {
-	return &Server{config}
+	ctx := context.Background()
+	errChan := make(chan error, 10)
+	go rmqLogErrors(errChan)
+
+	connection, err := rmq.OpenConnectionWithRedisClient(
+		config.RmqDbName,
+		util.RedisConnect(ctx, config),
+		errChan,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	queue, err := connection.OpenQueue("tasks")
+	if err != nil {
+		panic(err)
+	}
+
+	return &Server{config: config, queue: queue, err: err}
 }
 
-// DeleteScan delelee a scan from the database
-func (s *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
-	_, err := s.config.DB.Delete(ctx, in.Key)
+// DeleteScan delele a scan from the database
+func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
+	_, err := server.config.DB.Delete(ctx, in.Key)
 	return generateResponse(in.Key, nil, err)
 }
 
-// GetScan fetch a scan from the database by key id
-func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
+// ServiceControl control the service
+func (server *Server) ServiceControl(ctx context.Context, in *proto.ScannerServiceControl) (*proto.ScannerServiceControl, error) {
+	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
+		return &proto.ScannerServiceControl{State: server.workerState.State}, nil
+	} else {
+		if server.workerState.State != in.State {
+			server.workerState.State = in.State
+		}
+	}
+	return &proto.ScannerServiceControl{State: server.workerState.State}, nil
+}
+
+// GetScan return the engine scan resultt
+func (server *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
 	var scannerResponse proto.ScannerResponse
 
-	scanResult, err := s.config.DB.Get(ctx, in.Key)
-	log.Printf("%s %v", in.Key, scanResult)
+	scanResult, err := server.config.DB.Get(ctx, in.Key)
 	if err != nil {
 		return generateResponse(in.Key, nil, err)
 	}
@@ -47,57 +80,30 @@ func (s *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*pro
 	return generateResponse(in.Key, &scannerResponse, nil)
 }
 
-func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.ParamsScannerRequest {
-
-	// if the Key is not forced, we generate one unique
-	guid := xid.New()
-	if request.Key == "" {
-		request.Key = guid.String()
-	}
-
-	// If timeout < 10s, fallback to 1h
-	if request.Timeout < 30 {
-		request.Timeout = 60 * 60
-	}
-
-	// replace all whitespaces
-	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
-	request.Ports = strings.ReplaceAll(request.Ports, " ", "")
-
-	// add the defer duration to the current unix timestamp
-	request.DeferDuration = time.Now().Add(time.Duration(request.DeferDuration) * time.Second).Unix()
-
-	return request
-
-}
-
-// Scan function prepare a nmap scan
-func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
-
+// StartScan function prepare a nmap scan
+func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
 	// sanitize
 	request := parseParamsScannerRequest(in)
 
 	// we start the scan
-	newEngine := engine.NewEngine(s.config)
+	newEngine := engine.NewEngine(server.config)
 
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 
 	key, scanResult, err := newEngine.StartNmapScan(ctx, request)
 	if err != nil || scanResult == nil {
-		// and write the response to the database
 		return generateResponse(key, nil, err)
 	}
 
 	key, scanParsedResult, err := engine.ParseScanResult(key, scanResult)
 	if err != nil {
-		// and write the response to the database
 		return generateResponse(key, nil, err)
 	}
 
 	scanResultJSON, _ := json.Marshal(scanParsedResult)
 
 	// and write the response to the database
-	_, err = s.config.DB.Set(
+	_, err = server.config.DB.Set(
 		ctx, key,
 		string(scanResultJSON),
 		time.Duration(request.GetRetentionTime())*time.Second,
@@ -113,25 +119,15 @@ func (s *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) 
 	return generateResponse(key, &scannerResponse, err)
 }
 
-// Scan function prepare a nmap scan
-func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
-
-	errChan := make(chan error, 10)
-	go rmqLogErrors(errChan)
-
-	connection, err := rmq.OpenConnectionWithRedisClient(
-		s.config.RmqDbName,
-		util.RedisConnect(ctx, s.config),
-		errChan,
-	)
-	taskQueue, err := connection.OpenQueue("tasks")
+// StartAsyncScan function prepare a nmap scan
+func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
 
 	request := parseParamsScannerRequest(in)
 
 	// and write the response to the database
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
 	scanResponseJSON, _ := json.Marshal(&scannerResponse)
-	_, err = s.config.DB.Set(ctx, request.Key, string(scanResponseJSON), 0)
+	_, err := server.config.DB.Set(ctx, request.Key, string(scanResponseJSON), 0)
 	if err != nil {
 		log.Print(err)
 	}
@@ -142,7 +138,7 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 		return generateResponse(request.Key, &scannerResponse, err)
 	}
-	err = taskQueue.PublishBytes(taskScanBytes)
+	err = server.queue.PublishBytes(taskScanBytes)
 	if err != nil {
 		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 		return generateResponse(request.Key, &scannerResponse, err)
@@ -188,4 +184,27 @@ func rmqLogErrors(errChan <-chan error) {
 			log.Print("other error: ", err)
 		}
 	}
+}
+
+func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.ParamsScannerRequest {
+
+	// if the Key is not forced, we generate one unique
+	guid := xid.New()
+	if request.Key == "" {
+		request.Key = guid.String()
+	}
+
+	// If timeout < 10s, fallback to 1h
+	if request.Timeout < 30 {
+		request.Timeout = 60 * 60
+	}
+
+	// replace all whitespaces
+	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
+	request.Ports = strings.ReplaceAll(request.Ports, " ", "")
+
+	// add the defer duration to the current unix timestamp
+	request.DeferDuration = time.Now().Add(time.Duration(request.DeferDuration) * time.Second).Unix()
+
+	return request
 }

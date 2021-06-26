@@ -11,7 +11,10 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -43,6 +46,25 @@ type Broker struct {
 	incoming   rmq.Queue
 	pushed     rmq.Queue
 	connection rmq.Connection
+}
+
+func (worker *Worker) GetState() {
+	var conn *grpc.ClientConn
+	conn, err := grpc.Dial("tcp://server:9000", grpc.WithInsecure())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not connect: %s", err)
+		return
+	}
+	defer conn.Close()
+
+	toServer := proto.NewServerWorkerCommClient(conn)
+
+	state := proto.ScannerServiceControl{State: 0}
+	go func() {
+		var response *proto.ScannerServiceControl
+
+		time.Sleep(1 * time.Second)
+	}()
 }
 
 // NewWorker create a new worker and init the database connection

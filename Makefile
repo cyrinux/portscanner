@@ -2,11 +2,11 @@ all: up
 
 up: build-docker
 	docker network create my-network --subnet 10.190.33.0/24 || true
-	docker-compose up -d --build --scale worker=3
+	docker-compose up -d --scale worker=2
 	docker-compose logs -f --tail=50
 
 build:
-	CGO_ENABLED=0 GOOS=linux go build -mod vendor -installsuffix cgo -o grpcnmapscanner .
+	 DOCKER_BUILDKIT=1 CGO_ENABLED=0 GOOS=linux go build -mod vendor -installsuffix cgo -o grpcnmapscanner .
 
 .PHONY: vendor
 vendor:
@@ -15,13 +15,13 @@ vendor:
 .PHONY: proto
 proto:
 	@echo Generating protobuf code from docker
-	@docker run --rm -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -l go
+	@docker run --rm -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -f proto/service.proto -f proto/worker.proto  -l go
 	@sudo chown -R $(shell id -u):$(shell id -g) ./gen
-	@mv gen/pb-go/proto/service.pb.go ./proto
+	@mv gen/pb-go/proto/*.pb.go ./proto
 	@rm ./gen -rf
 
 build-docker: proto
-	docker-compose build
+	DOCKER_BUILDKIT=1 docker-compose build
 
 .PHONY: server
 server:
