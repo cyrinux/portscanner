@@ -6,7 +6,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
-	"github.com/go-redis/redis/v8"
+	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
 	"log"
@@ -121,7 +121,7 @@ func (s *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequ
 
 	connection, err := rmq.OpenConnectionWithRedisClient(
 		s.config.RmqDbName,
-		redisConnect(ctx, s),
+		util.RedisConnect(ctx, s.config),
 		errChan,
 	)
 	taskQueue, err := connection.OpenQueue("tasks")
@@ -188,21 +188,4 @@ func rmqLogErrors(errChan <-chan error) {
 			log.Print("other error: ", err)
 		}
 	}
-}
-
-func redisConnect(ctx context.Context, s *Server) *redis.Client {
-	config := s.config
-	// Connect to redis for the locker
-	redisClient := redis.NewClient(&redis.Options{
-		Network:  "tcp",
-		Addr:     config.RmqServer,
-		Password: config.RmqDbPassword,
-		DB:       0,
-	})
-	_, err := redisClient.Ping(ctx).Result()
-	if err != nil {
-		panic(err)
-	}
-
-	return redisClient
 }

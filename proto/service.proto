@@ -60,6 +60,7 @@ message ParamsScannerRequest {
     bool fast_mode = 12;
     string key = 13;
     int64 defer_duration = 14;
+    string crontab = 15;
 }
 
 message GetScannerRequest {

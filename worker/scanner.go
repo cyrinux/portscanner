@@ -9,6 +9,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
+	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
 	"log"
 	"os"
@@ -37,6 +38,13 @@ type Worker struct {
 	config config.Config
 }
 
+// Broker represent a RMQ broker
+type Broker struct {
+	incoming   rmq.Queue
+	pushed     rmq.Queue
+	connection rmq.Connection
+}
+
 // NewWorker create a new worker and init the database connection
 func NewWorker(config config.Config) *Worker {
 	return &Worker{
@@ -58,19 +66,20 @@ func (worker *Worker) StartWorker() {
 	}
 
 	// open tasks queues and connection
-	incomingQueue, pushQueue, connection := openQueues(ctx, config, worker)
+	redisClient := util.RedisConnect(worker.ctx, config)
+	broker := openBroker(ctx, config, *redisClient)
 
 	// start the returner
-	locker := redislock.New(redisConnect(ctx, worker))
-	worker.startReturner(ctx, locker, incomingQueue)
+	locker := redislock.New(redisClient)
+	worker.startReturner(ctx, locker, broker.incoming)
 
 	for i := 0; i < int(numConsumers); i++ {
 		tag, consumer := NewConsumer(i, "incoming", config)
-		if _, err := incomingQueue.AddConsumer(tag, consumer); err != nil {
+		if _, err := broker.incoming.AddConsumer(tag, consumer); err != nil {
 			panic(err)
 		}
 		tag, consumer = NewConsumer(i, "push", config)
-		if _, err := pushQueue.AddConsumer(tag, consumer); err != nil {
+		if _, err := broker.pushed.AddConsumer(tag, consumer); err != nil {
 			panic(err)
 		}
 	}
@@ -85,7 +94,7 @@ func (worker *Worker) StartWorker() {
 		<-signals // hard exit on second signal (in case shutdown gets stuck)
 		os.Exit(1)
 	}()
-	<-connection.StopAllConsuming() // wait for all Consume() calls to finish
+	<-broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
 }
 
 type Consumer struct {
@@ -221,14 +230,13 @@ func (worker *Worker) startReturner(ctx context.Context, locker *redislock.Clien
 }
 
 // openQueues open the broker queues
-func openQueues(
-	ctx context.Context, config config.Config, worker *Worker,
-) (rmq.Queue, rmq.Queue, rmq.Connection) {
+func openBroker(
+	ctx context.Context, config config.Config, redisClient redis.Client) *Broker {
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
 	connection, err := rmq.OpenConnectionWithRedisClient(
-		config.RmqDbName, redisConnect(ctx, worker), errChan,
+		config.RmqDbName, &redisClient, errChan,
 	)
 	if err != nil {
 		panic(err)
@@ -252,22 +260,5 @@ func openQueues(
 		panic(err)
 	}
 
-	return incomingQueue, pushQueue, connection
-}
-
-func redisConnect(ctx context.Context, worker *Worker) *redis.Client {
-	config := worker.config
-	// Connect to redis for the locker
-	redisClient := redis.NewClient(&redis.Options{
-		Network:  "tcp",
-		Addr:     config.RmqServer,
-		Password: config.RmqDbPassword,
-		DB:       0,
-	})
-	_, err := redisClient.Ping(ctx).Result()
-	if err != nil {
-		panic(err)
-	}
-
-	return redisClient
+	return &Broker{incoming: incomingQueue, pushed: pushQueue, connection: connection}
 }

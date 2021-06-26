@@ -1,4 +1,3 @@
-- Split gRPC entry point and scanner
-- Use several scanners, with go-machinery maybe, or consul?
-- Store result in a database
 - Reports metrics with prometheus or github.com/rs/xstats
+- Use go-cron for reccuring scan tasks
+- scan nmap export to defectdojo
