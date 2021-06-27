@@ -953,15 +953,8 @@ var file_proto_service_proto_rawDesc = []byte{
 	0x6f, 0x6c, 0x12, 0x1c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e,
 	0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c,
 	0x1a, 0x1c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72,
-	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x32, 0x60,
-	0x0a, 0x10, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x57, 0x6f, 0x72, 0x6b, 0x65, 0x72, 0x43, 0x6f,
-	0x6d, 0x6d, 0x12, 0x4c, 0x0a, 0x0e, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e,
-	0x74, 0x72, 0x6f, 0x6c, 0x12, 0x1c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61,
-	0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72,
-	0x6f, 0x6c, 0x1a, 0x1c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e,
-	0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c,
-	0x42, 0x08, 0x5a, 0x06, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x42, 0x08,
+	0x5a, 0x06, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1004,15 +997,13 @@ var file_proto_service_proto_depIdxs = []int32{
 	9,  // 9: proto.ScannerService.GetScan:input_type -> proto.GetScannerRequest
 	9,  // 10: proto.ScannerService.DeleteScan:input_type -> proto.GetScannerRequest
 	8,  // 11: proto.ScannerService.ServiceControl:input_type -> proto.ScannerServiceControl
-	8,  // 12: proto.ServerWorkerComm.ServiceControl:input_type -> proto.ScannerServiceControl
-	10, // 13: proto.ScannerService.StartAsyncScan:output_type -> proto.ServerResponse
-	10, // 14: proto.ScannerService.StartScan:output_type -> proto.ServerResponse
-	10, // 15: proto.ScannerService.GetScan:output_type -> proto.ServerResponse
-	10, // 16: proto.ScannerService.DeleteScan:output_type -> proto.ServerResponse
-	8,  // 17: proto.ScannerService.ServiceControl:output_type -> proto.ScannerServiceControl
-	8,  // 18: proto.ServerWorkerComm.ServiceControl:output_type -> proto.ScannerServiceControl
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
+	10, // 12: proto.ScannerService.StartAsyncScan:output_type -> proto.ServerResponse
+	10, // 13: proto.ScannerService.StartScan:output_type -> proto.ServerResponse
+	10, // 14: proto.ScannerService.GetScan:output_type -> proto.ServerResponse
+	10, // 15: proto.ScannerService.DeleteScan:output_type -> proto.ServerResponse
+	8,  // 16: proto.ScannerService.ServiceControl:output_type -> proto.ScannerServiceControl
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1141,7 +1132,7 @@ func file_proto_service_proto_init() {
 			NumEnums:      2,
 			NumMessages:   9,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   1,
 		},
 		GoTypes:           file_proto_service_proto_goTypes,
 		DependencyIndexes: file_proto_service_proto_depIdxs,
@@ -1372,78 +1363,6 @@ var _ScannerService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ServiceControl",
 			Handler:    _ScannerService_ServiceControl_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/service.proto",
-}
-
-// ServerWorkerCommClient is the client API for ServerWorkerComm service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type ServerWorkerCommClient interface {
-	ServiceControl(ctx context.Context, in *ScannerServiceControl, opts ...grpc.CallOption) (*ScannerServiceControl, error)
-}
-
-type serverWorkerCommClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewServerWorkerCommClient(cc grpc.ClientConnInterface) ServerWorkerCommClient {
-	return &serverWorkerCommClient{cc}
-}
-
-func (c *serverWorkerCommClient) ServiceControl(ctx context.Context, in *ScannerServiceControl, opts ...grpc.CallOption) (*ScannerServiceControl, error) {
-	out := new(ScannerServiceControl)
-	err := c.cc.Invoke(ctx, "/proto.ServerWorkerComm/ServiceControl", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// ServerWorkerCommServer is the server API for ServerWorkerComm service.
-type ServerWorkerCommServer interface {
-	ServiceControl(context.Context, *ScannerServiceControl) (*ScannerServiceControl, error)
-}
-
-// UnimplementedServerWorkerCommServer can be embedded to have forward compatible implementations.
-type UnimplementedServerWorkerCommServer struct {
-}
-
-func (*UnimplementedServerWorkerCommServer) ServiceControl(context.Context, *ScannerServiceControl) (*ScannerServiceControl, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ServiceControl not implemented")
-}
-
-func RegisterServerWorkerCommServer(s *grpc.Server, srv ServerWorkerCommServer) {
-	s.RegisterService(&_ServerWorkerComm_serviceDesc, srv)
-}
-
-func _ServerWorkerComm_ServiceControl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ScannerServiceControl)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerWorkerCommServer).ServiceControl(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/proto.ServerWorkerComm/ServiceControl",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerWorkerCommServer).ServiceControl(ctx, req.(*ScannerServiceControl))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-var _ServerWorkerComm_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.ServerWorkerComm",
-	HandlerType: (*ServerWorkerCommServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "ServiceControl",
-			Handler:    _ServerWorkerComm_ServiceControl_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

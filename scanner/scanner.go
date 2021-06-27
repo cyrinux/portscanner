@@ -56,8 +56,8 @@ func (server *Server) ServiceControl(ctx context.Context, in *proto.ScannerServi
 	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
 		return &proto.ScannerServiceControl{State: server.workerState.State}, nil
 	} else {
-		if server.workerState.State != in.State {
-			server.workerState.State = in.State
+		if server.workerState.State != in.GetState() {
+			server.workerState.State = in.GetState()
 		}
 	}
 	return &proto.ScannerServiceControl{State: server.workerState.State}, nil
