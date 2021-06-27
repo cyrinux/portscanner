@@ -49,8 +49,8 @@ func NewWorker(config config.Config) *Worker {
 	}
 }
 
-// GetState return the workers status and control them
-func (worker *Worker) GetState() {
+// ControlService return the workers status and control them
+func (worker *Worker) ControlService() {
 	var conn *grpc.ClientConn
 	conn, err := grpc.Dial("server:9000", grpc.WithInsecure())
 	if err != nil {
@@ -79,7 +79,6 @@ func (worker *Worker) GetState() {
 			} else if response.State == proto.ScannerServiceControl_STOP && worker.workerState.State == proto.ScannerServiceControl_START {
 				log.Print("from start to stop")
 				worker.workerState.State = proto.ScannerServiceControl_STOP
-				worker.stopConsuming()
 			} else {
 				// worker.workerState.State = proto.ScannerServiceControl_START
 				log.Print("no state change")
@@ -95,9 +94,6 @@ func (worker *Worker) StartWorker() {
 	// open tasks queues and connection
 	worker.workerState.State = proto.ScannerServiceControl_UNKNOWN
 
-	// manage the workers status
-	worker.GetState()
-
 	// manage signals
 	go func() {
 		signals := make(chan os.Signal, 1)
@@ -111,6 +107,9 @@ func (worker *Worker) StartWorker() {
 		}()
 		<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
 	}()
+
+	// manage the workers status
+	worker.ControlService()
 }
 
 // RmqLogErrors display the rmq errors log

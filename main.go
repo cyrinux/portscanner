@@ -38,7 +38,6 @@ func main() {
 
 	if *isWorker {
 		worker := worker.NewWorker(allConfig)
-		// worker.GetState()
 		worker.StartWorker()
 	}
 
