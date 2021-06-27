@@ -39,6 +39,16 @@ type Worker struct {
 	config      config.Config
 	broker      *Broker
 	redisClient *redis.Client
+	workerState proto.ScannerServiceControl
+}
+
+// Consumer define a broker consumer
+type Consumer struct {
+	name   string
+	count  int
+	before time.Time
+	ctx    context.Context
+	config config.Config
 }
 
 // Broker represent a RMQ broker
@@ -48,6 +58,7 @@ type Broker struct {
 	connection rmq.Connection
 }
 
+// GetState return the workers status and control them
 func (worker *Worker) GetState() {
 	var conn *grpc.ClientConn
 	conn, err := grpc.Dial("server:9000", grpc.WithInsecure())
@@ -68,13 +79,15 @@ func (worker *Worker) GetState() {
 		}
 		if err == nil {
 			log.Print(response.State)
-			if response.State == proto.ScannerServiceControl_STOP {
+			if response.State == proto.ScannerServiceControl_START && worker.workerState.State != proto.ScannerServiceControl_START {
 				worker.StartConsuming(worker.broker)
-			} else if response.State == proto.ScannerServiceControl_STOP {
+				worker.workerState.State = proto.ScannerServiceControl_START
+			} else if response.State == proto.ScannerServiceControl_STOP && worker.workerState.State == proto.ScannerServiceControl_START {
 				worker.StopConsuming(worker.broker)
+				worker.workerState.State = proto.ScannerServiceControl_STOP
 			}
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -93,34 +106,9 @@ func NewWorker(config config.Config) *Worker {
 
 // StartWorker start a scanner worker
 func (worker *Worker) StartWorker() {
-	config := worker.config
-	ctx := worker.ctx
-
-	numConsumers, err := strconv.ParseInt(
-		config.NumConsumers, 10, 0,
-	)
-	if err != nil {
-		panic(err)
-	}
-
 	// open tasks queues and connection
-	worker.StartConsuming(worker.broker)
-
-	// start the returner
-	locker := redislock.New(worker.redisClient)
-	worker.startReturner(ctx, locker, worker.broker.incoming)
-
-	for i := 0; i < int(numConsumers); i++ {
-		tag, consumer := NewConsumer(i, "incoming", config)
-		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
-			panic(err)
-		}
-		tag, consumer = NewConsumer(i, "push", config)
-		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
-			panic(err)
-		}
-	}
-
+	worker = worker.StartConsuming(worker.broker)
+	worker.workerState.State = proto.ScannerServiceControl_START
 	// manage signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT)
@@ -132,14 +120,6 @@ func (worker *Worker) StartWorker() {
 		os.Exit(1)
 	}()
 	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
-}
-
-type Consumer struct {
-	name   string
-	count  int
-	before time.Time
-	ctx    context.Context
-	config config.Config
 }
 
 func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer) {
@@ -294,22 +274,48 @@ func OpenBroker(
 	return &Broker{incoming: incomingQueue, pushed: pushQueue, connection: connection}
 }
 
-func (worker *Worker) StartConsuming(broker *Broker) *Broker {
-	if err := broker.incoming.StartConsuming(prefetchLimit, pollDuration); err != nil {
+func (worker *Worker) StartConsuming(broker *Broker) *Worker {
+	config := worker.config
+	ctx := worker.ctx
+
+	if err := worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration); err != nil {
 		panic(err)
 	}
-	if err := broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed); err != nil {
+	if err := worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed); err != nil {
 		panic(err)
 	}
-	return broker
+
+	numConsumers, err := strconv.ParseInt(
+		config.NumConsumers, 10, 0,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// start the returner
+	locker := redislock.New(worker.redisClient)
+	worker.startReturner(ctx, locker, worker.broker.incoming)
+
+	for i := 0; i < int(numConsumers); i++ {
+		tag, consumer := NewConsumer(i, "incoming", config)
+		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
+			panic(err)
+		}
+		tag, consumer = NewConsumer(i, "push", config)
+		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
+			panic(err)
+		}
+	}
+
+	return worker
+
 }
 
-func (worker *Worker) StopConsuming(broker *Broker) *Broker {
-	if err := broker.incoming.StopConsuming(); err != nil {
+func (worker *Worker) StopConsuming(broker *Broker) {
+	if err := worker.broker.incoming.StopConsuming(); err != nil {
 		panic(err)
 	}
-	if err := broker.pushed.StopConsuming(); err != nil {
+	if err := worker.broker.pushed.StopConsuming(); err != nil {
 		panic(err)
 	}
-	return broker
 }

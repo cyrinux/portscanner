@@ -67,9 +67,7 @@ message ScannerServiceControl {
     enum ServiceState {
         UNKNOWN = 0;
         START = 1;
-        STARTED = 2;
-        STOP = 3;
-        STOPPED = 4;
+        STOP = 2;
     }
     ServiceState state = 1;
 }
