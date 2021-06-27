@@ -35,8 +35,10 @@ var (
 
 // Worker define the worker struct
 type Worker struct {
-	ctx    context.Context
-	config config.Config
+	ctx         context.Context
+	config      config.Config
+	broker      *Broker
+	redisClient *redis.Client
 }
 
 // Broker represent a RMQ broker
@@ -55,17 +57,22 @@ func (worker *Worker) GetState() {
 	}
 	defer conn.Close()
 
-	toServer := proto.NewScannerServiceClient(conn)
+	client := proto.NewScannerServiceClient(conn)
 
 	state := proto.ScannerServiceControl{State: 0}
 	var response *proto.ScannerServiceControl
 	for {
-		response, err = toServer.ServiceControl(context.Background(), &state)
+		response, err = client.ServiceControl(context.Background(), &state)
 		if err != nil {
 			log.Print(err)
 		}
 		if err == nil {
 			log.Print(response.State)
+			if response.State == proto.ScannerServiceControl_STOP {
+				worker.StartConsuming(worker.broker)
+			} else if response.State == proto.ScannerServiceControl_STOP {
+				worker.StopConsuming(worker.broker)
+			}
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -73,9 +80,14 @@ func (worker *Worker) GetState() {
 
 // NewWorker create a new worker and init the database connection
 func NewWorker(config config.Config) *Worker {
+	ctx := context.Background()
+	redisClient := util.RedisConnect(ctx, config)
+	broker := OpenBroker(ctx, config, *redisClient)
 	return &Worker{
-		config: config,
-		ctx:    context.Background(),
+		config:      config,
+		ctx:         ctx,
+		broker:      broker,
+		redisClient: redisClient,
 	}
 }
 
@@ -92,20 +104,19 @@ func (worker *Worker) StartWorker() {
 	}
 
 	// open tasks queues and connection
-	redisClient := util.RedisConnect(worker.ctx, config)
-	broker := openBroker(ctx, config, *redisClient)
+	worker.StartConsuming(worker.broker)
 
 	// start the returner
-	locker := redislock.New(redisClient)
-	worker.startReturner(ctx, locker, broker.incoming)
+	locker := redislock.New(worker.redisClient)
+	worker.startReturner(ctx, locker, worker.broker.incoming)
 
 	for i := 0; i < int(numConsumers); i++ {
 		tag, consumer := NewConsumer(i, "incoming", config)
-		if _, err := broker.incoming.AddConsumer(tag, consumer); err != nil {
+		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
 			panic(err)
 		}
 		tag, consumer = NewConsumer(i, "push", config)
-		if _, err := broker.pushed.AddConsumer(tag, consumer); err != nil {
+		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
 			panic(err)
 		}
 	}
@@ -120,7 +131,7 @@ func (worker *Worker) StartWorker() {
 		<-signals // hard exit on second signal (in case shutdown gets stuck)
 		os.Exit(1)
 	}()
-	<-broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
+	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
 }
 
 type Consumer struct {
@@ -256,7 +267,7 @@ func (worker *Worker) startReturner(ctx context.Context, locker *redislock.Clien
 }
 
 // openQueues open the broker queues
-func openBroker(
+func OpenBroker(
 	ctx context.Context, config config.Config, redisClient redis.Client) *Broker {
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
@@ -272,19 +283,33 @@ func openBroker(
 	if err != nil {
 		panic(err)
 	}
-	if err := incomingQueue.StartConsuming(prefetchLimit, pollDuration); err != nil {
-		panic(err)
-	}
 
 	pushQueue, err := connection.OpenQueue("tasks-rejected")
 	if err != nil {
 		panic(err)
 	}
+
 	incomingQueue.SetPushQueue(pushQueue)
 
-	if err := pushQueue.StartConsuming(prefetchLimit, pollDurationPushed); err != nil {
+	return &Broker{incoming: incomingQueue, pushed: pushQueue, connection: connection}
+}
+
+func (worker *Worker) StartConsuming(broker *Broker) *Broker {
+	if err := broker.incoming.StartConsuming(prefetchLimit, pollDuration); err != nil {
 		panic(err)
 	}
+	if err := broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed); err != nil {
+		panic(err)
+	}
+	return broker
+}
 
-	return &Broker{incoming: incomingQueue, pushed: pushQueue, connection: connection}
+func (worker *Worker) StopConsuming(broker *Broker) *Broker {
+	if err := broker.incoming.StopConsuming(); err != nil {
+		panic(err)
+	}
+	if err := broker.pushed.StopConsuming(); err != nil {
+		panic(err)
+	}
+	return broker
 }
