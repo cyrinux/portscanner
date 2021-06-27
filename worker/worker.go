@@ -72,6 +72,10 @@ func (worker *Worker) GetState() {
 				log.Print("from stop/unknown to start")
 				worker.workerState.State = proto.ScannerServiceControl_START
 				worker.startConsuming()
+			} else if response.State == proto.ScannerServiceControl_FORCESTART {
+				log.Print("to force start")
+				worker.workerState.State = proto.ScannerServiceControl_START
+				worker.startConsuming()
 			} else if response.State == proto.ScannerServiceControl_STOP && worker.workerState.State == proto.ScannerServiceControl_START {
 				log.Print("from start to stop")
 				worker.workerState.State = proto.ScannerServiceControl_STOP

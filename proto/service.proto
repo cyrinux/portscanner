@@ -68,6 +68,7 @@ message ScannerServiceControl {
         UNKNOWN = 0;
         START = 1;
         STOP = 2;
+        FORCESTART = 3;
     }
     ServiceState state = 1;
 }
