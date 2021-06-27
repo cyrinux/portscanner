@@ -36,8 +36,9 @@ var (
 // Worker define the worker struct
 type Worker struct {
 	ctx         context.Context
-	config      config.Config
 	broker      *Broker
+	config      config.Config
+	locker      *redislock.Client
 	redisClient *redis.Client
 	workerState proto.ScannerServiceControl
 }
@@ -58,6 +59,21 @@ type Broker struct {
 	connection rmq.Connection
 }
 
+// NewWorker create a new worker and init the database connection
+func NewWorker(config config.Config) *Worker {
+	ctx := context.Background()
+	redisClient := util.RedisConnect(ctx, config)
+	broker := NewBroker(ctx, config, *redisClient)
+	locker := redislock.New(redisClient)
+	return &Worker{
+		config:      config,
+		ctx:         ctx,
+		broker:      broker,
+		redisClient: redisClient,
+		locker:      locker,
+	}
+}
+
 // GetState return the workers status and control them
 func (worker *Worker) GetState() {
 	var conn *grpc.ClientConn
@@ -69,57 +85,56 @@ func (worker *Worker) GetState() {
 	defer conn.Close()
 
 	client := proto.NewScannerServiceClient(conn)
-
 	state := proto.ScannerServiceControl{State: 0}
 	var response *proto.ScannerServiceControl
 	for {
-		response, err = client.ServiceControl(context.Background(), &state)
+		response, err = client.ServiceControl(worker.ctx, &state)
 		if err != nil {
 			log.Print(err)
-		}
-		if err == nil {
-			log.Print(response.State)
+		} else {
+			// log.Print(response.State)
 			if response.State == proto.ScannerServiceControl_START && worker.workerState.State != proto.ScannerServiceControl_START {
-				worker.StartConsuming(worker.broker)
+				log.Print("from stop/unknown to start")
 				worker.workerState.State = proto.ScannerServiceControl_START
+				worker.startConsuming()
 			} else if response.State == proto.ScannerServiceControl_STOP && worker.workerState.State == proto.ScannerServiceControl_START {
-				worker.StopConsuming(worker.broker)
+				log.Print("from start to stop")
 				worker.workerState.State = proto.ScannerServiceControl_STOP
+				worker.stopConsuming()
+			} else {
+				// worker.workerState.State = proto.ScannerServiceControl_START
+				log.Print("no state change")
+				// worker.startConsuming()
 			}
 		}
 		time.Sleep(2 * time.Second)
 	}
 }
 
-// NewWorker create a new worker and init the database connection
-func NewWorker(config config.Config) *Worker {
-	ctx := context.Background()
-	redisClient := util.RedisConnect(ctx, config)
-	broker := OpenBroker(ctx, config, *redisClient)
-	return &Worker{
-		config:      config,
-		ctx:         ctx,
-		broker:      broker,
-		redisClient: redisClient,
-	}
-}
-
 // StartWorker start a scanner worker
 func (worker *Worker) StartWorker() {
 	// open tasks queues and connection
-	worker = worker.StartConsuming(worker.broker)
-	worker.workerState.State = proto.ScannerServiceControl_START
-	// manage signals
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT)
-	defer signal.Stop(signals)
+	worker.workerState.State = proto.ScannerServiceControl_UNKNOWN
 
-	<-signals // wait for signal
+	// manage the workers status
+	worker.GetState()
+
+	// start the returner
+	worker.startReturner(worker.broker.incoming)
+
+	// manage signals
 	go func() {
-		<-signals // hard exit on second signal (in case shutdown gets stuck)
-		os.Exit(1)
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGINT)
+		defer signal.Stop(signals)
+
+		<-signals // wait for signal
+		go func() {
+			<-signals // hard exit on second signal (in case shutdown gets stuck)
+			os.Exit(1)
+		}()
+		<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
 	}()
-	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
 }
 
 func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer) {
@@ -220,16 +235,16 @@ func rmqLogErrors(errChan <-chan error) {
 }
 
 // Locker help to lock some tasks
-func (worker *Worker) startReturner(ctx context.Context, locker *redislock.Client, queue rmq.Queue) {
+func (worker *Worker) startReturner(queue rmq.Queue) {
 	go func() {
 		for {
 			// Try to obtain lock.
-			lock, err := locker.Obtain(ctx, "returner", 10*time.Second, nil)
+			lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
 			if err != nil && err != redislock.ErrNotObtained {
 				log.Fatalln(err)
 			} else if err != redislock.ErrNotObtained {
 				// Sleep and check the remaining TTL.
-				if ttl, err := lock.TTL(ctx); err != nil {
+				if ttl, err := lock.TTL(worker.ctx); err != nil {
 					log.Fatalf("Returner error: %v: ttl: %v", err, ttl)
 				} else if ttl > 0 {
 					// Yay, I still have my lock!
@@ -237,7 +252,7 @@ func (worker *Worker) startReturner(ctx context.Context, locker *redislock.Clien
 					if returned > 0 {
 						log.Printf("Returned reject message %v", returned)
 					}
-					lock.Refresh(ctx, 5*time.Second, nil)
+					lock.Refresh(worker.ctx, 5*time.Second, nil)
 				}
 			}
 			// cpu cooling
@@ -247,7 +262,7 @@ func (worker *Worker) startReturner(ctx context.Context, locker *redislock.Clien
 }
 
 // openQueues open the broker queues
-func OpenBroker(
+func NewBroker(
 	ctx context.Context, config config.Config, redisClient redis.Client) *Broker {
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
@@ -260,12 +275,12 @@ func OpenBroker(
 	}
 
 	incomingQueue, err := connection.OpenQueue("tasks")
-	if err != nil {
+	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		panic(err)
 	}
 
 	pushQueue, err := connection.OpenQueue("tasks-rejected")
-	if err != nil {
+	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		panic(err)
 	}
 
@@ -274,48 +289,46 @@ func OpenBroker(
 	return &Broker{incoming: incomingQueue, pushed: pushQueue, connection: connection}
 }
 
-func (worker *Worker) StartConsuming(broker *Broker) *Worker {
-	config := worker.config
-	ctx := worker.ctx
-
-	if err := worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration); err != nil {
-		panic(err)
-	}
-	if err := worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed); err != nil {
-		panic(err)
-	}
-
+func (worker *Worker) startConsuming() {
 	numConsumers, err := strconv.ParseInt(
-		config.NumConsumers, 10, 0,
+		worker.config.NumConsumers, 10, 0,
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	// start the returner
-	locker := redislock.New(worker.redisClient)
-	worker.startReturner(ctx, locker, worker.broker.incoming)
+	err = worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
+	if err != nil {
+		log.Print(err)
+	}
+	err = worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed)
+	if err != nil {
+		log.Print(err)
+	}
 
 	for i := 0; i < int(numConsumers); i++ {
-		tag, consumer := NewConsumer(i, "incoming", config)
+		tag, consumer := NewConsumer(i, "incoming", worker.config)
 		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
-			panic(err)
+			log.Printf("%v\n", err)
 		}
-		tag, consumer = NewConsumer(i, "push", config)
+		tag, consumer = NewConsumer(i, "push", worker.config)
 		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
-			panic(err)
+			log.Printf("%v\n", err)
 		}
 	}
 
-	return worker
-
+	err = worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
+	if err != nil {
+		log.Print(err)
+	}
+	err = worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
-func (worker *Worker) StopConsuming(broker *Broker) {
-	if err := worker.broker.incoming.StopConsuming(); err != nil {
-		panic(err)
-	}
-	if err := worker.broker.pushed.StopConsuming(); err != nil {
-		panic(err)
-	}
+func (worker *Worker) stopConsuming() {
+	<-worker.broker.incoming.StopConsuming()
+	<-worker.broker.pushed.StopConsuming()
+	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
 }
