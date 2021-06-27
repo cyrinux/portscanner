@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	rmq "github.com/adjust/rmq/v4"
-	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"log"
@@ -32,11 +31,11 @@ type Consumer struct {
 	count  int
 	before time.Time
 	ctx    context.Context
-	config config.Config
+	worker *Worker
 }
 
 // NewConsumer create a new consumer
-func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer) {
+func NewConsumer(worker Worker, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Printf("New consumer: %s\n", name)
 	return name, &Consumer{
@@ -44,7 +43,7 @@ func NewConsumer(tag int, queue string, config config.Config) (string, *Consumer
 		count:  0,
 		before: time.Now(),
 		ctx:    context.TODO(),
-		config: config,
+		worker: &worker,
 	}
 }
 
@@ -53,6 +52,15 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
 	log.Printf("%s: start consume %s", consumer.name, payload)
 	time.Sleep(consumeDuration)
+
+	log.Printf("DEBUG %v\n", consumer.worker.state.State)
+	if consumer.worker.state.State == proto.ScannerServiceControl_STOP {
+		if err := delivery.Reject(); err != nil {
+			log.Printf("%s: failed to requeue %s: %s", consumer.name, payload, err)
+		} else {
+			log.Printf("%s: requeue %s, worker are stop", consumer.name, payload)
+		}
+	}
 
 	consumer.count++
 	if consumer.count%reportBatchSize == 0 {
@@ -73,7 +81,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			log.Printf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	} else {
-		newEngine := engine.NewEngine(consumer.config)
+		newEngine := engine.NewEngine(consumer.worker.config)
 		key, result, err := newEngine.StartNmapScan(consumer.ctx, request)
 		if err != nil {
 			log.Printf("%s: scan %v %v: %v", consumer.name, key, result, err)
@@ -88,7 +96,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		if err != nil {
 			log.Printf("%s: failed to parse result: %s", consumer.name, err)
 		}
-		_, err = consumer.config.DB.Set(
+		_, err = consumer.worker.config.DB.Set(
 			consumer.ctx, key, string(scanResultJSON),
 			time.Duration(request.GetRetentionTime())*time.Second,
 		)

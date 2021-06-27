@@ -24,7 +24,7 @@ type Worker struct {
 	config      config.Config
 	locker      *redislock.Client
 	redisClient *redis.Client
-	workerState proto.ScannerServiceControl
+	state       proto.ScannerServiceControl
 }
 
 // Broker represent a RMQ broker
@@ -49,6 +49,28 @@ func NewWorker(config config.Config) *Worker {
 	}
 }
 
+// StartWorker start a scanner worker
+func (worker *Worker) StartWorker() {
+	// open tasks queues and connection
+	worker.state.State = proto.ScannerServiceControl_UNKNOWN
+
+	// manage signals
+	go func() {
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGINT)
+		defer signal.Stop(signals)
+
+		<-signals // wait for signal
+		go func() {
+			<-signals // hard exit on second signal (in case shutdown gets stuck)
+			os.Exit(1)
+		}()
+		<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
+	}()
+
+	worker.ControlService()
+}
+
 // ControlService return the workers status and control them
 func (worker *Worker) ControlService() {
 	var conn *grpc.ClientConn
@@ -67,49 +89,23 @@ func (worker *Worker) ControlService() {
 		if err != nil {
 			log.Print(err)
 		} else {
-			// log.Print(response.State)
-			if response.State == proto.ScannerServiceControl_START && worker.workerState.State != proto.ScannerServiceControl_START {
+			if response.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
 				log.Print("from stop/unknown to start")
-				worker.workerState.State = proto.ScannerServiceControl_START
+				worker.state.State = proto.ScannerServiceControl_START
 				worker.startConsuming()
 			} else if response.State == proto.ScannerServiceControl_FORCESTART {
 				log.Print("to force start")
-				worker.workerState.State = proto.ScannerServiceControl_START
+				worker.state.State = proto.ScannerServiceControl_START
 				worker.startConsuming()
-			} else if response.State == proto.ScannerServiceControl_STOP && worker.workerState.State == proto.ScannerServiceControl_START {
+			} else if response.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
 				log.Print("from start to stop")
-				worker.workerState.State = proto.ScannerServiceControl_STOP
+				worker.state.State = proto.ScannerServiceControl_STOP
 			} else {
-				// worker.workerState.State = proto.ScannerServiceControl_START
 				log.Print("no state change")
-				// worker.startConsuming()
 			}
 		}
 		time.Sleep(2 * time.Second)
 	}
-}
-
-// StartWorker start a scanner worker
-func (worker *Worker) StartWorker() {
-	// open tasks queues and connection
-	worker.workerState.State = proto.ScannerServiceControl_UNKNOWN
-
-	// manage signals
-	go func() {
-		signals := make(chan os.Signal, 1)
-		signal.Notify(signals, syscall.SIGINT)
-		defer signal.Stop(signals)
-
-		<-signals // wait for signal
-		go func() {
-			<-signals // hard exit on second signal (in case shutdown gets stuck)
-			os.Exit(1)
-		}()
-		<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
-	}()
-
-	// manage the workers status
-	worker.ControlService()
 }
 
 // RmqLogErrors display the rmq errors log
@@ -205,11 +201,11 @@ func (worker *Worker) startConsuming() {
 	}
 
 	for i := 0; i < int(numConsumers); i++ {
-		tag, consumer := NewConsumer(i, "incoming", worker.config)
+		tag, consumer := NewConsumer(*worker, i, "incoming")
 		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
 			log.Printf("%v\n", err)
 		}
-		tag, consumer = NewConsumer(i, "push", worker.config)
+		tag, consumer = NewConsumer(*worker, i, "push")
 		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
 			log.Printf("%v\n", err)
 		}
