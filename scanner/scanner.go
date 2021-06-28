@@ -51,13 +51,16 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 	return generateResponse(in.Key, nil, err)
 }
 
-// ServiceControl control the service
+// StreamServiceControl control the service
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
+	log.Print("StreamServiceControl server 1")
 	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
+		log.Print("StreamServiceControl server 2")
 		for {
 			if err := stream.Send(&server.workerState); err != nil {
 				return err
 			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 	return nil

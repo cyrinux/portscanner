@@ -5,10 +5,11 @@ WORKDIR /app
 COPY . .
 RUN make build
 
-FROM alpine:latest as worker
+FROM alpine:latest as scanner
 MAINTAINER  Cyril Levis <grpcnmapscanner@levis.name>
-LABEL Name=grpcnmapscanner-worker Version=0.0.1
+LABEL Name=grpcnmapscanner-server Version=0.0.1
 RUN apk --no-cache add ca-certificates nmap nmap-scripts && rm -f /var/cache/apk/*
 WORKDIR /app
 COPY --from=builder /app/grpcnmapscanner /app/grpcnmapscanner
-CMD ["/app/grpcnmapscanner", "-worker"]
+EXPOSE 9000
+ENTRYPOINT ["/app/grpcnmapscanner"]

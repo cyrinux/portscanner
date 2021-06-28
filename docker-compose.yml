@@ -10,32 +10,22 @@ volumes:
     driver: local
 
 services:
-  # client:
-  #   image: namely/grpc-cli
-  #   environment:
-  #     - TZ=Europe/Paris
-  #   networks:
-  #     - backend
-  #   depends_on:
-  #     - server
-  #     - worker
-  #     - redis
-  #   command: "ls redis:9000 proto.ScannerService -l"
-
   server:
     hostname: server
     build:
       context: .
-      dockerfile: docker/server.Dockerfile
+      dockerfile: Dockerfile
     image: grpcscanner:server
     environment:
       - TZ=Europe/Paris
+      - MODE=server
       - DB_DRIVER=redis
       - DB_SERVER=redis:6379
       - DB_PASSWORD=oatiChahNoat6aeliepheijo
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_PASSWORD=oatiChahNoat6aeliepheijo
       - RMQ_DB_NAME=scanner
+    command: "-server"
     cap_add:
       - NET_ADMIN
     restart: always
@@ -49,11 +39,12 @@ services:
   worker:
     build:
       context: .
-      dockerfile: docker/worker.Dockerfile
+      dockerfile: Dockerfile
     image: grpcscanner:worker
     environment:
       - TZ="Europe/Paris"
       - CONTROLLER_SERVER=server:9000
+      - MODE=worker
       - DB_DRIVER=redis
       - DB_PASSWORD=oatiChahNoat6aeliepheijo
       - DB_SERVER=redis:6379
@@ -61,6 +52,7 @@ services:
       - RMQ_DB_NAME=scanner
       - RMQ_DB_PASSWORD=oatiChahNoat6aeliepheijo
       - RMQ_CONSUMERS=10
+    command: "-worker"
     restart: always
     cap_add:
       - NET_ADMIN

@@ -8,14 +8,12 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/scanner"
 	"github.com/cyrinux/grpcnmapscanner/worker"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
 )
 
 func main() {
-
 	isServer := flag.Bool("server", false, "start the gRPC server")
 	isWorker := flag.Bool("worker", false, "start the worker")
 	allConfig := config.GetConfig(context.Background())

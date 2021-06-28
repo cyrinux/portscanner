@@ -9,6 +9,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -73,7 +74,7 @@ func (worker *Worker) StartWorker() {
 	// handle exit signal
 	go worker.handleSignal()
 	// watch the control server and stop/start service
-	worker.ControlService()
+	worker.StreamControlService()
 }
 
 // ControlService return the workers status and control them
@@ -107,6 +108,42 @@ func (worker *Worker) ControlService() {
 		}
 		time.Sleep(1 * time.Second)
 	}
+}
+
+// StreamControlService return the workers status and control them
+func (worker *Worker) StreamControlService() error {
+	var conn *grpc.ClientConn
+	conn, err := grpc.Dial(worker.config.ControllerServer, grpc.WithInsecure())
+	if err != nil {
+		log.Printf("could not connect to controller: %s", err)
+		panic(err)
+	}
+	defer conn.Close()
+
+	client := proto.NewScannerServiceClient(conn)
+	getState := &proto.ScannerServiceControl{State: 0}
+	stream, err := client.StreamServiceControl(worker.ctx, getState)
+	go func() {
+		for {
+			state, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				if state.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
+					log.Print("from stop/unknown to start")
+					worker.state.State = proto.ScannerServiceControl_START
+				} else if state.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
+					log.Print("from start to stop")
+					worker.state.State = proto.ScannerServiceControl_STOP
+				} else {
+					log.Print("no state change")
+				}
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+	return err
 }
 
 // RmqLogErrors display the rmq errors log
@@ -214,7 +251,6 @@ func (worker *Worker) startConsuming() {
 
 	// start the returner
 	worker.startReturner(worker.broker.incoming)
-
 }
 
 func (worker *Worker) stopConsuming() {
