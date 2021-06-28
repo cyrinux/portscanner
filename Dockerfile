@@ -7,7 +7,7 @@ RUN make build
 
 FROM alpine:latest as scanner
 MAINTAINER  Cyril Levis <grpcnmapscanner@levis.name>
-LABEL Name=grpcnmapscanner-server Version=0.0.1
+LABEL Name=grpcnmapscanner Version=0.0.1
 RUN apk --no-cache add ca-certificates nmap nmap-scripts && rm -f /var/cache/apk/*
 WORKDIR /app
 COPY --from=builder /app/grpcnmapscanner /app/grpcnmapscanner

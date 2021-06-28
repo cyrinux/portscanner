@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"encoding/json"
+	"fmt"
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/engine"
@@ -9,10 +10,27 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/rs/xid"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/reflection"
 	"log"
+	"net"
 	"strings"
 	"time"
 )
+
+var kaep = keepalive.EnforcementPolicy{
+	MinTime:             5 * time.Second, // If a client pings more than once every 5 seconds, terminate the connection
+	PermitWithoutStream: true,            // Allow pings even when there are no active streams
+}
+
+var kasp = keepalive.ServerParameters{
+	MaxConnectionIdle:     15 * time.Second, // If a client is idle for 15 seconds, send a GOAWAY
+	MaxConnectionAge:      30 * time.Second, // If any connection is alive for more than 30 seconds, send a GOAWAY
+	MaxConnectionAgeGrace: 5 * time.Second,  // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
+	Time:                  5 * time.Second,  // Ping the client if it is idle for 5 seconds to ensure the connection is still active
+	Timeout:               1 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
+}
 
 // Server define the grpc server struct
 type Server struct {
@@ -20,6 +38,22 @@ type Server struct {
 	queue       rmq.Queue
 	err         error
 	workerState proto.ScannerServiceControl
+}
+
+// Listen start the grpc server
+func Listen(allConfig config.Config) {
+	fmt.Println("Prepare to serve the gRPC api")
+	listener, err := net.Listen("tcp", ":9000")
+	if err != nil {
+		panic(err) // The port may be on use
+	}
+	srv := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
+
+	reflection.Register(srv)
+	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
+	if e := srv.Serve(listener); e != nil {
+		panic(err)
+	}
 }
 
 // NewServer create a new server and init the database connection
@@ -53,9 +87,7 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 
 // StreamServiceControl control the service
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
-	log.Print("StreamServiceControl server 1")
 	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
-		log.Print("StreamServiceControl server 2")
 		for {
 			if err := stream.Send(&server.workerState); err != nil {
 				return err

@@ -9,6 +9,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"io"
 	"log"
 	"os"
@@ -17,6 +18,12 @@ import (
 	"syscall"
 	"time"
 )
+
+var kacp = keepalive.ClientParameters{
+	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
+	Timeout:             time.Second,      // wait 1 second for ping ack before considering the connection dead
+	PermitWithoutStream: true,             // send pings even without active streams
+}
 
 // Worker define the worker struct
 type Worker struct {
@@ -77,43 +84,14 @@ func (worker *Worker) StartWorker() {
 	worker.StreamControlService()
 }
 
-// ControlService return the workers status and control them
-func (worker *Worker) ControlService() {
-	var conn *grpc.ClientConn
-	conn, err := grpc.Dial(worker.config.ControllerServer, grpc.WithInsecure())
-	if err != nil {
-		log.Printf("could not connect to controller: %s", err)
-		panic(err)
-	}
-	defer conn.Close()
-
-	client := proto.NewScannerServiceClient(conn)
-	state := proto.ScannerServiceControl{State: 0}
-	var response *proto.ScannerServiceControl
-	for {
-		response, err = client.ServiceControl(worker.ctx, &state)
-		if err != nil {
-			log.Print(err)
-		} else {
-			if response.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
-				log.Print("from stop/unknown to start")
-				worker.state.State = proto.ScannerServiceControl_START
-			} else if response.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
-				log.Print("from start to stop")
-				worker.state.State = proto.ScannerServiceControl_STOP
-			}
-			// } else {
-			// 	log.Print("no state change")
-			// }
-		}
-		time.Sleep(1 * time.Second)
-	}
-}
-
 // StreamControlService return the workers status and control them
-func (worker *Worker) StreamControlService() error {
+func (worker *Worker) StreamControlService() {
 	var conn *grpc.ClientConn
-	conn, err := grpc.Dial(worker.config.ControllerServer, grpc.WithInsecure())
+	conn, err := grpc.Dial(
+		worker.config.ControllerServer,
+		grpc.WithInsecure(),
+		grpc.WithKeepaliveParams(kacp),
+	)
 	if err != nil {
 		log.Printf("could not connect to controller: %s", err)
 		panic(err)
@@ -122,28 +100,34 @@ func (worker *Worker) StreamControlService() error {
 
 	client := proto.NewScannerServiceClient(conn)
 	getState := &proto.ScannerServiceControl{State: 0}
-	stream, err := client.StreamServiceControl(worker.ctx, getState)
-	go func() {
+	for {
+		// wait before try to reconnect
+		time.Sleep(1 * time.Second)
+		log.Printf("trying to connect to server control")
+		stream, err := client.StreamServiceControl(worker.ctx, getState)
+		if err != nil {
+			continue
+		}
+		log.Printf("connected to server control")
 		for {
-			state, err := stream.Recv()
+			serviceControl, err := stream.Recv()
 			if err == io.EOF {
 				break
-			}
-			if err != nil {
-				if state.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
+			} else if serviceControl == nil {
+				continue
+			} else {
+				if serviceControl.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
 					log.Print("from stop/unknown to start")
 					worker.state.State = proto.ScannerServiceControl_START
-				} else if state.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
+				} else if serviceControl.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
 					log.Print("from start to stop")
 					worker.state.State = proto.ScannerServiceControl_STOP
-				} else {
-					log.Print("no state change")
 				}
 			}
-			time.Sleep(500 * time.Millisecond)
+			// cpu cooling
+			time.Sleep(1 * time.Second)
 		}
-	}()
-	return err
+	}
 }
 
 // RmqLogErrors display the rmq errors log

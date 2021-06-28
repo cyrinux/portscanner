@@ -18,12 +18,11 @@ services:
     image: grpcscanner:server
     environment:
       - TZ=Europe/Paris
-      - MODE=server
       - DB_DRIVER=redis
       - DB_SERVER=redis:6379
-      - DB_PASSWORD=oatiChahNoat6aeliepheijo
+      - DB_PASSWORD=
       - RMQ_DB_SERVER=redis:6379
-      - RMQ_DB_PASSWORD=oatiChahNoat6aeliepheijo
+      - RMQ_DB_PASSWORD=
       - RMQ_DB_NAME=scanner
     command: "-server"
     cap_add:
@@ -46,12 +45,13 @@ services:
       - CONTROLLER_SERVER=server:9000
       - MODE=worker
       - DB_DRIVER=redis
-      - DB_PASSWORD=oatiChahNoat6aeliepheijo
+      - DB_PASSWORD=
       - DB_SERVER=redis:6379
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
-      - RMQ_DB_PASSWORD=oatiChahNoat6aeliepheijo
+      - RMQ_DB_PASSWORD=
       - RMQ_CONSUMERS=10
+      - GODEBUG=http2debug=1
     command: "-worker"
     restart: always
     cap_add:
@@ -64,8 +64,8 @@ services:
   redis:
     image: "bitnami/redis:latest"
     environment:
-      # - ALLOW_EMPTY_PASSWORD=yes
-      - REDIS_PASSWORD=oatiChahNoat6aeliepheijo
+      - ALLOW_EMPTY_PASSWORD=yes
+      # - REDIS_PASSWORD=redispassw0rd
     restart: always
     volumes:
       - "redis_data:/bitnami/redis/data"
