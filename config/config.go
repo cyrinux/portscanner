@@ -3,14 +3,11 @@ package config
 import (
 	"context"
 	"github.com/cyrinux/grpcnmapscanner/database"
-	// "github.com/go-redis/redis/v8"
 	"log"
 	"os"
 )
 
 type Config struct {
-	DBDriver         string
-	DBServer         string
 	NumConsumers     string
 	RmqDbName        string
 	RmqServer        string
@@ -37,6 +34,7 @@ func GetConfig(ctx context.Context) Config {
 		DBServer:   os.Getenv("DB_SERVER"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		DBDriver:   os.Getenv("DB_DRIVER"),
+		DBName:     os.Getenv("DB_NAME"),
 	}
 
 	db, err := database.Factory(ctx, dbConfig)

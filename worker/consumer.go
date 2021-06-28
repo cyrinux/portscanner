@@ -18,7 +18,7 @@ const (
 	pollDuration       = 100 * time.Millisecond
 	pollDurationPushed = 5000 * time.Millisecond
 	reportBatchSize    = 10000
-	consumeDuration    = 5 * time.Second
+	consumeDuration    = 15 * time.Second
 )
 
 var (

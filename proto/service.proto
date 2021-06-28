@@ -90,5 +90,6 @@ service ScannerService {
     rpc GetScan(GetScannerRequest) returns (ServerResponse);
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
     rpc ServiceControl(ScannerServiceControl) returns (ScannerServiceControl);
+    rpc StreamServiceControl(ScannerServiceControl) returns (stream ScannerServiceControl);
 }
 

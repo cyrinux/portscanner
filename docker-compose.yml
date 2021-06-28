@@ -32,8 +32,9 @@ services:
       - TZ=Europe/Paris
       - DB_DRIVER=redis
       - DB_SERVER=redis:6379
+      - DB_PASSWORD=oatiChahNoat6aeliepheijo
       - RMQ_DB_SERVER=redis:6379
-      - RMQ_DB_PASSWORD=
+      - RMQ_DB_PASSWORD=oatiChahNoat6aeliepheijo
       - RMQ_DB_NAME=scanner
     cap_add:
       - NET_ADMIN
@@ -54,10 +55,11 @@ services:
       - TZ="Europe/Paris"
       - CONTROLLER_SERVER=server:9000
       - DB_DRIVER=redis
+      - DB_PASSWORD=oatiChahNoat6aeliepheijo
       - DB_SERVER=redis:6379
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
-      - RMQ_DB_PASSWORD=
+      - RMQ_DB_PASSWORD=oatiChahNoat6aeliepheijo
       - RMQ_CONSUMERS=10
     restart: always
     cap_add:
@@ -70,7 +72,8 @@ services:
   redis:
     image: "bitnami/redis:latest"
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+      # - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PASSWORD=oatiChahNoat6aeliepheijo
     restart: always
     volumes:
       - "redis_data:/bitnami/redis/data"

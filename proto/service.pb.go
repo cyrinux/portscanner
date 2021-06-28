@@ -924,7 +924,7 @@ var file_proto_service_proto_rawDesc = []byte{
 	0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70,
 	0x6f, 0x6e, 0x73, 0x65, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x65,
 	0x72, 0x72, 0x6f, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f,
-	0x72, 0x32, 0xe0, 0x02, 0x0a, 0x0e, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72,
+	0x72, 0x32, 0xb6, 0x03, 0x0a, 0x0e, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72,
 	0x76, 0x69, 0x63, 0x65, 0x12, 0x44, 0x0a, 0x0e, 0x53, 0x74, 0x61, 0x72, 0x74, 0x41, 0x73, 0x79,
 	0x6e, 0x63, 0x53, 0x63, 0x61, 0x6e, 0x12, 0x1b, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x50,
 	0x61, 0x72, 0x61, 0x6d, 0x73, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75,
@@ -946,8 +946,13 @@ var file_proto_service_proto_rawDesc = []byte{
 	0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43,
 	0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x1a, 0x1c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53,
 	0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e,
-	0x74, 0x72, 0x6f, 0x6c, 0x42, 0x08, 0x5a, 0x06, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x74, 0x72, 0x6f, 0x6c, 0x12, 0x54, 0x0a, 0x14, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x53, 0x65,
+	0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x12, 0x1c, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76,
+	0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x1a, 0x1c, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
+	0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x30, 0x01, 0x42, 0x08, 0x5a, 0x06, 0x2f, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -990,13 +995,15 @@ var file_proto_service_proto_depIdxs = []int32{
 	9,  // 9: proto.ScannerService.GetScan:input_type -> proto.GetScannerRequest
 	9,  // 10: proto.ScannerService.DeleteScan:input_type -> proto.GetScannerRequest
 	8,  // 11: proto.ScannerService.ServiceControl:input_type -> proto.ScannerServiceControl
-	10, // 12: proto.ScannerService.StartAsyncScan:output_type -> proto.ServerResponse
-	10, // 13: proto.ScannerService.StartScan:output_type -> proto.ServerResponse
-	10, // 14: proto.ScannerService.GetScan:output_type -> proto.ServerResponse
-	10, // 15: proto.ScannerService.DeleteScan:output_type -> proto.ServerResponse
-	8,  // 16: proto.ScannerService.ServiceControl:output_type -> proto.ScannerServiceControl
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
+	8,  // 12: proto.ScannerService.StreamServiceControl:input_type -> proto.ScannerServiceControl
+	10, // 13: proto.ScannerService.StartAsyncScan:output_type -> proto.ServerResponse
+	10, // 14: proto.ScannerService.StartScan:output_type -> proto.ServerResponse
+	10, // 15: proto.ScannerService.GetScan:output_type -> proto.ServerResponse
+	10, // 16: proto.ScannerService.DeleteScan:output_type -> proto.ServerResponse
+	8,  // 17: proto.ScannerService.ServiceControl:output_type -> proto.ScannerServiceControl
+	8,  // 18: proto.ScannerService.StreamServiceControl:output_type -> proto.ScannerServiceControl
+	13, // [13:19] is the sub-list for method output_type
+	7,  // [7:13] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1155,6 +1162,7 @@ type ScannerServiceClient interface {
 	GetScan(ctx context.Context, in *GetScannerRequest, opts ...grpc.CallOption) (*ServerResponse, error)
 	DeleteScan(ctx context.Context, in *GetScannerRequest, opts ...grpc.CallOption) (*ServerResponse, error)
 	ServiceControl(ctx context.Context, in *ScannerServiceControl, opts ...grpc.CallOption) (*ScannerServiceControl, error)
+	StreamServiceControl(ctx context.Context, in *ScannerServiceControl, opts ...grpc.CallOption) (ScannerService_StreamServiceControlClient, error)
 }
 
 type scannerServiceClient struct {
@@ -1210,6 +1218,38 @@ func (c *scannerServiceClient) ServiceControl(ctx context.Context, in *ScannerSe
 	return out, nil
 }
 
+func (c *scannerServiceClient) StreamServiceControl(ctx context.Context, in *ScannerServiceControl, opts ...grpc.CallOption) (ScannerService_StreamServiceControlClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_ScannerService_serviceDesc.Streams[0], "/proto.ScannerService/StreamServiceControl", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &scannerServiceStreamServiceControlClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ScannerService_StreamServiceControlClient interface {
+	Recv() (*ScannerServiceControl, error)
+	grpc.ClientStream
+}
+
+type scannerServiceStreamServiceControlClient struct {
+	grpc.ClientStream
+}
+
+func (x *scannerServiceStreamServiceControlClient) Recv() (*ScannerServiceControl, error) {
+	m := new(ScannerServiceControl)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // ScannerServiceServer is the server API for ScannerService service.
 type ScannerServiceServer interface {
 	StartAsyncScan(context.Context, *ParamsScannerRequest) (*ServerResponse, error)
@@ -1217,6 +1257,7 @@ type ScannerServiceServer interface {
 	GetScan(context.Context, *GetScannerRequest) (*ServerResponse, error)
 	DeleteScan(context.Context, *GetScannerRequest) (*ServerResponse, error)
 	ServiceControl(context.Context, *ScannerServiceControl) (*ScannerServiceControl, error)
+	StreamServiceControl(*ScannerServiceControl, ScannerService_StreamServiceControlServer) error
 }
 
 // UnimplementedScannerServiceServer can be embedded to have forward compatible implementations.
@@ -1237,6 +1278,9 @@ func (*UnimplementedScannerServiceServer) DeleteScan(context.Context, *GetScanne
 }
 func (*UnimplementedScannerServiceServer) ServiceControl(context.Context, *ScannerServiceControl) (*ScannerServiceControl, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ServiceControl not implemented")
+}
+func (*UnimplementedScannerServiceServer) StreamServiceControl(*ScannerServiceControl, ScannerService_StreamServiceControlServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamServiceControl not implemented")
 }
 
 func RegisterScannerServiceServer(s *grpc.Server, srv ScannerServiceServer) {
@@ -1333,6 +1377,27 @@ func _ScannerService_ServiceControl_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScannerService_StreamServiceControl_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ScannerServiceControl)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ScannerServiceServer).StreamServiceControl(m, &scannerServiceStreamServiceControlServer{stream})
+}
+
+type ScannerService_StreamServiceControlServer interface {
+	Send(*ScannerServiceControl) error
+	grpc.ServerStream
+}
+
+type scannerServiceStreamServiceControlServer struct {
+	grpc.ServerStream
+}
+
+func (x *scannerServiceStreamServiceControlServer) Send(m *ScannerServiceControl) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 var _ScannerService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "proto.ScannerService",
 	HandlerType: (*ScannerServiceServer)(nil),
@@ -1358,6 +1423,12 @@ var _ScannerService_serviceDesc = grpc.ServiceDesc{
 			Handler:    _ScannerService_ServiceControl_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamServiceControl",
+			Handler:       _ScannerService_StreamServiceControl_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "proto/service.proto",
 }

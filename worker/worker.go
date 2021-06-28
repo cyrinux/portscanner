@@ -49,24 +49,30 @@ func NewWorker(config config.Config) *Worker {
 	}
 }
 
+// handleSignal handle the worker exit signal
+func (worker *Worker) handleSignal() {
+	// open tasks queues and connection
+	worker.state.State = proto.ScannerServiceControl_UNKNOWN
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT)
+	defer signal.Stop(signals)
+
+	<-signals // wait for signal
+	go func() {
+		<-signals // hard exit on second signal (in case shutdown gets stuck)
+		os.Exit(1)
+	}()
+	worker.stopConsuming() // wait for all Consume() calls to finish
+}
+
 // StartWorker start a scanner worker
 func (worker *Worker) StartWorker() {
-	// manage signals
-	go func() {
-		// open tasks queues and connection
-		worker.state.State = proto.ScannerServiceControl_UNKNOWN
-		signals := make(chan os.Signal, 1)
-		signal.Notify(signals, syscall.SIGINT)
-		defer signal.Stop(signals)
-
-		<-signals // wait for signal
-		go func() {
-			<-signals // hard exit on second signal (in case shutdown gets stuck)
-			os.Exit(1)
-		}()
-		<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
-	}()
-
+	// start the worker on boot
+	worker.state.State = proto.ScannerServiceControl_START
+	worker.startConsuming()
+	// handle exit signal
+	go worker.handleSignal()
+	// watch the control server and stop/start service
 	worker.ControlService()
 }
 
@@ -91,7 +97,6 @@ func (worker *Worker) ControlService() {
 			if response.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
 				log.Print("from stop/unknown to start")
 				worker.state.State = proto.ScannerServiceControl_START
-				worker.startConsuming()
 			} else if response.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
 				log.Print("from start to stop")
 				worker.state.State = proto.ScannerServiceControl_STOP
@@ -213,6 +218,7 @@ func (worker *Worker) startConsuming() {
 }
 
 func (worker *Worker) stopConsuming() {
+	log.Print("Stop consumming...")
 	<-worker.broker.incoming.StopConsuming()
 	<-worker.broker.pushed.StopConsuming()
 	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish

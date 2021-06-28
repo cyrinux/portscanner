@@ -15,7 +15,7 @@ func createRedisDatabase(ctx context.Context, config DBConfig) (Database, error)
 	ctx = context.Background()
 	client := redis.NewClient(&redis.Options{
 		Addr:     config.DBServer,
-		Password: "",
+		Password: config.DBPassword,
 		DB:       0,
 	})
 	_, err := client.Ping(ctx).Result() // makes sure database is connected
