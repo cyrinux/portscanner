@@ -34,10 +34,10 @@ var kasp = keepalive.ServerParameters{
 
 // Server define the grpc server struct
 type Server struct {
-	config      config.Config
-	queue       rmq.Queue
-	err         error
-	workerState proto.ScannerServiceControl
+	config config.Config
+	queue  rmq.Queue
+	err    error
+	state  proto.ScannerServiceControl
 }
 
 // Listen start the grpc server
@@ -88,28 +88,25 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 // StreamServiceControl control the service
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
 	for {
-		if in.GetState() != proto.ScannerServiceControl_UNKNOWN {
-			if err := stream.Send(&server.workerState); err != nil {
-				return err
-			}
+		if err := stream.Send(&server.state); err != nil {
+			log.Printf("Send error %v", err)
+			return err
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
 // ServiceControl control the service
 func (server *Server) ServiceControl(ctx context.Context, in *proto.ScannerServiceControl) (*proto.ScannerServiceControl, error) {
-	// if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
-	// 	log.Printf("DEBUG SERVER 1: %v", server.workerState.State)
-	// 	return &proto.ScannerServiceControl{State: server.workerState.State}, nil
-	// }
+	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
+		return &proto.ScannerServiceControl{State: server.state.State}, nil
+	}
 
-	// if server.workerState.State != in.GetState() {
-	server.workerState.State = in.GetState()
-	// }
-	// log.Printf("DEBUG SERVER 2: %v", server.workerState.State)
+	if server.state.State != in.GetState() {
+		server.state.State = in.GetState()
+	}
 
-	return &proto.ScannerServiceControl{State: server.workerState.State}, nil
+	return &proto.ScannerServiceControl{State: server.state.State}, nil
 }
 
 // GetScan return the engine scan resultt

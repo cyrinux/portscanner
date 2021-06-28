@@ -8,6 +8,8 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
+	// "github.com/rs/zerolog"
+	// "github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"io"
@@ -21,7 +23,7 @@ import (
 
 var kacp = keepalive.ClientParameters{
 	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
-	Timeout:             2 * time.Second,  // wait 1 second for ping ack before considering the connection dead
+	Timeout:             1 * time.Second,  // wait 1 second for ping ack before considering the connection dead
 	PermitWithoutStream: true,             // send pings even without active streams
 }
 
@@ -124,15 +126,9 @@ func (worker *Worker) StreamControlService() {
 			if serviceControl == nil {
 				continue
 			} else {
-				log.Printf("%+v", serviceControl)
-				log.Printf("DEBUG 4: %v", worker.state.State)
-				if serviceControl.State == proto.ScannerServiceControl_START {
-					log.Printf("DEBUG scs 5")
-					log.Print("from stop/unknown to start")
+				if serviceControl.State == 1 { //proto.ScannerServiceControl_START
 					worker.state.State = proto.ScannerServiceControl_START
-				} else if serviceControl.State == proto.ScannerServiceControl_STOP {
-					log.Print("DEBUG scs 6")
-					log.Print("from start to stop")
+				} else if serviceControl.State == 2 { //proto.ScannerServiceControl_STOP
 					worker.state.State = proto.ScannerServiceControl_STOP
 				}
 			}
@@ -168,7 +164,7 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 			// Try to obtain lock.
 			lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
 			if err != nil && err != redislock.ErrNotObtained {
-				log.Fatalln(err)
+				log.Print(err)
 			} else if err != redislock.ErrNotObtained {
 				// Sleep and check the remaining TTL.
 				if ttl, err := lock.TTL(worker.ctx); err != nil {

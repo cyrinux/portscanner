@@ -9,6 +9,7 @@ require (
 	github.com/go-redis/redis/v8 v8.10.0
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/rs/xid v1.3.0
+	github.com/rs/zerolog v1.23.0
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	google.golang.org/genproto v0.0.0-20210207032614-bba0dbe2a9ea // indirect
 	google.golang.org/grpc v1.38.0
