@@ -87,28 +87,27 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 
 // StreamServiceControl control the service
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
-	if in.GetState() != proto.ScannerServiceControl_UNKNOWN {
-		for {
+	for {
+		if in.GetState() != proto.ScannerServiceControl_UNKNOWN {
 			if err := stream.Send(&server.workerState); err != nil {
 				return err
 			}
-			time.Sleep(100 * time.Millisecond)
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
-	return nil
 }
 
 // ServiceControl control the service
 func (server *Server) ServiceControl(ctx context.Context, in *proto.ScannerServiceControl) (*proto.ScannerServiceControl, error) {
-	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
-		log.Printf("DEBUG SERVER 1: %v", server.workerState.State)
-		return &proto.ScannerServiceControl{State: server.workerState.State}, nil
-	}
+	// if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
+	// 	log.Printf("DEBUG SERVER 1: %v", server.workerState.State)
+	// 	return &proto.ScannerServiceControl{State: server.workerState.State}, nil
+	// }
 
-	if server.workerState.State != in.GetState() {
-		server.workerState.State = in.GetState()
-	}
-	log.Printf("DEBUG SERVER 2: %v", server.workerState.State)
+	// if server.workerState.State != in.GetState() {
+	server.workerState.State = in.GetState()
+	// }
+	// log.Printf("DEBUG SERVER 2: %v", server.workerState.State)
 
 	return &proto.ScannerServiceControl{State: server.workerState.State}, nil
 }

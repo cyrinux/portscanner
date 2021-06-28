@@ -21,7 +21,7 @@ import (
 
 var kacp = keepalive.ClientParameters{
 	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
-	Timeout:             time.Second,      // wait 1 second for ping ack before considering the connection dead
+	Timeout:             2 * time.Second,  // wait 1 second for ping ack before considering the connection dead
 	PermitWithoutStream: true,             // send pings even without active streams
 }
 
@@ -107,7 +107,7 @@ func (worker *Worker) StreamControlService() {
 		log.Printf("trying to connect to server control")
 		stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
-			continue
+			break
 		}
 		log.Printf("connected to server control")
 		for {
@@ -116,21 +116,22 @@ func (worker *Worker) StreamControlService() {
 
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
-				log.Print("DEBUG 1")
-				continue
-			} else if err != nil {
-				continue
-			} else if serviceControl == nil {
-				log.Print("DEBUG 3")
+				break
+			}
+			if err != nil {
+				break
+			}
+			if serviceControl == nil {
 				continue
 			} else {
+				log.Printf("%+v", serviceControl)
 				log.Printf("DEBUG 4: %v", worker.state.State)
-				if serviceControl.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
-					log.Printf("DEBUG 5")
+				if serviceControl.State == proto.ScannerServiceControl_START {
+					log.Printf("DEBUG scs 5")
 					log.Print("from stop/unknown to start")
 					worker.state.State = proto.ScannerServiceControl_START
-				} else if serviceControl.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
-					log.Print("DEBUG 6")
+				} else if serviceControl.State == proto.ScannerServiceControl_STOP {
+					log.Print("DEBUG scs 6")
 					log.Print("from start to stop")
 					worker.state.State = proto.ScannerServiceControl_STOP
 				}

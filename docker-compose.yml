@@ -43,14 +43,13 @@ services:
     environment:
       - TZ="Europe/Paris"
       - CONTROLLER_SERVER=server:9000
-      - MODE=worker
       - DB_DRIVER=redis
       - DB_PASSWORD=
       - DB_SERVER=redis:6379
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
       - RMQ_DB_PASSWORD=
-      - RMQ_CONSUMERS=5
+      - RMQ_CONSUMERS=3
       # - GODEBUG=http2debug=2
     command: "-worker"
     restart: always
