@@ -201,11 +201,11 @@ func (worker *Worker) startConsuming() {
 	}
 
 	for i := 0; i < int(numConsumers); i++ {
-		tag, consumer := NewConsumer(*worker, i, "incoming")
+		tag, consumer := NewConsumer(worker, i, "incoming")
 		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
 			log.Printf("%v\n", err)
 		}
-		tag, consumer = NewConsumer(*worker, i, "push")
+		tag, consumer = NewConsumer(worker, i, "push")
 		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
 			log.Printf("%v\n", err)
 		}

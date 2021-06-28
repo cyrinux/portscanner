@@ -35,7 +35,7 @@ type Consumer struct {
 }
 
 // NewConsumer create a new consumer
-func NewConsumer(worker Worker, tag int, queue string) (string, *Consumer) {
+func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Printf("New consumer: %s\n", name)
 	return name, &Consumer{
@@ -43,23 +43,24 @@ func NewConsumer(worker Worker, tag int, queue string) (string, *Consumer) {
 		count:  0,
 		before: time.Now(),
 		ctx:    context.TODO(),
-		worker: &worker,
+		worker: worker,
 	}
 }
 
 // Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
-	payload := delivery.Payload()
-	log.Printf("%s: start consume %s", consumer.name, payload)
 	time.Sleep(consumeDuration)
+	payload := delivery.Payload()
 
-	log.Printf("DEBUG %v\n", consumer.worker.state.State)
+	log.Printf("%s: state: %v\n", consumer.name, consumer.worker.state.State)
 	if consumer.worker.state.State == proto.ScannerServiceControl_STOP {
+		log.Printf("%s: start consume %s", consumer.name, payload)
 		if err := delivery.Reject(); err != nil {
 			log.Printf("%s: failed to requeue %s: %s", consumer.name, payload, err)
 		} else {
 			log.Printf("%s: requeue %s, worker are stop", consumer.name, payload)
 		}
+		return
 	}
 
 	consumer.count++
