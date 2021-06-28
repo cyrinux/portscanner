@@ -15,7 +15,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: grpcscanner:server
+    image: grpcscanner
     environment:
       - TZ=Europe/Paris
       - DB_DRIVER=redis
@@ -39,7 +39,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: grpcscanner:worker
+    image: grpcscanner
     environment:
       - TZ="Europe/Paris"
       - CONTROLLER_SERVER=server:9000
@@ -50,8 +50,8 @@ services:
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
       - RMQ_DB_PASSWORD=
-      - RMQ_CONSUMERS=10
-      - GODEBUG=http2debug=1
+      - RMQ_CONSUMERS=5
+      # - GODEBUG=http2debug=2
     command: "-worker"
     restart: always
     cap_add:

@@ -60,7 +60,6 @@ func NewWorker(config config.Config) *Worker {
 // handleSignal handle the worker exit signal
 func (worker *Worker) handleSignal() {
 	// open tasks queues and connection
-	worker.state.State = proto.ScannerServiceControl_UNKNOWN
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT)
 	defer signal.Stop(signals)
@@ -75,11 +74,12 @@ func (worker *Worker) handleSignal() {
 
 // StartWorker start a scanner worker
 func (worker *Worker) StartWorker() {
+	// handle exit signal
+	go worker.handleSignal()
+
 	// start the worker on boot
 	worker.state.State = proto.ScannerServiceControl_START
 	worker.startConsuming()
-	// handle exit signal
-	go worker.handleSignal()
 	// watch the control server and stop/start service
 	worker.StreamControlService()
 }
@@ -103,6 +103,7 @@ func (worker *Worker) StreamControlService() {
 	for {
 		// wait before try to reconnect
 		time.Sleep(1 * time.Second)
+
 		log.Printf("trying to connect to server control")
 		stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
@@ -110,22 +111,30 @@ func (worker *Worker) StreamControlService() {
 		}
 		log.Printf("connected to server control")
 		for {
+			// cpu cooling
+			time.Sleep(500 * time.Millisecond)
+
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
-				break
+				log.Print("DEBUG 1")
+				continue
+			} else if err != nil {
+				continue
 			} else if serviceControl == nil {
+				log.Print("DEBUG 3")
 				continue
 			} else {
+				log.Printf("DEBUG 4: %v", worker.state.State)
 				if serviceControl.State == proto.ScannerServiceControl_START && worker.state.State != proto.ScannerServiceControl_START {
+					log.Printf("DEBUG 5")
 					log.Print("from stop/unknown to start")
 					worker.state.State = proto.ScannerServiceControl_START
 				} else if serviceControl.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
+					log.Print("DEBUG 6")
 					log.Print("from start to stop")
 					worker.state.State = proto.ScannerServiceControl_STOP
 				}
 			}
-			// cpu cooling
-			time.Sleep(1 * time.Second)
 		}
 	}
 }
@@ -152,6 +161,7 @@ func rmqLogErrors(errChan <-chan error) {
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue) {
+	log.Print("DEBUGGGG starting the returner DEBBUGGG")
 	go func() {
 		for {
 			// Try to obtain lock.
@@ -233,7 +243,6 @@ func (worker *Worker) startConsuming() {
 		}
 	}
 
-	// start the returner
 	worker.startReturner(worker.broker.incoming)
 }
 

@@ -16,7 +16,7 @@ const (
 	prefetchLimit      = 1000
 	returnerLimit      = 1000
 	pollDuration       = 100 * time.Millisecond
-	pollDurationPushed = 5000 * time.Millisecond
+	pollDurationPushed = 500 * time.Millisecond
 	reportBatchSize    = 10000
 	consumeDuration    = 5 * time.Second
 )
@@ -53,7 +53,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
 
 	log.Printf("%s: state: %v\n", consumer.name, consumer.worker.state.State)
-	if consumer.worker.state.State == proto.ScannerServiceControl_STOP {
+	if consumer.worker.state.State != proto.ScannerServiceControl_START {
 		log.Printf("%s: start consume %s", consumer.name, payload)
 		if err := delivery.Reject(); err != nil {
 			log.Printf("%s: failed to requeue %s: %s", consumer.name, payload, err)

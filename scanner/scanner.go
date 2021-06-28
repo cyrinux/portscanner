@@ -87,12 +87,12 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 
 // StreamServiceControl control the service
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
-	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
+	if in.GetState() != proto.ScannerServiceControl_UNKNOWN {
 		for {
 			if err := stream.Send(&server.workerState); err != nil {
 				return err
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 	return nil
@@ -101,12 +101,15 @@ func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stre
 // ServiceControl control the service
 func (server *Server) ServiceControl(ctx context.Context, in *proto.ScannerServiceControl) (*proto.ScannerServiceControl, error) {
 	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
+		log.Printf("DEBUG SERVER 1: %v", server.workerState.State)
 		return &proto.ScannerServiceControl{State: server.workerState.State}, nil
-	} else {
-		if server.workerState.State != in.GetState() {
-			server.workerState.State = in.GetState()
-		}
 	}
+
+	if server.workerState.State != in.GetState() {
+		server.workerState.State = in.GetState()
+	}
+	log.Printf("DEBUG SERVER 2: %v", server.workerState.State)
+
 	return &proto.ScannerServiceControl{State: server.workerState.State}, nil
 }
 
@@ -174,6 +177,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScanne
 	// and write the response to the database
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
 	scanResponseJSON, _ := json.Marshal(&scannerResponse)
+	log.Printf("Receive async task order: %v", scanResponseJSON)
 	_, err := server.config.DB.Set(ctx, request.Key, string(scanResponseJSON), 0)
 	if err != nil {
 		log.Print(err)
