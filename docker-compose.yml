@@ -52,6 +52,7 @@ services:
     image: grpcscanner:worker
     environment:
       - TZ="Europe/Paris"
+      - CONTROLLER_SERVER=server:9000
       - DB_DRIVER=redis
       - DB_SERVER=redis:6379
       - RMQ_DB_SERVER=redis:6379

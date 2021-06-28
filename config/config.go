@@ -9,23 +9,24 @@ import (
 )
 
 type Config struct {
-	DBDriver      string
-	DBServer      string
-	NumConsumers  string
-	RmqDbName     string
-	RmqServer     string
-	RmqDbPassword string
-	DB            database.Database
-	// RedisClient   redis.Client
+	DBDriver         string
+	DBServer         string
+	NumConsumers     string
+	RmqDbName        string
+	RmqServer        string
+	RmqDbPassword    string
+	DB               database.Database
+	ControllerServer string
 }
 
 func GetConfig(ctx context.Context) Config {
 
 	config := Config{
-		NumConsumers:  os.Getenv("RMQ_CONSUMERS"),
-		RmqServer:     os.Getenv("RMQ_DB_SERVER"),
-		RmqDbPassword: os.Getenv("RMQ_DB_PASSWORD"),
-		RmqDbName:     os.Getenv("RMQ_DB_NAME"),
+		NumConsumers:     os.Getenv("RMQ_CONSUMERS"),
+		RmqServer:        os.Getenv("RMQ_DB_SERVER"),
+		RmqDbPassword:    os.Getenv("RMQ_DB_PASSWORD"),
+		RmqDbName:        os.Getenv("RMQ_DB_NAME"),
+		ControllerServer: os.Getenv("CONTROLLER_SERVER"),
 	}
 
 	if config.NumConsumers == "0" {
@@ -44,21 +45,6 @@ func GetConfig(ctx context.Context) Config {
 	}
 
 	config.DB = db
-
-	// // Connect to redis for the locker
-	// redisClient := *redis.NewClient(&redis.Options{
-	// 	Network:  "tcp",
-	// 	Addr:     config.RmqServer,
-	// 	Password: config.RmqDbPassword,
-	// 	DB:       0,
-	// })
-	// _, err = redisClient.Ping(ctx).Result()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer redisClient.Close()
-
-	// config.RedisClient = redisClient
 
 	return config
 }

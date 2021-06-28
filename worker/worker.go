@@ -51,11 +51,10 @@ func NewWorker(config config.Config) *Worker {
 
 // StartWorker start a scanner worker
 func (worker *Worker) StartWorker() {
-	// open tasks queues and connection
-	worker.state.State = proto.ScannerServiceControl_UNKNOWN
-
 	// manage signals
 	go func() {
+		// open tasks queues and connection
+		worker.state.State = proto.ScannerServiceControl_UNKNOWN
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT)
 		defer signal.Stop(signals)
@@ -74,9 +73,9 @@ func (worker *Worker) StartWorker() {
 // ControlService return the workers status and control them
 func (worker *Worker) ControlService() {
 	var conn *grpc.ClientConn
-	conn, err := grpc.Dial("server:9000", grpc.WithInsecure())
+	conn, err := grpc.Dial(worker.config.ControllerServer, grpc.WithInsecure())
 	if err != nil {
-		log.Printf("could not connect: %s", err)
+		log.Printf("could not connect to controller: %s", err)
 		panic(err)
 	}
 	defer conn.Close()
@@ -93,18 +92,15 @@ func (worker *Worker) ControlService() {
 				log.Print("from stop/unknown to start")
 				worker.state.State = proto.ScannerServiceControl_START
 				worker.startConsuming()
-			} else if response.State == proto.ScannerServiceControl_FORCESTART {
-				log.Print("to force start")
-				worker.state.State = proto.ScannerServiceControl_START
-				worker.startConsuming()
 			} else if response.State == proto.ScannerServiceControl_STOP && worker.state.State == proto.ScannerServiceControl_START {
 				log.Print("from start to stop")
 				worker.state.State = proto.ScannerServiceControl_STOP
-			} else {
-				log.Print("no state change")
 			}
+			// } else {
+			// 	log.Print("no state change")
+			// }
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -139,12 +135,12 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 			} else if err != redislock.ErrNotObtained {
 				// Sleep and check the remaining TTL.
 				if ttl, err := lock.TTL(worker.ctx); err != nil {
-					log.Fatalf("Returner error: %v: ttl: %v", err, ttl)
+					log.Printf("Returner error: %v: ttl: %v", err, ttl)
 				} else if ttl > 0 {
 					// Yay, I still have my lock!
 					returned, _ := queue.ReturnRejected(returnerLimit)
 					if returned > 0 {
-						log.Printf("Returned reject message %v", returned)
+						log.Printf("Returner success requeue %v tasks messages to incoming", returned)
 					}
 					lock.Refresh(worker.ctx, 5*time.Second, nil)
 				}

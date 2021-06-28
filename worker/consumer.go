@@ -119,5 +119,4 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			}
 		}
 	}
-
 }
