@@ -14,11 +14,12 @@ import (
 
 // Consumer define a broker consumer
 type Consumer struct {
-	name   string
-	count  int
-	before time.Time
-	ctx    context.Context
-	worker *Worker
+	name      string
+	count     int64
+	scanCount map[int]int64
+	before    time.Time
+	ctx       context.Context
+	worker    *Worker
 }
 
 // NewConsumer create a new consumer
@@ -26,11 +27,12 @@ func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Info().Msgf("New consumer: %s", name)
 	return name, &Consumer{
-		ctx:    context.Background(),
-		name:   name,
-		count:  0,
-		before: time.Now(),
-		worker: worker,
+		ctx:       context.Background(),
+		name:      name,
+		count:     0,
+		scanCount: make(map[int]int64),
+		before:    time.Now(),
+		worker:    worker,
 	}
 }
 
@@ -62,18 +64,13 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	json.Unmarshal([]byte(payload), &request)
 
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
-	if deferTime >= time.Now().Unix() {
-		if err := delivery.Reject(); err != nil {
-			log.Error().Msgf("%s: failed to reject %s: %s", consumer.name, payload, err)
-		} else {
-			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
-		}
-	} else {
+	if deferTime <= time.Now().Unix() {
 		newEngine := engine.NewEngine(consumer.ctx, consumer.worker.config, consumer.worker.db)
 		key, result, err := newEngine.StartNmapScan(request)
 		if err != nil {
-			log.Info().Msgf("%s: scan %v %v: %v", consumer.name, key, result, err)
+			log.Error().Msgf("%s: scan %v %v: %v", consumer.name, key, result, err)
 		}
+		// consumer.scanCount[request.ScanSpeed]+
 
 		key, scanResult, _ := engine.ParseScanResult(key, result)
 
@@ -104,6 +101,12 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			} else {
 				log.Info().Msgf("%s: rejected %s", consumer.name, payload)
 			}
+		}
+	} else {
+		if err := delivery.Reject(); err != nil {
+			log.Error().Msgf("%s: failed to reject %s: %s", consumer.name, payload, err)
+		} else {
+			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	}
 }

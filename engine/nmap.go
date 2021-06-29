@@ -8,12 +8,12 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/proto"
-	// "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"strings"
 	"time"
 )
 
+// Engine define a scanner engine
 type Engine struct {
 	ctx    context.Context
 	config config.Config
@@ -95,8 +95,6 @@ func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsSc
 
 // StartNmapScan start a nmap scan
 func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
-	ctx := engine.ctx
-
 	scannerResponse := &proto.ScannerResponse{
 		Status: proto.ScannerResponse_RUNNING,
 	}

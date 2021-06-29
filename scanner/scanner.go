@@ -248,10 +248,10 @@ func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.Param
 		request.Key = guid.String()
 	}
 
-	// If timeout < 10s, fallback to 1h
-	if request.Timeout < 30 {
-		request.Timeout = 60 * 60
-	}
+	// // If timeout < 10s, fallback to 1h
+	// if request.Timeout < 30 {
+	// 	request.Timeout = 60 * 60
+	// }
 
 	// replace all whitespaces
 	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
