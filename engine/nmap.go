@@ -15,13 +15,14 @@ import (
 )
 
 type Engine struct {
+	ctx    context.Context
 	config config.Config
 	db     database.Database
 }
 
 // NewEngine create a new nmap engine and init the database connection
-func NewEngine(config config.Config, db database.Database) *Engine {
-	return &Engine{config: config, db: db}
+func NewEngine(ctx context.Context, config config.Config, db database.Database) *Engine {
+	return &Engine{ctx: ctx, config: config, db: db}
 }
 
 func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
@@ -92,7 +93,8 @@ func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsSc
 }
 
 // StartNmapScan start a nmap scan
-func (engine *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
+func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
+	ctx := engine.ctx
 
 	scannerResponse := &proto.ScannerResponse{
 		Status: proto.ScannerResponse_RUNNING,
@@ -102,7 +104,7 @@ func (engine *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerR
 	if err != nil {
 		return s.Key, nil, err
 	}
-	_, err = engine.db.Set(ctx, s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
+	_, err = engine.db.Set(engine.ctx, s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
 	if err != nil {
 		return s.Key, nil, err
 	}

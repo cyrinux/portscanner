@@ -26,10 +26,10 @@ func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Info().Msgf("New consumer: %s", name)
 	return name, &Consumer{
+		ctx:    context.Background(),
 		name:   name,
 		count:  0,
 		before: time.Now(),
-		ctx:    context.TODO(),
 		worker: worker,
 	}
 }
@@ -69,8 +69,8 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	} else {
-		newEngine := engine.NewEngine(consumer.worker.config, consumer.worker.db)
-		key, result, err := newEngine.StartNmapScan(consumer.ctx, request)
+		newEngine := engine.NewEngine(consumer.ctx, consumer.worker.config, consumer.worker.db)
+		key, result, err := newEngine.StartNmapScan(request)
 		if err != nil {
 			log.Info().Msgf("%s: scan %v %v: %v", consumer.name, key, result, err)
 		}

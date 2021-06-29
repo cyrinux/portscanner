@@ -139,11 +139,11 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 	request := parseParamsScannerRequest(in)
 
 	// we start the scan
-	newEngine := engine.NewEngine(server.config, server.db)
+	newEngine := engine.NewEngine(ctx, server.config, server.db)
 
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 
-	key, scanResult, err := newEngine.StartNmapScan(ctx, request)
+	key, scanResult, err := newEngine.StartNmapScan(request)
 	if err != nil || scanResult == nil {
 		return generateResponse(key, nil, err)
 	}
