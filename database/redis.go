@@ -24,10 +24,10 @@ func createRedisDatabase(ctx context.Context, config config.Config) (Database, e
 	if err != nil {
 		return nil, &CreateDatabaseError{}
 	}
-	return &redisDatabase{client: client}, nil
+	return redisDatabase{client: client}, nil
 }
 
-func (r *redisDatabase) Set(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
+func (r redisDatabase) Set(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
 	_, err := r.client.Set(ctx, key, value, retention).Result()
 	if err != nil {
 		return generateError("set", err)
@@ -35,7 +35,7 @@ func (r *redisDatabase) Set(ctx context.Context, key string, value string, reten
 	return key, nil
 }
 
-func (r *redisDatabase) Get(ctx context.Context, key string) (string, error) {
+func (r redisDatabase) Get(ctx context.Context, key string) (string, error) {
 	value, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		return generateError("get", err)
@@ -43,7 +43,7 @@ func (r *redisDatabase) Get(ctx context.Context, key string) (string, error) {
 	return value, nil
 }
 
-func (r *redisDatabase) Delete(ctx context.Context, key string) (string, error) {
+func (r redisDatabase) Delete(ctx context.Context, key string) (string, error) {
 	_, err := r.client.Del(ctx, key).Result()
 	if err != nil {
 		return generateError("delete", err)

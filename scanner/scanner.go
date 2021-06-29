@@ -8,6 +8,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
+	"github.com/pkg/errors"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
@@ -37,7 +38,10 @@ func Listen(allConfig config.Config) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Can't listen on tcp/9000")
 	}
-	srv := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
+	srv := grpc.NewServer(
+		grpc.KeepaliveEnforcementPolicy(kaep),
+		grpc.KeepaliveParams(kasp),
+	)
 
 	reflection.Register(srv)
 	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
@@ -92,8 +96,8 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
 	for {
 		if err := stream.Send(&server.state); err != nil {
-			log.Error().Msgf("Send error %s", err)
-			return err
+			log.Error().Err(err).Msgf("streamer service control send error")
+			return errors.Wrap(err, "streamer service control send error")
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
