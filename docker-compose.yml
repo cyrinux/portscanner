@@ -51,7 +51,7 @@ services:
       - RMQ_DB_NAME=scanner
       - RMQ_DB_PASSWORD=
       - DEBUG=true
-      # - RMQ_CONSUMERS=10
+      - RMQ_CONSUMERS=10
       # - GODEBUG=http2debug=2
     command: "-worker"
     restart: always

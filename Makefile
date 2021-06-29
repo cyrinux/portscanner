@@ -6,7 +6,7 @@ up: build-docker
 	docker-compose logs -f --tail=50
 
 build:
-	 DOCKER_BUILDKIT=1 CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -mod vendor -installsuffix cgo -o grpcnmapscanner .
+	 DOCKER_BUILDKIT=1 CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -installsuffix cgo -o grpcnmapscanner .
 
 .PHONY: vendor
 vendor:

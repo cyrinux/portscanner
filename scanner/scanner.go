@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"encoding/json"
-	"fmt"
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -10,32 +9,20 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/rs/xid"
-	// "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
-var kaep = keepalive.EnforcementPolicy{
-	MinTime:             5 * time.Second, // If a client pings more than once every 5 seconds, terminate the connection
-	PermitWithoutStream: true,            // Allow pings even when there are no active streams
-}
-
-var kasp = keepalive.ServerParameters{
-	MaxConnectionIdle:     15 * time.Second, // If a client is idle for 15 seconds, send a GOAWAY
-	MaxConnectionAge:      30 * time.Second, // If any connection is alive for more than 30 seconds, send a GOAWAY
-	MaxConnectionAgeGrace: 5 * time.Second,  // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
-	Time:                  5 * time.Second,  // Ping the client if it is idle for 5 seconds to ensure the connection is still active
-	Timeout:               1 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
-}
-
 // Server define the grpc server struct
 type Server struct {
+	sync.Mutex
+	ctx    context.Context
 	config config.Config
 	queue  rmq.Queue
 	err    error
@@ -44,8 +31,8 @@ type Server struct {
 }
 
 // Listen start the grpc server
-func Listen(allConfig config.Config, ctx context.Context) {
-	fmt.Println("Prepare to serve the gRPC api")
+func Listen(allConfig config.Config) {
+	log.Info().Msg("Prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
 		log.Fatal().Err(err)
@@ -53,14 +40,16 @@ func Listen(allConfig config.Config, ctx context.Context) {
 	srv := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 
 	reflection.Register(srv)
-	proto.RegisterScannerServiceServer(srv, NewServer(allConfig, ctx))
+	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
 	if e := srv.Serve(listener); e != nil {
 		log.Fatal().Err(err)
 	}
 }
 
 // NewServer create a new server and init the database connection
-func NewServer(config config.Config, ctx context.Context) *Server {
+func NewServer(config config.Config) *Server {
+	ctx := context.Background()
+
 	errChan := make(chan error, 10) //TODO: arbitrary, to be change
 	go rmqLogErrors(errChan)
 
@@ -85,10 +74,11 @@ func NewServer(config config.Config, ctx context.Context) *Server {
 		log.Fatal().Err(err)
 	}
 	return &Server{
+		ctx:    ctx,
 		config: config,
 		queue:  queue,
-		err:    err,
 		db:     db,
+		err:    err,
 	}
 }
 

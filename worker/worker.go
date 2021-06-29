@@ -16,12 +16,14 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 )
 
 // Worker define the worker struct
 type Worker struct {
+	sync.Mutex
 	ctx         context.Context
 	broker      *Broker
 	config      config.Config
@@ -39,15 +41,17 @@ type Broker struct {
 }
 
 // NewWorker create a new worker and init the database connection
-func NewWorker(config config.Config, ctx context.Context) *Worker {
+func NewWorker(config config.Config) *Worker {
+	ctx := context.Background()
+
 	// Storage database init
-	db, err := database.Factory(context.Background(), config)
+	db, err := database.Factory(ctx, config)
 	if err != nil {
 		log.Fatal().Err(err)
 	}
 
 	redisClient := util.RedisConnect(ctx, config)
-	broker := NewBroker(ctx, config, *redisClient)
+	broker := NewBroker(ctx, config, redisClient)
 	locker := redislock.New(redisClient)
 	return &Worker{
 		config:      config,
@@ -138,7 +142,7 @@ func (worker *Worker) StreamControlService() {
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue) {
-	log.Print("Starting the returner")
+	log.Info().Msg("Starting the returner")
 	go func() {
 		for {
 			// Try to obtain lock.
@@ -165,13 +169,12 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 }
 
 // NewBroker open the broker queues
-func NewBroker(
-	ctx context.Context, config config.Config, redisClient redis.Client) *Broker {
+func NewBroker(ctx context.Context, config config.Config, redisClient *redis.Client) *Broker {
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
 	connection, err := rmq.OpenConnectionWithRedisClient(
-		config.RMQ.Name, &redisClient, errChan,
+		config.RMQ.Name, redisClient, errChan,
 	)
 	if err != nil {
 		log.Fatal().Err(err)

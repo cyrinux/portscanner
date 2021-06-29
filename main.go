@@ -14,14 +14,12 @@ func main() {
 	allConfig := config.GetConfig(context.Background())
 	flag.Parse()
 
-	ctx := context.Background()
-
 	if *isServer {
-		scanner.Listen(allConfig, ctx)
+		scanner.Listen(allConfig)
 	}
 
 	if *isWorker {
-		worker := worker.NewWorker(allConfig, ctx)
+		worker := worker.NewWorker(allConfig)
 		worker.StartWorker()
 	}
 }
