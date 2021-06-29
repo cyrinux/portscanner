@@ -12,8 +12,8 @@ func RedisConnect(ctx context.Context, config config.Config) *redis.Client {
 	// Connect to redis for the locker
 	redisClient := redis.NewClient(&redis.Options{
 		Network:    "tcp",
-		Addr:       config.RmqServer,
-		Password:   config.RmqDbPassword,
+		Addr:       config.RMQ.Server,
+		Password:   config.RMQ.Password,
 		DB:         0,
 		MaxRetries: 5,
 	})

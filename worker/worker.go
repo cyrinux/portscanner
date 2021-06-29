@@ -5,6 +5,7 @@ import (
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
@@ -27,6 +28,7 @@ type Worker struct {
 	locker      *redislock.Client
 	redisClient *redis.Client
 	state       proto.ScannerServiceControl
+	db          database.Database
 }
 
 // Broker represent a RMQ broker
@@ -37,8 +39,13 @@ type Broker struct {
 }
 
 // NewWorker create a new worker and init the database connection
-func NewWorker(config config.Config) *Worker {
-	ctx := context.Background()
+func NewWorker(config config.Config, ctx context.Context) *Worker {
+	// Storage database init
+	db, err := database.Factory(context.Background(), config)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+
 	redisClient := util.RedisConnect(ctx, config)
 	broker := NewBroker(ctx, config, *redisClient)
 	locker := redislock.New(redisClient)
@@ -48,6 +55,7 @@ func NewWorker(config config.Config) *Worker {
 		broker:      broker,
 		redisClient: redisClient,
 		locker:      locker,
+		db:          db,
 	}
 }
 
@@ -163,7 +171,7 @@ func NewBroker(
 	go rmqLogErrors(errChan)
 
 	connection, err := rmq.OpenConnectionWithRedisClient(
-		config.RmqDbName, &redisClient, errChan,
+		config.RMQ.Name, &redisClient, errChan,
 	)
 	if err != nil {
 		log.Fatal().Err(err)
@@ -186,7 +194,7 @@ func NewBroker(
 
 func (worker *Worker) startConsuming() {
 	numConsumers, err := strconv.ParseInt(
-		worker.config.RmqNumConsumers, 10, 0,
+		worker.config.RMQ.NumConsumers, 10, 0,
 	)
 	if err != nil {
 		log.Fatal().Err(err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
@@ -39,10 +40,11 @@ type Server struct {
 	queue  rmq.Queue
 	err    error
 	state  proto.ScannerServiceControl
+	db     database.Database
 }
 
 // Listen start the grpc server
-func Listen(allConfig config.Config) {
+func Listen(allConfig config.Config, ctx context.Context) {
 	fmt.Println("Prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
@@ -51,20 +53,26 @@ func Listen(allConfig config.Config) {
 	srv := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 
 	reflection.Register(srv)
-	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
+	proto.RegisterScannerServiceServer(srv, NewServer(allConfig, ctx))
 	if e := srv.Serve(listener); e != nil {
 		log.Fatal().Err(err)
 	}
 }
 
 // NewServer create a new server and init the database connection
-func NewServer(config config.Config) *Server {
-	ctx := context.Background()
+func NewServer(config config.Config, ctx context.Context) *Server {
 	errChan := make(chan error, 10) //TODO: arbitrary, to be change
 	go rmqLogErrors(errChan)
 
+	// Storage database init
+	db, err := database.Factory(context.Background(), config)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+
+	// Broker init
 	connection, err := rmq.OpenConnectionWithRedisClient(
-		config.RmqDbName,
+		config.RMQ.Name,
 		util.RedisConnect(ctx, config),
 		errChan,
 	)
@@ -80,13 +88,13 @@ func NewServer(config config.Config) *Server {
 		config: config,
 		queue:  queue,
 		err:    err,
-		// state:  proto.ScannerServiceControl_START, //TODO: how to pass this?
+		db:     db,
 	}
 }
 
 // DeleteScan delele a scan from the database
 func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
-	_, err := server.config.DB.Delete(ctx, in.Key)
+	_, err := server.db.Delete(ctx, in.Key)
 	return generateResponse(in.Key, nil, err)
 }
 
@@ -118,7 +126,7 @@ func (server *Server) ServiceControl(ctx context.Context, in *proto.ScannerServi
 func (server *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
 	var scannerResponse proto.ScannerResponse
 
-	scanResult, err := server.config.DB.Get(ctx, in.Key)
+	scanResult, err := server.db.Get(ctx, in.Key)
 	if err != nil {
 		return generateResponse(in.Key, nil, err)
 	}
@@ -137,7 +145,7 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 	request := parseParamsScannerRequest(in)
 
 	// we start the scan
-	newEngine := engine.NewEngine(server.config)
+	newEngine := engine.NewEngine(server.config, server.db)
 
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 
@@ -154,7 +162,7 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 	scanResultJSON, _ := json.Marshal(scanParsedResult)
 
 	// and write the response to the database
-	_, err = server.config.DB.Set(
+	_, err = server.db.Set(
 		ctx, key,
 		string(scanResultJSON),
 		time.Duration(request.GetRetentionTime())*time.Second,
@@ -179,7 +187,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScanne
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
 	scanResponseJSON, _ := json.Marshal(&scannerResponse)
 	log.Info().Msgf("Receive async task order: %+v", request)
-	_, err := server.config.DB.Set(ctx, request.Key, string(scanResponseJSON), 0)
+	_, err := server.db.Set(ctx, request.Key, string(scanResponseJSON), 0)
 	if err != nil {
 		log.Print(err)
 	}

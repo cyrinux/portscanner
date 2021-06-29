@@ -2,15 +2,9 @@ package database
 
 import (
 	"context"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"time"
 )
-
-type DBConfig struct {
-	DBDriver   string
-	DBName     string
-	DBServer   string
-	DBPassword string
-}
 
 // Database abstraction
 type Database interface {
@@ -20,11 +14,11 @@ type Database interface {
 }
 
 // Factory looks up acording to the databaseName the database implementation
-func Factory(ctx context.Context, config DBConfig) (Database, error) {
-	switch config.DBDriver {
+func Factory(ctx context.Context, config config.Config) (Database, error) {
+	switch config.DBConfig.Driver {
 	case "redis":
 		return createRedisDatabase(ctx, config)
 	default:
-		return nil, &NotImplementedDatabaseError{config.DBDriver}
+		return nil, &NotImplementedDatabaseError{config.DBConfig.Driver}
 	}
 }

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
 	"time"
 )
@@ -11,11 +12,11 @@ type redisDatabase struct {
 }
 
 // createRedisDatabase creates the redis database
-func createRedisDatabase(ctx context.Context, config DBConfig) (Database, error) {
+func createRedisDatabase(ctx context.Context, config config.Config) (Database, error) {
 	ctx = context.Background()
 	client := redis.NewClient(&redis.Options{
-		Addr:       config.DBServer,
-		Password:   config.DBPassword,
+		Addr:       config.DBConfig.Server,
+		Password:   config.DBConfig.Password,
 		DB:         0,
 		MaxRetries: 5,
 	})
