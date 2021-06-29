@@ -35,14 +35,14 @@ func Listen(allConfig config.Config) {
 	log.Info().Msg("Prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("Can't listen on tcp/9000")
 	}
 	srv := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 
 	reflection.Register(srv)
 	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
 	if e := srv.Serve(listener); e != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("Can't serve the gRPC service")
 	}
 }
 
@@ -56,7 +56,7 @@ func NewServer(config config.Config) *Server {
 	// Storage database init
 	db, err := database.Factory(context.Background(), config)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("Can't open the database")
 	}
 
 	// Broker init
@@ -66,12 +66,12 @@ func NewServer(config config.Config) *Server {
 		errChan,
 	)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("RMQ connection error")
 	}
 
 	queue, err := connection.OpenQueue("tasks")
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("RMQ queue open error")
 	}
 	return &Server{
 		ctx:    ctx,

@@ -16,15 +16,8 @@ services:
       context: .
       dockerfile: Dockerfile
     image: grpcscanner
-    environment:
-      - TZ=Europe/Paris
-      - DB_DRIVER=redis
-      - DB_SERVER=redis:6379
-      # - DB_PASSWORD=
-      - RMQ_DB_SERVER=redis:6379
-      # - RMQ_DB_PASSWORD=
-      - RMQ_DB_NAME=scanner
-      - DEBUG=true
+    env_file:
+      - .envrc
     command: "-server"
     cap_add:
       - NET_ADMIN
@@ -41,18 +34,8 @@ services:
       context: .
       dockerfile: Dockerfile
     image: grpcscanner
-    environment:
-      - TZ="Europe/Paris"
-      - CONTROLLER_SERVER=server:9000
-      - DB_DRIVER=redis
-      # - DB_PASSWORD=
-      - DB_SERVER=redis:6379
-      - RMQ_DB_SERVER=redis:6379
-      - RMQ_DB_NAME=scanner
-      # - RMQ_DB_PASSWORD=
-      - DEBUG=true
-      - RMQ_CONSUMERS=10
-      # - GODEBUG=http2debug=2
+    env_file:
+      - .envrc
     command: "-worker"
     restart: always
     cap_add:
@@ -64,9 +47,8 @@ services:
 
   redis:
     image: "bitnami/redis:latest"
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-      # - REDIS_PASSWORD=redispassw0rd
+    env_file:
+      - .envrc
     restart: always
     volumes:
       - "redis_data:/bitnami/redis/data"

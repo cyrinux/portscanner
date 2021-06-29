@@ -2,25 +2,26 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
-	RMQ struct {
-		NumConsumers string `default:"5"`
-		Name         string `default:"scanner"`
-		Server       string `required:"true"`
-		Password     string `default:""`
-	}
-	DBConfig struct {
-		Driver   string `default:"redis:6379"`
-		Name     string `default:"scanner"`
+	DB struct {
+		Driver   string `default:"redis"`
 		Server   string `default:"redis:6379"`
+		Name     string `default:"scanner"`
 		Password string `default:""`
 	}
-	ControllerServer string `default:"server:9000"`
+	RMQ struct {
+		Server       string `default:"redis:6379"`
+		Name         string `default:"scanner"`
+		Password     string `default:""`
+		NumConsumers int64  `default:"5" split_words:"true"`
+	}
+	ControllerServer string `default:"server:9000" split_words:"true"`
 }
 
 func GetConfig(ctx context.Context) Config {
@@ -29,6 +30,7 @@ func GetConfig(ctx context.Context) Config {
 	if err := envconfig.Process("", &config); err != nil {
 		log.Fatal().Err(errors.Wrap(err, "Unable to process config"))
 	}
+	fmt.Printf("%+v", config)
 
 	return config
 }

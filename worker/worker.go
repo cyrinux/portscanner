@@ -15,7 +15,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -148,7 +147,7 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 			// Try to obtain lock.
 			lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
 			if err != nil && err != redislock.ErrNotObtained {
-				log.Error().Err(err)
+				log.Error().Err(err).Msg("can't obtain returner lock")
 			} else if err != redislock.ErrNotObtained {
 				// Sleep and check the remaining TTL.
 				if ttl, err := lock.TTL(worker.ctx); err != nil {
@@ -177,17 +176,17 @@ func NewBroker(ctx context.Context, config config.Config, redisClient *redis.Cli
 		config.RMQ.Name, redisClient, errChan,
 	)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("can't open RMQ connection")
 	}
 
 	queueIncoming, err := connection.OpenQueue("tasks")
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("can't open tasks queue")
 	}
 
 	queuePushed, err := connection.OpenQueue("tasks-rejected")
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("can't open tasks-rejected queue")
 	}
 
 	queueIncoming.SetPushQueue(queuePushed)
@@ -196,23 +195,18 @@ func NewBroker(ctx context.Context, config config.Config, redisClient *redis.Cli
 }
 
 func (worker *Worker) startConsuming() {
-	numConsumers, err := strconv.ParseInt(
-		worker.config.RMQ.NumConsumers, 10, 0,
-	)
-	if err != nil {
-		log.Fatal().Err(err)
-	}
+	numConsumers := worker.config.RMQ.NumConsumers
 	numConsumers++                    // we got one consumer for the returned, lets add 1 more
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 
-	err = worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
+	err := worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("queue incoming consume error")
 	}
 
 	err = worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed)
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("queue pushed consume error")
 	}
 
 	for i := 0; i < int(numConsumers)+1; i++ {

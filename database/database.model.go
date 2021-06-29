@@ -15,10 +15,10 @@ type Database interface {
 
 // Factory looks up acording to the databaseName the database implementation
 func Factory(ctx context.Context, config config.Config) (Database, error) {
-	switch config.DBConfig.Driver {
+	switch config.DB.Driver {
 	case "redis":
 		return createRedisDatabase(ctx, config)
 	default:
-		return nil, &NotImplementedDatabaseError{config.DBConfig.Driver}
+		return nil, &NotImplementedDatabaseError{config.DB.Driver}
 	}
 }
