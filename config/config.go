@@ -15,9 +15,9 @@ type Config struct {
 		Password     string `default:""`
 	}
 	DBConfig struct {
-		Driver   string `default:"redis"`
+		Driver   string `default:"redis:6379"`
 		Name     string `default:"scanner"`
-		Server   string `default:"redis"`
+		Server   string `default:"redis:6379"`
 		Password string `default:""`
 	}
 	ControllerServer string `default:"server:9000"`

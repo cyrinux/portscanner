@@ -20,9 +20,9 @@ services:
       - TZ=Europe/Paris
       - DB_DRIVER=redis
       - DB_SERVER=redis:6379
-      - DB_PASSWORD=
+      # - DB_PASSWORD=
       - RMQ_DB_SERVER=redis:6379
-      - RMQ_DB_PASSWORD=
+      # - RMQ_DB_PASSWORD=
       - RMQ_DB_NAME=scanner
       - DEBUG=true
     command: "-server"
@@ -45,11 +45,11 @@ services:
       - TZ="Europe/Paris"
       - CONTROLLER_SERVER=server:9000
       - DB_DRIVER=redis
-      - DB_PASSWORD=
+      # - DB_PASSWORD=
       - DB_SERVER=redis:6379
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
-      - RMQ_DB_PASSWORD=
+      # - RMQ_DB_PASSWORD=
       - DEBUG=true
       - RMQ_CONSUMERS=10
       # - GODEBUG=http2debug=2
