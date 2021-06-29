@@ -9,16 +9,19 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
 	// "github.com/rs/zerolog"
-	// "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
+)
+
+const (
+	returnerLimit = 1000
 )
 
 var kacp = keepalive.ClientParameters{
@@ -95,8 +98,7 @@ func (worker *Worker) StreamControlService() {
 		grpc.WithKeepaliveParams(kacp),
 	)
 	if err != nil {
-		log.Printf("could not connect to controller: %s", err)
-		panic(err)
+		log.Fatal().Msgf("could not connect to controller: %s", err)
 	}
 	defer conn.Close()
 
@@ -104,14 +106,15 @@ func (worker *Worker) StreamControlService() {
 	getState := &proto.ScannerServiceControl{State: 0}
 	for {
 		// wait before try to reconnect
-		time.Sleep(1 * time.Second)
-
-		log.Printf("trying to connect to server control")
+		reconnectTime := 5 * time.Second
+		log.Info().Msgf("trying to connect in %v to server control", reconnectTime)
+		time.Sleep(reconnectTime)
 		stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
 			break
 		}
-		log.Printf("connected to server control")
+		log.Info().Msg("connected to server control")
+
 		for {
 			// cpu cooling
 			time.Sleep(500 * time.Millisecond)
@@ -142,16 +145,16 @@ func rmqLogErrors(errChan <-chan error) {
 		switch err := err.(type) {
 		case *rmq.HeartbeatError:
 			if err.Count == rmq.HeartbeatErrorLimit {
-				log.Print("heartbeat error (limit): ", err)
+				log.Error().Msgf("heartbeat error (limit): ", err)
 			} else {
-				log.Print("heartbeat error: ", err)
+				log.Error().Msgf("heartbeat error: ", err)
 			}
 		case *rmq.ConsumeError:
-			log.Print("consume error: ", err)
+			log.Error().Msgf("consume error: ", err)
 		case *rmq.DeliveryError:
-			log.Print("delivery error: ", err.Delivery, err)
+			log.Error().Msgf("delivery error: ", err.Delivery, err)
 		default:
-			log.Print("other error: ", err)
+			log.Error().Msgf("other error: ", err)
 		}
 	}
 }
@@ -164,16 +167,16 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 			// Try to obtain lock.
 			lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
 			if err != nil && err != redislock.ErrNotObtained {
-				log.Print(err)
+				log.Error().Err(err)
 			} else if err != redislock.ErrNotObtained {
 				// Sleep and check the remaining TTL.
 				if ttl, err := lock.TTL(worker.ctx); err != nil {
-					log.Printf("Returner error: %v: ttl: %v", err, ttl)
+					log.Error().Msgf("Returner error: %v: ttl: %v", err, ttl)
 				} else if ttl > 0 {
 					// Yay, I still have my lock!
 					returned, _ := queue.ReturnRejected(returnerLimit)
 					if returned > 0 {
-						log.Printf("Returner success requeue %v tasks messages to incoming", returned)
+						log.Error().Msgf("Returner success requeue %v tasks messages to incoming", returned)
 					}
 					lock.Refresh(worker.ctx, 5*time.Second, nil)
 				}
@@ -224,22 +227,22 @@ func (worker *Worker) startConsuming() {
 
 	err = worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
 	if err != nil {
-		log.Print(err)
+		log.Error().Err(err)
 	}
 
 	err = worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed)
 	if err != nil {
-		log.Print(err)
+		log.Error().Err(err)
 	}
 
 	for i := 0; i < int(numConsumers)+1; i++ {
 		tag, consumer := NewConsumer(worker, i, "incoming")
 		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
-			log.Printf("%v\n", err)
+			log.Error().Err(err)
 		}
 		tag, consumer = NewConsumer(worker, i, "push")
 		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
-			log.Printf("%v\n", err)
+			log.Error().Err(err)
 		}
 	}
 
@@ -247,7 +250,7 @@ func (worker *Worker) startConsuming() {
 }
 
 func (worker *Worker) stopConsuming() {
-	log.Print("Stop consumming...")
+	log.Info().Msg("Stop consumming...")
 	<-worker.broker.incoming.StopConsuming()
 	<-worker.broker.pushed.StopConsuming()
 	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish

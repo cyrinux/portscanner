@@ -9,11 +9,12 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/rs/xid"
+	// "github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -45,14 +46,14 @@ func Listen(allConfig config.Config) {
 	fmt.Println("Prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
-		panic(err) // The port may be on use
+		log.Panic().Err(err)
 	}
 	srv := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 
 	reflection.Register(srv)
 	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
 	if e := srv.Serve(listener); e != nil {
-		panic(err)
+		log.Panic().Err(err)
 	}
 }
 
@@ -68,12 +69,12 @@ func NewServer(config config.Config) *Server {
 		errChan,
 	)
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err)
 	}
 
 	queue, err := connection.OpenQueue("tasks")
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err)
 	}
 	return &Server{
 		config: config,
@@ -93,7 +94,7 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
 	for {
 		if err := stream.Send(&server.state); err != nil {
-			log.Printf("Send error %v", err)
+			log.Error().Msgf("Send error %s", err)
 			return err
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -177,7 +178,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScanne
 	// and write the response to the database
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
 	scanResponseJSON, _ := json.Marshal(&scannerResponse)
-	log.Printf("Receive async task order: %v", scanResponseJSON)
+	log.Info().Msgf("Receive async task order: %+v", &scanResponseJSON)
 	_, err := server.config.DB.Set(ctx, request.Key, string(scanResponseJSON), 0)
 	if err != nil {
 		log.Print(err)
@@ -223,16 +224,16 @@ func rmqLogErrors(errChan <-chan error) {
 		switch err := err.(type) {
 		case *rmq.HeartbeatError:
 			if err.Count == rmq.HeartbeatErrorLimit {
-				log.Print("heartbeat error (limit): ", err)
+				log.Error().Msgf("heartbeat error (limit): %s", err)
 			} else {
-				log.Print("heartbeat error: ", err)
+				log.Error().Msgf("heartbeat error: %s", err)
 			}
 		case *rmq.ConsumeError:
-			log.Print("consume error: ", err)
+			log.Error().Msgf("consume error: %s", err)
 		case *rmq.DeliveryError:
-			log.Print("delivery error: ", err.Delivery, err)
+			log.Error().Msgf("delivery error: %s %s", err.Delivery, err)
 		default:
-			log.Print("other error: ", err)
+			log.Error().Msgf("other error: %s", err)
 		}
 	}
 }
