@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -30,7 +29,6 @@ func GetConfig(ctx context.Context) Config {
 	if err := envconfig.Process("", &config); err != nil {
 		log.Fatal().Err(errors.Wrap(err, "Unable to process config"))
 	}
-	fmt.Printf("%+v", config)
 
 	return config
 }
