@@ -33,6 +33,7 @@ func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsSc
 	var options = []nmap.Option{
 		nmap.WithVerbosity(3),
 		nmap.WithTargets(hostsList...),
+		nmap.WithTimingTemplate(nmap.Timing(s.ScanSpeed)),
 	}
 
 	portsList := strings.Split(ports, ",")
@@ -203,18 +204,18 @@ func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult,
 				OsVersion: osversion,
 				State:     host.Status.Reason,
 			}
-			for _, p := range host.Ports {
+			for _, port := range host.Ports {
 				version := &proto.PortVersion{
-					ExtraInfos:  p.Service.ExtraInfo,
-					LowVersion:  p.Service.LowVersion,
-					HighVersion: p.Service.HighVersion,
-					Product:     p.Service.Product,
+					ExtraInfos:  port.Service.ExtraInfo,
+					LowVersion:  port.Service.LowVersion,
+					HighVersion: port.Service.HighVersion,
+					Product:     port.Service.Product,
 				}
 				newPort := &proto.Port{
-					PortId:      fmt.Sprintf("%v", p.ID),
-					ServiceName: p.Service.Name,
-					Protocol:    p.Protocol,
-					State:       p.State.Reason,
+					PortId:      fmt.Sprintf("%v", port.ID),
+					ServiceName: port.Service.Name,
+					Protocol:    port.Protocol,
+					State:       port.State.Reason,
 					Version:     version,
 				}
 				portList = append(portList, newPort)
