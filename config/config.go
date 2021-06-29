@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	NumConsumers     string
+	RmqNumConsumers  string
 	RmqDbName        string
 	RmqServer        string
 	RmqDbPassword    string
@@ -19,15 +19,18 @@ type Config struct {
 func GetConfig(ctx context.Context) Config {
 
 	config := Config{
-		NumConsumers:     os.Getenv("RMQ_CONSUMERS"),
 		RmqServer:        os.Getenv("RMQ_DB_SERVER"),
 		RmqDbPassword:    os.Getenv("RMQ_DB_PASSWORD"),
 		RmqDbName:        os.Getenv("RMQ_DB_NAME"),
 		ControllerServer: os.Getenv("CONTROLLER_SERVER"),
 	}
 
-	if config.NumConsumers == "0" {
-		config.NumConsumers = "5"
+	rmqNumConsumers := "5"
+	if tmpRmqNumConsumers, ok := os.LookupEnv("RMQ_CONSUMERS"); ok {
+		if tmpRmqNumConsumers == "0" {
+			config.RmqNumConsumers = rmqNumConsumers
+		}
+		config.RmqNumConsumers = tmpRmqNumConsumers
 	}
 
 	dbConfig := database.DBConfig{

@@ -59,7 +59,7 @@ func Listen(allConfig config.Config) {
 // NewServer create a new server and init the database connection
 func NewServer(config config.Config) *Server {
 	ctx := context.Background()
-	errChan := make(chan error, 10)
+	errChan := make(chan error, 10) //TODO: arbitrary, to be change
 	go rmqLogErrors(errChan)
 
 	connection, err := rmq.OpenConnectionWithRedisClient(
@@ -75,8 +75,12 @@ func NewServer(config config.Config) *Server {
 	if err != nil {
 		panic(err)
 	}
-
-	return &Server{config: config, queue: queue, err: err}
+	return &Server{
+		config: config,
+		queue:  queue,
+		err:    err,
+		// state:  proto.ScannerServiceControl_START, //TODO: how to pass this?
+	}
 }
 
 // DeleteScan delele a scan from the database

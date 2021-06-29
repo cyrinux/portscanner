@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	prefetchLimit      = 1000
+	// prefetchLimit should be greater than RMQ consumers
+	// prefetchLimit      = 1000
 	returnerLimit      = 1000
 	pollDuration       = 100 * time.Millisecond
 	pollDurationPushed = 5000 * time.Millisecond

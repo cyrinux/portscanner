@@ -158,7 +158,7 @@ func rmqLogErrors(errChan <-chan error) {
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue) {
-	log.Print("DEBUGGGG starting the returner DEBBUGGG")
+	log.Print("Starting the returner")
 	go func() {
 		for {
 			// Try to obtain lock.
@@ -197,39 +197,42 @@ func NewBroker(
 		panic(err)
 	}
 
-	incomingQueue, err := connection.OpenQueue("tasks")
+	queueIncoming, err := connection.OpenQueue("tasks")
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		panic(err)
 	}
 
-	pushQueue, err := connection.OpenQueue("tasks-rejected")
+	queuePushed, err := connection.OpenQueue("tasks-rejected")
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		panic(err)
 	}
 
-	incomingQueue.SetPushQueue(pushQueue)
+	queueIncoming.SetPushQueue(queuePushed)
 
-	return &Broker{incoming: incomingQueue, pushed: pushQueue, connection: connection}
+	return &Broker{incoming: queueIncoming, pushed: queuePushed, connection: connection}
 }
 
 func (worker *Worker) startConsuming() {
 	numConsumers, err := strconv.ParseInt(
-		worker.config.NumConsumers, 10, 0,
+		worker.config.RmqNumConsumers, 10, 0,
 	)
 	if err != nil {
 		panic(err)
 	}
+	numConsumers++                    // we got one consumer for the returned, lets add 1 more
+	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 
 	err = worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
 	if err != nil {
 		log.Print(err)
 	}
+
 	err = worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed)
 	if err != nil {
 		log.Print(err)
 	}
 
-	for i := 0; i < int(numConsumers); i++ {
+	for i := 0; i < int(numConsumers)+1; i++ {
 		tag, consumer := NewConsumer(worker, i, "incoming")
 		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
 			log.Printf("%v\n", err)

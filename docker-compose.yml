@@ -49,7 +49,7 @@ services:
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
       - RMQ_DB_PASSWORD=
-      - RMQ_CONSUMERS=3
+      - RMQ_CONSUMERS=10
       # - GODEBUG=http2debug=2
     command: "-worker"
     restart: always
