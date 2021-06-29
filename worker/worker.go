@@ -128,26 +128,6 @@ func (worker *Worker) StreamControlService() {
 	}
 }
 
-// RmqLogErrors display the rmq errors log
-func rmqLogErrors(errChan <-chan error) {
-	for err := range errChan {
-		switch err := err.(type) {
-		case *rmq.HeartbeatError:
-			if err.Count == rmq.HeartbeatErrorLimit {
-				log.Error().Msgf("heartbeat error (limit): ", err)
-			} else {
-				log.Error().Msgf("heartbeat error: ", err)
-			}
-		case *rmq.ConsumeError:
-			log.Error().Msgf("consume error: ", err)
-		case *rmq.DeliveryError:
-			log.Error().Msgf("delivery error: ", err.Delivery, err)
-		default:
-			log.Error().Msgf("other error: ", err)
-		}
-	}
-}
-
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue) {
 	log.Print("Starting the returner")
@@ -243,4 +223,24 @@ func (worker *Worker) stopConsuming() {
 	<-worker.broker.incoming.StopConsuming()
 	<-worker.broker.pushed.StopConsuming()
 	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
+}
+
+// RmqLogErrors display the rmq errors log
+func rmqLogErrors(errChan <-chan error) {
+	for err := range errChan {
+		switch err := err.(type) {
+		case *rmq.HeartbeatError:
+			if err.Count == rmq.HeartbeatErrorLimit {
+				log.Error().Msgf("heartbeat error (limit): %v", err.RedisErr)
+			} else {
+				log.Error().Msgf("heartbeat error: %v", err.RedisErr)
+			}
+		case *rmq.ConsumeError:
+			log.Error().Msgf("consume error: %v", err.RedisErr)
+		case *rmq.DeliveryError:
+			log.Error().Msgf("delivery error: %v %v", err.Delivery, err.RedisErr)
+		default:
+			log.Error().Msgf("other error: %v", err.Error)
+		}
+	}
 }

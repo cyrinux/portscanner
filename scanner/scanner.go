@@ -178,7 +178,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScanne
 	// and write the response to the database
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
 	scanResponseJSON, _ := json.Marshal(&scannerResponse)
-	log.Info().Msgf("Receive async task order: %+v", &scanResponseJSON)
+	log.Info().Msgf("Receive async task order: %+v", request)
 	_, err := server.config.DB.Set(ctx, request.Key, string(scanResponseJSON), 0)
 	if err != nil {
 		log.Print(err)
@@ -224,16 +224,16 @@ func rmqLogErrors(errChan <-chan error) {
 		switch err := err.(type) {
 		case *rmq.HeartbeatError:
 			if err.Count == rmq.HeartbeatErrorLimit {
-				log.Error().Msgf("heartbeat error (limit): %s", err)
+				log.Error().Msgf("heartbeat error (limit): %s", err.RedisErr)
 			} else {
-				log.Error().Msgf("heartbeat error: %s", err)
+				log.Error().Msgf("heartbeat error: %v", err.RedisErr)
 			}
 		case *rmq.ConsumeError:
-			log.Error().Msgf("consume error: %s", err)
+			log.Error().Msgf("consume error: %v", err.RedisErr)
 		case *rmq.DeliveryError:
-			log.Error().Msgf("delivery error: %s %s", err.Delivery, err)
+			log.Error().Msgf("delivery error: %v %v", err.Delivery, err.RedisErr)
 		default:
-			log.Error().Msgf("other error: %s", err)
+			log.Error().Msgf("other error: %v", err.Error)
 		}
 	}
 }

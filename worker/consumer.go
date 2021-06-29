@@ -24,7 +24,7 @@ type Consumer struct {
 // NewConsumer create a new consumer
 func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
-	log.Info().Msgf("New consumer: %s\n", name)
+	log.Info().Msgf("New consumer: %s", name)
 	return name, &Consumer{
 		name:   name,
 		count:  0,

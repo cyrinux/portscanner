@@ -24,6 +24,7 @@ services:
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_PASSWORD=
       - RMQ_DB_NAME=scanner
+      - DEBUG=true
     command: "-server"
     cap_add:
       - NET_ADMIN
@@ -49,7 +50,8 @@ services:
       - RMQ_DB_SERVER=redis:6379
       - RMQ_DB_NAME=scanner
       - RMQ_DB_PASSWORD=
-      - RMQ_CONSUMERS=10
+      - DEBUG=true
+      # - RMQ_CONSUMERS=10
       # - GODEBUG=http2debug=2
     command: "-worker"
     restart: always
