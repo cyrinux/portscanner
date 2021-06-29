@@ -9,19 +9,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	// "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"os"
 	"time"
-)
-
-const (
-	pollDuration       = 100 * time.Millisecond
-	pollDurationPushed = 5000 * time.Millisecond
-	reportBatchSize    = 10000
-	consumeDuration    = 1 * time.Second
-)
-
-var (
-	hostname, _ = os.Hostname()
 )
 
 // Consumer define a broker consumer

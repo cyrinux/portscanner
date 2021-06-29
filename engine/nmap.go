@@ -7,7 +7,8 @@ import (
 	nmap "github.com/Ullaakut/nmap/v2"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/proto"
-	"log"
+	// "github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"strings"
 	"time"
 )
@@ -127,7 +128,7 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 		return s.Key, nil, err
 	}
 
-	log.Printf("Starting scan of host: %s, port: %s, timeout: %v, retention: %v",
+	log.Info().Msgf("Starting scan of host: %s, port: %s, timeout: %v, retention: %v",
 		hosts,
 		ports,
 		timeout,
@@ -143,7 +144,7 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 			if p < previous {
 				continue
 			} else {
-				log.Printf("Running scan of host: %s, port: %s, timeout: %v, retention: %v: %v %%",
+				log.Info().Msgf("Running scan of host: %s, port: %s, timeout: %v, retention: %v: %v %%",
 					hosts,
 					ports,
 					timeout,
@@ -155,31 +156,16 @@ func (e *Engine) StartNmapScan(ctx context.Context, s *proto.ParamsScannerReques
 		}
 	}()
 
-	// go func() {
-	// 	select {
-	// 	case <-time.After(2 * time.Second):
-	// 		// If we receive a message after 2 seconds
-	// 		// that means the request has been processed
-	// 		// We then write this as the response
-	// 		log.Println("processing request")
-	// 	case <-ctx.Done():
-	// 		// If the request gets cancelled, log it
-	// 		// to STDERR
-	// 		log.Println("request cancelled")
-	// 	}
-
-	// }()
-
 	result, warnings, err := scanner.RunWithProgress(progress)
 	if err != nil {
 		return s.Key, nil, err
 	}
 
 	if warnings != nil {
-		log.Printf("warnings: %v", warnings)
+		log.Warn().Msgf("Nmap warnings: %v", warnings)
 	}
 
-	log.Printf("Nmap done: %d/%d hosts up scanned in %3f seconds\n",
+	log.Info().Msgf("Nmap done: %d/%d hosts up scanned in %3f seconds",
 		result.Stats.Hosts.Up,
 		result.Stats.Hosts.Total,
 		result.Stats.Finished.Elapsed,
@@ -194,7 +180,7 @@ func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult,
 	scanResult := []*proto.HostResult{}
 	totalPorts := 0
 	if len(result.Hosts) == 0 || result == nil {
-		log.Println("Scan timeout or no result")
+		log.Error().Msg("Scan timeout or no result")
 		return key, nil, nil
 	}
 	for _, host := range result.Hosts {
@@ -209,8 +195,7 @@ func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult,
 		for _, adr := range host.Addresses {
 			address := adr.Addr
 			hostResult := &proto.Host{
-				Address: address,
-				// Fqdn:      fqdn,
+				Address:   address,
 				OsVersion: osversion,
 				State:     host.Status.Reason,
 			}

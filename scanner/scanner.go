@@ -46,14 +46,14 @@ func Listen(allConfig config.Config) {
 	fmt.Println("Prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
-		log.Panic().Err(err)
+		log.Fatal().Err(err)
 	}
 	srv := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 
 	reflection.Register(srv)
 	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
 	if e := srv.Serve(listener); e != nil {
-		log.Panic().Err(err)
+		log.Fatal().Err(err)
 	}
 }
 
@@ -69,12 +69,12 @@ func NewServer(config config.Config) *Server {
 		errChan,
 	)
 	if err != nil {
-		log.Panic().Err(err)
+		log.Fatal().Err(err)
 	}
 
 	queue, err := connection.OpenQueue("tasks")
 	if err != nil {
-		log.Panic().Err(err)
+		log.Fatal().Err(err)
 	}
 	return &Server{
 		config: config,

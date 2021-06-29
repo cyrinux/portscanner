@@ -3,7 +3,8 @@ package config
 import (
 	"context"
 	"github.com/cyrinux/grpcnmapscanner/database"
-	"log"
+	// "github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"os"
 )
 
@@ -42,7 +43,7 @@ func GetConfig(ctx context.Context) Config {
 
 	db, err := database.Factory(ctx, dbConfig)
 	if err != nil {
-		log.Println(err)
+		log.Fatal().Err(err)
 	}
 
 	config.DB = db

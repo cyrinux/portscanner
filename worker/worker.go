@@ -11,7 +11,6 @@ import (
 	// "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 	"io"
 	"os"
 	"os/signal"
@@ -19,16 +18,6 @@ import (
 	"syscall"
 	"time"
 )
-
-const (
-	returnerLimit = 1000
-)
-
-var kacp = keepalive.ClientParameters{
-	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
-	Timeout:             1 * time.Second,  // wait 1 second for ping ack before considering the connection dead
-	PermitWithoutStream: true,             // send pings even without active streams
-}
 
 // Worker define the worker struct
 type Worker struct {
@@ -197,17 +186,17 @@ func NewBroker(
 		config.RmqDbName, &redisClient, errChan,
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err)
 	}
 
 	queueIncoming, err := connection.OpenQueue("tasks")
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		panic(err)
+		log.Fatal().Err(err)
 	}
 
 	queuePushed, err := connection.OpenQueue("tasks-rejected")
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		panic(err)
+		log.Fatal().Err(err)
 	}
 
 	queueIncoming.SetPushQueue(queuePushed)
@@ -220,7 +209,7 @@ func (worker *Worker) startConsuming() {
 		worker.config.RmqNumConsumers, 10, 0,
 	)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err)
 	}
 	numConsumers++                    // we got one consumer for the returned, lets add 1 more
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
