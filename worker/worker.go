@@ -173,25 +173,25 @@ func (worker *Worker) startConsuming() {
 
 	err := worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
 	if err != nil {
-		log.Error().Err(err).Msg("queue incoming consume error")
+		log.Error().Stack().Err(err).Msg("queue incoming consume error")
 	}
 
 	err = worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed)
 	if err != nil {
-		log.Error().Err(err).Msg("queue pushed consume error")
+		log.Error().Stack().Err(err).Msg("queue pushed consume error")
 	}
 
 	for i := 0; i < int(numConsumers)+1; i++ {
 		tag, consumer := NewConsumer(worker, i, "incoming")
 		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
-			log.Error().Err(err)
+			log.Error().Stack().Err(err).Msg("")
 		}
 		// store consumer pointer to the worker struct
 		worker.consumers = append(worker.consumers, *consumer)
 
 		tag, consumer = NewConsumer(worker, i, "push")
 		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
-			log.Error().Err(err)
+			log.Error().Stack().Err(err).Msg("")
 		}
 	}
 
