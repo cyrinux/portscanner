@@ -30,6 +30,7 @@ type Worker struct {
 	redisClient *redis.Client
 	state       proto.ScannerServiceControl
 	db          database.Database
+	consumers   []Consumer
 }
 
 // Broker represent a RMQ broker
@@ -52,6 +53,8 @@ func NewWorker(config config.Config) *Worker {
 	redisClient := util.RedisConnect(ctx, config)
 	broker := NewBroker(ctx, config, redisClient)
 	locker := redislock.New(redisClient)
+	consumers := make([]Consumer, 100)
+
 	return &Worker{
 		config:      config,
 		ctx:         ctx,
@@ -59,6 +62,7 @@ func NewWorker(config config.Config) *Worker {
 		redisClient: redisClient,
 		locker:      locker,
 		db:          db,
+		consumers:   consumers,
 	}
 }
 
@@ -133,6 +137,12 @@ func (worker *Worker) StreamControlService() {
 					worker.state.State = proto.ScannerServiceControl_START
 				} else if serviceControl.State == 2 { //proto.ScannerServiceControl_STOP
 					worker.state.State = proto.ScannerServiceControl_STOP
+					for _, consumer := range worker.consumers {
+						if consumer.engine != nil {
+							log.Info().Msgf("cancelling consumer %v", consumer.name)
+							consumer.cancel()
+						}
+					}
 				}
 			}
 		}
@@ -214,6 +224,9 @@ func (worker *Worker) startConsuming() {
 		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
 			log.Error().Err(err)
 		}
+		// store consumer pointer to the worker struct
+		worker.consumers = append(worker.consumers, *consumer)
+
 		tag, consumer = NewConsumer(worker, i, "push")
 		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
 			log.Error().Err(err)

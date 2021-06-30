@@ -113,7 +113,7 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 	retention := time.Duration(s.RetentionTime) * time.Second
 
 	// define scan context
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(engine.ctx, timeout)
 	defer cancel()
 
 	// parse all input options

@@ -19,20 +19,28 @@ type Consumer struct {
 	scanCount map[int]int64
 	before    time.Time
 	ctx       context.Context
+	cancel    context.CancelFunc
 	worker    *Worker
+	engine    *engine.Engine
 }
 
 // NewConsumer create a new consumer
 func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Info().Msgf("New consumer: %s", name)
+	ctx := context.TODO()
+	ctx, cancel := context.WithCancel(ctx)
+	engine := engine.NewEngine(ctx, worker.config, worker.db)
+
 	return name, &Consumer{
-		ctx:       context.Background(),
+		ctx:       ctx,
+		cancel:    cancel,
 		name:      name,
 		count:     0,
-		scanCount: make(map[int]int64),
+		scanCount: make(map[int]int64), //TODO: store and incremente by scan_speed
 		before:    time.Now(),
 		worker:    worker,
+		engine:    engine,
 	}
 }
 
@@ -65,28 +73,29 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime <= time.Now().Unix() {
-		newEngine := engine.NewEngine(consumer.ctx, consumer.worker.config, consumer.worker.db)
-		key, result, err := newEngine.StartNmapScan(request)
-		if err != nil {
+		key, result, err := consumer.engine.StartNmapScan(request)
+		if err != nil || result == nil {
 			log.Error().Msgf("%s: scan %v %v: %v", consumer.name, key, result, err)
 		}
-		// consumer.scanCount[request.ScanSpeed]+
 
-		key, scanResult, _ := engine.ParseScanResult(key, result)
-
-		scannerResponse := &proto.ScannerResponse{
-			HostResult: scanResult,
-		}
-		scanResultJSON, err := json.Marshal(scannerResponse)
-		if err != nil {
-			log.Error().Msgf("%s: failed to parse result: %s", consumer.name, err)
-		}
-		_, err = consumer.worker.db.Set(
-			consumer.ctx, key, string(scanResultJSON),
-			time.Duration(request.GetRetentionTime())*time.Second,
-		)
-		if err != nil {
-			log.Error().Msgf("%s: failed to insert result: %s", consumer.name, err)
+		// if scan is cancel, result will be nil and we can't
+		// parse the result
+		if result != nil {
+			key, scanResult, _ := engine.ParseScanResult(key, result)
+			scannerResponse := &proto.ScannerResponse{
+				HostResult: scanResult,
+			}
+			scanResultJSON, err := json.Marshal(scannerResponse)
+			if err != nil {
+				log.Error().Msgf("%s: failed to parse result: %s", consumer.name, err)
+			}
+			_, err = consumer.worker.db.Set(
+				consumer.ctx, key, string(scanResultJSON),
+				time.Duration(request.GetRetentionTime())*time.Second,
+			)
+			if err != nil {
+				log.Error().Msgf("%s: failed to insert result: %s", consumer.name, err)
+			}
 		}
 
 		if consumer.count%reportBatchSize > 0 {
