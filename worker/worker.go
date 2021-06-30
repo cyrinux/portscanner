@@ -135,14 +135,11 @@ func (worker *Worker) StreamControlService() {
 			} else {
 				if serviceControl.State == 1 && worker.state.State != 1 { //proto.ScannerServiceControl_START
 					worker.state.State = proto.ScannerServiceControl_START
+					worker.broker = NewBroker(context.TODO(), worker.config, worker.redisClient)
+					worker.startConsuming()
 				} else if serviceControl.State == 2 && worker.state.State != 2 { //proto.ScannerServiceControl_STOP
 					worker.state.State = proto.ScannerServiceControl_STOP
-					for _, consumer := range worker.consumers {
-						if consumer.engine != nil {
-							log.Info().Msgf("cancelling consumer %v", consumer.name)
-							consumer.cancel()
-						}
-					}
+					worker.stopConsuming()
 				}
 			}
 		}
@@ -238,6 +235,12 @@ func (worker *Worker) startConsuming() {
 
 func (worker *Worker) stopConsuming() {
 	log.Info().Msg("Stop consumming...")
+	for _, consumer := range worker.consumers {
+		if consumer.engine != nil {
+			log.Info().Msgf("cancelling consumer %v", consumer.name)
+			consumer.cancel()
+		}
+	}
 	<-worker.broker.incoming.StopConsuming()
 	<-worker.broker.pushed.StopConsuming()
 	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
