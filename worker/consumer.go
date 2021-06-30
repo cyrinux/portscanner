@@ -28,7 +28,7 @@ type Consumer struct {
 func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Info().Msgf("New consumer: %s", name)
-	ctx := context.TODO()
+	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	engine := engine.NewEngine(ctx, worker.config, worker.db)
 
@@ -90,7 +90,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 				log.Error().Msgf("%s: failed to parse result: %s", consumer.name, err)
 			}
 			_, err = consumer.worker.db.Set(
-				consumer.ctx, key, string(scanResultJSON),
+				context.TODO(), key, string(scanResultJSON),
 				time.Duration(request.GetRetentionTime())*time.Second,
 			)
 			if err != nil {

@@ -58,24 +58,24 @@ func NewServer(config config.Config) *Server {
 	go rmqLogErrors(errChan)
 
 	// Storage database init
-	db, err := database.Factory(context.Background(), config)
+	db, err := database.Factory(context.TODO(), config)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Can't open the database")
+		log.Fatal().Stack().Err(err).Msg("Can't open the database")
 	}
 
 	// Broker init
 	connection, err := rmq.OpenConnectionWithRedisClient(
 		config.RMQ.Name,
-		util.RedisConnect(ctx, config),
+		util.RedisConnect(context.TODO(), config),
 		errChan,
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("RMQ connection error")
+		log.Fatal().Stack().Err(err).Msg("RMQ connection error")
 	}
 
 	queue, err := connection.OpenQueue("tasks")
 	if err != nil {
-		log.Fatal().Err(err).Msg("RMQ queue open error")
+		log.Fatal().Stack().Err(err).Msg("RMQ queue open error")
 	}
 	return &Server{
 		ctx:    ctx,

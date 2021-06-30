@@ -45,15 +45,15 @@ func NewWorker(config config.Config) *Worker {
 	ctx := context.Background()
 
 	// Storage database init
-	db, err := database.Factory(ctx, config)
+	db, err := database.Factory(context.TODO(), config)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Stack().Err(err).Msg("")
 	}
 
-	redisClient := util.RedisConnect(ctx, config)
-	broker := NewBroker(ctx, config, redisClient)
+	redisClient := util.RedisConnect(context.TODO(), config)
+	broker := NewBroker(context.TODO(), config, redisClient)
 	locker := redislock.New(redisClient)
-	consumers := make([]Consumer, 100)
+	consumers := make([]Consumer, 0)
 
 	return &Worker{
 		config:      config,
@@ -133,9 +133,9 @@ func (worker *Worker) StreamControlService() {
 			if serviceControl == nil {
 				continue
 			} else {
-				if serviceControl.State == 1 { //proto.ScannerServiceControl_START
+				if serviceControl.State == 1 && worker.state.State != 1 { //proto.ScannerServiceControl_START
 					worker.state.State = proto.ScannerServiceControl_START
-				} else if serviceControl.State == 2 { //proto.ScannerServiceControl_STOP
+				} else if serviceControl.State == 2 && worker.state.State != 2 { //proto.ScannerServiceControl_STOP
 					worker.state.State = proto.ScannerServiceControl_STOP
 					for _, consumer := range worker.consumers {
 						if consumer.engine != nil {

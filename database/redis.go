@@ -13,7 +13,6 @@ type redisDatabase struct {
 
 // createRedisDatabase creates the redis database
 func createRedisDatabase(ctx context.Context, config config.Config) (Database, error) {
-	ctx = context.Background()
 	client := redis.NewClient(&redis.Options{
 		Addr:       config.DB.Server,
 		Password:   config.DB.Password,

@@ -103,7 +103,7 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 	if err != nil {
 		return s.Key, nil, err
 	}
-	_, err = engine.db.Set(engine.ctx, s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
+	_, err = engine.db.Set(context.TODO(), s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
 	if err != nil {
 		return s.Key, nil, err
 	}
