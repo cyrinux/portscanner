@@ -9,7 +9,6 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
-	// "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"io"
@@ -33,13 +32,6 @@ type Worker struct {
 	consumers   []Consumer
 }
 
-// Broker represent a RMQ broker
-type Broker struct {
-	incoming   rmq.Queue
-	pushed     rmq.Queue
-	connection rmq.Connection
-}
-
 // NewWorker create a new worker and init the database connection
 func NewWorker(config config.Config) *Worker {
 	ctx := context.Background()
@@ -51,7 +43,7 @@ func NewWorker(config config.Config) *Worker {
 	}
 
 	redisClient := util.RedisConnect(context.TODO(), config)
-	broker := NewBroker(context.TODO(), config, redisClient)
+	broker := newBroker(context.TODO(), config, redisClient)
 	locker := redislock.New(redisClient)
 	consumers := make([]Consumer, 0)
 
@@ -135,7 +127,7 @@ func (worker *Worker) StreamControlService() {
 			} else {
 				if serviceControl.State == 1 && worker.state.State != 1 { //proto.ScannerServiceControl_START
 					worker.state.State = proto.ScannerServiceControl_START
-					worker.broker = NewBroker(context.TODO(), worker.config, worker.redisClient)
+					worker.broker = newBroker(context.TODO(), worker.config, worker.redisClient)
 					worker.startConsuming()
 				} else if serviceControl.State == 2 && worker.state.State != 2 { //proto.ScannerServiceControl_STOP
 					worker.state.State = proto.ScannerServiceControl_STOP
@@ -172,33 +164,6 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 			time.Sleep(1 * time.Second)
 		}
 	}()
-}
-
-// NewBroker open the broker queues
-func NewBroker(ctx context.Context, config config.Config, redisClient *redis.Client) *Broker {
-	errChan := make(chan error, 10)
-	go rmqLogErrors(errChan)
-
-	connection, err := rmq.OpenConnectionWithRedisClient(
-		config.RMQ.Name, redisClient, errChan,
-	)
-	if err != nil {
-		log.Fatal().Err(err).Msg("can't open RMQ connection")
-	}
-
-	queueIncoming, err := connection.OpenQueue("tasks")
-	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		log.Fatal().Err(err).Msg("can't open tasks queue")
-	}
-
-	queuePushed, err := connection.OpenQueue("tasks-rejected")
-	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		log.Fatal().Err(err).Msg("can't open tasks-rejected queue")
-	}
-
-	queueIncoming.SetPushQueue(queuePushed)
-
-	return &Broker{incoming: queueIncoming, pushed: queuePushed, connection: connection}
 }
 
 func (worker *Worker) startConsuming() {
@@ -244,24 +209,4 @@ func (worker *Worker) stopConsuming() {
 	<-worker.broker.incoming.StopConsuming()
 	<-worker.broker.pushed.StopConsuming()
 	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
-}
-
-// RmqLogErrors display the rmq errors log
-func rmqLogErrors(errChan <-chan error) {
-	for err := range errChan {
-		switch err := err.(type) {
-		case *rmq.HeartbeatError:
-			if err.Count == rmq.HeartbeatErrorLimit {
-				log.Error().Msgf("heartbeat error (limit): %v", err.RedisErr)
-			} else {
-				log.Error().Msgf("heartbeat error: %v", err.RedisErr)
-			}
-		case *rmq.ConsumeError:
-			log.Error().Msgf("consume error: %v", err.RedisErr)
-		case *rmq.DeliveryError:
-			log.Error().Msgf("delivery error: %v %v", err.Delivery, err.RedisErr)
-		default:
-			log.Error().Msgf("other error: %v", err.Error)
-		}
-	}
 }
