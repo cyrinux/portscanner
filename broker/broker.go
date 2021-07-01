@@ -1,7 +1,8 @@
-package worker
+package broker
 
 import (
 	"context"
+
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
@@ -10,14 +11,13 @@ import (
 
 // Broker represent a RMQ broker
 type Broker struct {
-	config     config.Config
-	incoming   rmq.Queue
-	pushed     rmq.Queue
-	connection rmq.Connection
+	Incoming   rmq.Queue
+	Pushed     rmq.Queue
+	Connection rmq.Connection
 }
 
 // NewBroker open the broker queues
-func newBroker(ctx context.Context, config config.Config, redisClient *redis.Client) *Broker {
+func NewBroker(ctx context.Context, config config.Config, redisClient *redis.Client) Broker {
 	errChan := make(chan error, 10)
 	go rmqLogErrors(errChan)
 
@@ -40,7 +40,7 @@ func newBroker(ctx context.Context, config config.Config, redisClient *redis.Cli
 
 	queueIncoming.SetPushQueue(queuePushed)
 
-	return &Broker{incoming: queueIncoming, pushed: queuePushed, connection: connection, config: config}
+	return Broker{Incoming: queueIncoming, Pushed: queuePushed, Connection: connection}
 }
 
 // RmqLogErrors display the rmq errors log
@@ -58,7 +58,7 @@ func rmqLogErrors(errChan <-chan error) {
 		case *rmq.DeliveryError:
 			log.Error().Msgf("delivery error: %v %v", err.Delivery, err.RedisErr)
 		default:
-			log.Error().Msgf("other error: %v", err.Error)
+			log.Error().Msgf("other error: %v", err)
 		}
 	}
 }

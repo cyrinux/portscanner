@@ -41,6 +41,7 @@ message ScannerResponse {
         RUNNING = 2;
         OK = 3;
         ERROR = 4;
+        CANCEL = 5;
       }
     Status status = 6;
 }

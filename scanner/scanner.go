@@ -2,6 +2,11 @@ package scanner
 
 import (
 	"encoding/json"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -14,10 +19,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"net"
-	"strings"
-	"sync"
-	"time"
 )
 
 // Server define the grpc server struct
@@ -139,7 +140,7 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 	request := parseParamsScannerRequest(in)
 
 	// we start the scan
-	newEngine := engine.NewEngine(ctx, server.config, server.db)
+	newEngine := engine.NewEngine(ctx, server.db)
 
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 

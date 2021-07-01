@@ -2,8 +2,16 @@ package worker
 
 import (
 	"context"
+	"io"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
+	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/proto"
@@ -11,25 +19,19 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
-	"io"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-	"time"
 )
 
 // Worker define the worker struct
 type Worker struct {
 	sync.Mutex
 	ctx         context.Context
-	broker      *Broker
+	broker      broker.Broker
 	config      config.Config
 	locker      *redislock.Client
 	redisClient *redis.Client
 	state       proto.ScannerServiceControl
+	consumers   []*Consumer
 	db          database.Database
-	consumers   []Consumer
 }
 
 // NewWorker create a new worker and init the database connection
@@ -43,18 +45,18 @@ func NewWorker(config config.Config) *Worker {
 	}
 
 	redisClient := util.RedisConnect(context.TODO(), config)
-	broker := newBroker(context.TODO(), config, redisClient)
+	broker := broker.NewBroker(context.TODO(), config, redisClient)
 	locker := redislock.New(redisClient)
-	consumers := make([]Consumer, 0)
+	consumers := make([]*Consumer, 0)
 
 	return &Worker{
 		config:      config,
 		ctx:         ctx,
 		broker:      broker,
-		redisClient: redisClient,
 		locker:      locker,
-		db:          db,
 		consumers:   consumers,
+		db:          db,
+		redisClient: redisClient,
 	}
 }
 
@@ -79,8 +81,8 @@ func (worker *Worker) StartWorker() {
 	go worker.handleSignal()
 
 	// start the worker on boot
-	worker.state.State = proto.ScannerServiceControl_START
 	worker.startConsuming()
+
 	// watch the control server and stop/start service
 	worker.StreamControlService()
 }
@@ -127,7 +129,6 @@ func (worker *Worker) StreamControlService() {
 			} else {
 				if serviceControl.State == 1 && worker.state.State != 1 { //proto.ScannerServiceControl_START
 					worker.state.State = proto.ScannerServiceControl_START
-					worker.broker = newBroker(context.TODO(), worker.config, worker.redisClient)
 					worker.startConsuming()
 				} else if serviceControl.State == 2 && worker.state.State != 2 { //proto.ScannerServiceControl_STOP
 					worker.state.State = proto.ScannerServiceControl_STOP
@@ -171,31 +172,35 @@ func (worker *Worker) startConsuming() {
 	numConsumers++                    // we got one consumer for the returned, lets add 1 more
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 
-	err := worker.broker.incoming.StartConsuming(prefetchLimit, pollDuration)
+	worker.broker = broker.NewBroker(context.TODO(), worker.config, worker.redisClient)
+
+	err := worker.broker.Incoming.StartConsuming(prefetchLimit, pollDuration)
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("queue incoming consume error")
 	}
 
-	err = worker.broker.pushed.StartConsuming(prefetchLimit, pollDurationPushed)
+	err = worker.broker.Pushed.StartConsuming(prefetchLimit, pollDurationPushed)
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("queue pushed consume error")
 	}
 
 	for i := 0; i < int(numConsumers)+1; i++ {
-		tag, consumer := NewConsumer(worker, i, "incoming")
-		if _, err := worker.broker.incoming.AddConsumer(tag, consumer); err != nil {
+		tag, consumer := NewConsumer(worker.db, i, "incoming")
+		if _, err := worker.broker.Incoming.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
-		// store consumer pointer to the worker struct
-		worker.consumers = append(worker.consumers, *consumer)
+		consumer.state.State = proto.ScannerServiceControl_START
 
-		tag, consumer = NewConsumer(worker, i, "push")
-		if _, err := worker.broker.pushed.AddConsumer(tag, consumer); err != nil {
+		// store consumer pointer to the worker struct
+		worker.consumers = append(worker.consumers, consumer)
+
+		tag, consumer = NewConsumer(worker.db, i, "push")
+		if _, err := worker.broker.Pushed.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
 	}
 
-	worker.startReturner(worker.broker.incoming)
+	worker.startReturner(worker.broker.Incoming)
 }
 
 func (worker *Worker) stopConsuming() {
@@ -203,10 +208,11 @@ func (worker *Worker) stopConsuming() {
 	for _, consumer := range worker.consumers {
 		if consumer.engine != nil {
 			log.Info().Msgf("cancelling consumer %v", consumer.name)
+			consumer.state.State = worker.state.State
 			consumer.cancel()
 		}
 	}
-	<-worker.broker.incoming.StopConsuming()
-	<-worker.broker.pushed.StopConsuming()
-	<-worker.broker.connection.StopAllConsuming() // wait for all Consume() calls to finish
+	<-worker.broker.Incoming.StopConsuming()
+	<-worker.broker.Pushed.StopConsuming()
+	<-worker.broker.Connection.StopAllConsuming() // wait for all Consume() calls to finish
 }

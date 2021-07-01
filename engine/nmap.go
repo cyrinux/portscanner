@@ -4,25 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
+
 	nmap "github.com/Ullaakut/nmap/v2"
-	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/rs/zerolog/log"
-	"strings"
-	"time"
 )
 
 // Engine define a scanner engine
 type Engine struct {
-	ctx    context.Context
-	config config.Config
-	db     database.Database
+	ctx context.Context
+	db  database.Database
 }
 
 // NewEngine create a new nmap engine and init the database connection
-func NewEngine(ctx context.Context, config config.Config, db database.Database) *Engine {
-	return &Engine{ctx: ctx, config: config, db: db}
+func NewEngine(ctx context.Context, db database.Database) *Engine {
+	return &Engine{ctx: ctx, db: db}
 }
 
 func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {

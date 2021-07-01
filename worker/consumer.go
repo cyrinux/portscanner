@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	rmq "github.com/adjust/rmq/v4"
+	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
-	// "github.com/rs/zerolog"
+	// "github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
-	"time"
 )
 
 // Consumer define a broker consumer
@@ -20,17 +22,18 @@ type Consumer struct {
 	before    time.Time
 	ctx       context.Context
 	cancel    context.CancelFunc
-	worker    *Worker
 	engine    *engine.Engine
+	state     proto.ScannerServiceControl
+	db        database.Database
 }
 
 // NewConsumer create a new consumer
-func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
+func NewConsumer(db database.Database, tag int, queue string) (string, *Consumer) {
 	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
 	log.Info().Msgf("New consumer: %s", name)
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
-	engine := engine.NewEngine(ctx, worker.config, worker.db)
+	engine := engine.NewEngine(ctx, db)
 
 	return name, &Consumer{
 		ctx:       ctx,
@@ -39,8 +42,8 @@ func NewConsumer(worker *Worker, tag int, queue string) (string, *Consumer) {
 		count:     0,
 		scanCount: make(map[int]int64), //TODO: store and incremente by scan_speed
 		before:    time.Now(),
-		worker:    worker,
 		engine:    engine,
+		db:        db,
 	}
 }
 
@@ -49,8 +52,8 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	time.Sleep(consumeDuration)
 	payload := delivery.Payload()
 
-	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.worker.state.State)
-	if consumer.worker.state.State != proto.ScannerServiceControl_START {
+	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
+	if consumer.state.State != proto.ScannerServiceControl_START {
 		log.Info().Msgf("%s: start consume %s", consumer.name, payload)
 		if err := delivery.Reject(); err != nil {
 			log.Error().Msgf("%s: failed to requeue %s: %s", consumer.name, payload, err)
@@ -89,7 +92,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			if err != nil {
 				log.Error().Msgf("%s: failed to parse result: %s", consumer.name, err)
 			}
-			_, err = consumer.worker.db.Set(
+			_, err = consumer.db.Set(
 				context.TODO(), key, string(scanResultJSON),
 				time.Duration(request.GetRetentionTime())*time.Second,
 			)
