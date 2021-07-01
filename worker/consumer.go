@@ -17,6 +17,7 @@ import (
 // Consumer define a broker consumer
 type Consumer struct {
 	name      string
+	tasktype  string
 	count     int64
 	scanCount map[int]int64
 	before    time.Time
@@ -28,22 +29,23 @@ type Consumer struct {
 }
 
 // NewConsumer create a new consumer
-func NewConsumer(db database.Database, tag int, queue string) (string, *Consumer) {
-	name := fmt.Sprintf("%s-consumer-%s-%d", queue, hostname, tag)
+func NewConsumer(db database.Database, tag int, tasktype string, queue string) (string, *Consumer) {
+	name := fmt.Sprintf("%s-consumer-%s-%s-%d", tasktype, queue, hostname, tag)
 	log.Info().Msgf("New consumer: %s", name)
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	engine := engine.NewEngine(ctx, db)
 
 	return name, &Consumer{
-		ctx:       ctx,
-		cancel:    cancel,
-		name:      name,
-		count:     0,
-		scanCount: make(map[int]int64), //TODO: store and incremente by scan_speed
-		before:    time.Now(),
-		engine:    engine,
-		db:        db,
+		ctx:      ctx,
+		cancel:   cancel,
+		name:     name,
+		tasktype: tasktype,
+		count:    0,
+		// scanCount: make(map[int]int64), //TODO: store and incremente by scan_speed
+		before: time.Now(),
+		engine: engine,
+		db:     db,
 	}
 }
 
@@ -56,7 +58,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	if consumer.state.State != proto.ScannerServiceControl_START {
 		log.Info().Msgf("%s: start consume %s", consumer.name, payload)
 		if err := delivery.Reject(); err != nil {
-			log.Error().Msgf("%s: failed to requeue %s: %s", consumer.name, payload, err)
+			log.Error().Stack().Err(err).Msgf("%s: failed to requeue %s: %s", consumer.name, payload, err)
 		} else {
 			log.Debug().Msgf("%s: requeue %s, worker are stop", consumer.name, payload)
 		}
@@ -78,7 +80,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	if deferTime <= time.Now().Unix() {
 		key, result, err := consumer.engine.StartNmapScan(request)
 		if err != nil || result == nil {
-			log.Error().Msgf("%s: scan %v %v: %v", consumer.name, key, result, err)
+			log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
 		}
 
 		// if scan is cancel, result will be nil and we can't
@@ -90,33 +92,33 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			}
 			scanResultJSON, err := json.Marshal(scannerResponse)
 			if err != nil {
-				log.Error().Msgf("%s: failed to parse result: %s", consumer.name, err)
+				log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
 			}
 			_, err = consumer.db.Set(
 				context.TODO(), key, string(scanResultJSON),
 				time.Duration(request.GetRetentionTime())*time.Second,
 			)
 			if err != nil {
-				log.Error().Msgf("%s: failed to insert result: %s", consumer.name, err)
+				log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)
 			}
 		}
 
 		if consumer.count%reportBatchSize > 0 {
 			if err := delivery.Ack(); err != nil {
-				log.Error().Msgf("%s: failed to ack %s: %s", consumer.name, payload, err)
+				log.Error().Stack().Err(err).Msgf("%s: failed to ack %s: %s", consumer.name, payload)
 			} else {
 				log.Info().Msgf("%s: acked %s", consumer.name, payload)
 			}
 		} else { // reject one per batch
 			if err := delivery.Reject(); err != nil {
-				log.Error().Msgf("%s: failed to reject %s: %s", consumer.name, payload, err)
+				log.Error().Stack().Err(err).Msgf("%s: failed to reject %s", consumer.name, payload)
 			} else {
 				log.Info().Msgf("%s: rejected %s", consumer.name, payload)
 			}
 		}
 	} else {
 		if err := delivery.Reject(); err != nil {
-			log.Error().Msgf("%s: failed to reject %s: %s", consumer.name, payload, err)
+			log.Error().Stack().Err(err).Msgf("%s: failed to reject %s", consumer.name, payload)
 		} else {
 			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
 		}

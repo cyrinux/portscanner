@@ -19,7 +19,7 @@ func main() {
 	}
 
 	if *isWorker {
-		worker := worker.NewWorker(allConfig)
-		worker.StartWorker()
+		workerNMAP := worker.NewWorker(allConfig, "nmap")
+		workerNMAP.StartWorker()
 	}
 }

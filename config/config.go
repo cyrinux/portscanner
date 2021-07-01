@@ -16,8 +16,8 @@ type Config struct {
 	}
 	RMQ struct {
 		Server       string `default:"redis:6379"`
-		Name         string `default:"scanner"`
 		Password     string `default:""`
+		Name         string `default:"grpcnmapscanner"`
 		NumConsumers int64  `default:"5" split_words:"true"`
 	}
 	ControllerServer string `default:"server:9000" split_words:"true"`

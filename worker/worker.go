@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 
 // Worker define the worker struct
 type Worker struct {
-	sync.Mutex
 	ctx         context.Context
 	broker      broker.Broker
 	config      config.Config
@@ -32,10 +30,11 @@ type Worker struct {
 	state       proto.ScannerServiceControl
 	consumers   []*Consumer
 	db          database.Database
+	name        string
 }
 
 // NewWorker create a new worker and init the database connection
-func NewWorker(config config.Config) *Worker {
+func NewWorker(config config.Config, name string) *Worker {
 	ctx := context.Background()
 
 	// Storage database init
@@ -45,12 +44,13 @@ func NewWorker(config config.Config) *Worker {
 	}
 
 	redisClient := util.RedisConnect(context.TODO(), config)
-	broker := broker.NewBroker(context.TODO(), config, redisClient)
+	broker := broker.NewBroker(context.TODO(), name, config, redisClient)
 	locker := redislock.New(redisClient)
 	consumers := make([]*Consumer, 0)
 
 	return &Worker{
 		config:      config,
+		name:        name,
 		ctx:         ctx,
 		broker:      broker,
 		locker:      locker,
@@ -151,7 +151,7 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 			} else if err != redislock.ErrNotObtained {
 				// Sleep and check the remaining TTL.
 				if ttl, err := lock.TTL(worker.ctx); err != nil {
-					log.Error().Msgf("Returner error: %v: ttl: %v", err, ttl)
+					log.Error().Stack().Err(err).Msgf("Returner error, ttl: %v", ttl)
 				} else if ttl > 0 {
 					// Yay, I still have my lock!
 					returned, _ := queue.ReturnRejected(returnerLimit)
@@ -172,7 +172,7 @@ func (worker *Worker) startConsuming() {
 	numConsumers++                    // we got one consumer for the returned, lets add 1 more
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 
-	worker.broker = broker.NewBroker(context.TODO(), worker.config, worker.redisClient)
+	worker.broker = broker.NewBroker(context.TODO(), worker.name, worker.config, worker.redisClient)
 
 	err := worker.broker.Incoming.StartConsuming(prefetchLimit, pollDuration)
 	if err != nil {
@@ -185,7 +185,7 @@ func (worker *Worker) startConsuming() {
 	}
 
 	for i := 0; i < int(numConsumers)+1; i++ {
-		tag, consumer := NewConsumer(worker.db, i, "incoming")
+		tag, consumer := NewConsumer(worker.db, i, worker.name, "incoming")
 		if _, err := worker.broker.Incoming.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
@@ -194,7 +194,7 @@ func (worker *Worker) startConsuming() {
 		// store consumer pointer to the worker struct
 		worker.consumers = append(worker.consumers, consumer)
 
-		tag, consumer = NewConsumer(worker.db, i, "push")
+		tag, consumer = NewConsumer(worker.db, i, worker.name, "rejected")
 		if _, err := worker.broker.Pushed.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}

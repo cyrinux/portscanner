@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	rmq "github.com/adjust/rmq/v4"
+	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
@@ -23,13 +23,13 @@ import (
 
 // Server define the grpc server struct
 type Server struct {
-	sync.Mutex
-	ctx    context.Context
-	config config.Config
-	queue  rmq.Queue
-	err    error
-	state  proto.ScannerServiceControl
-	db     database.Database
+	ctx      context.Context
+	config   config.Config
+	db       database.Database
+	err      error
+	queue    rmq.Queue
+	state    proto.ScannerServiceControl
+	tasktype string
 }
 
 // Listen start the grpc server
@@ -45,18 +45,21 @@ func Listen(allConfig config.Config) {
 	)
 
 	reflection.Register(srv)
-	proto.RegisterScannerServiceServer(srv, NewServer(allConfig))
+	proto.RegisterScannerServiceServer(srv, NewServer(allConfig, "nmap"))
 	if e := srv.Serve(listener); e != nil {
 		log.Fatal().Err(err).Msg("Can't serve the gRPC service")
 	}
 }
 
 // NewServer create a new server and init the database connection
-func NewServer(config config.Config) *Server {
+func NewServer(config config.Config, tasktype string) *Server {
 	ctx := context.Background()
 
 	errChan := make(chan error, 10) //TODO: arbitrary, to be change
-	go rmqLogErrors(errChan)
+	go broker.RmqLogErrors(errChan)
+
+	// Broker init nmap queue
+	brk := broker.NewBroker(context.TODO(), tasktype, config, util.RedisConnect(ctx, config))
 
 	// Storage database init
 	db, err := database.Factory(context.TODO(), config)
@@ -64,26 +67,13 @@ func NewServer(config config.Config) *Server {
 		log.Fatal().Stack().Err(err).Msg("Can't open the database")
 	}
 
-	// Broker init
-	connection, err := rmq.OpenConnectionWithRedisClient(
-		config.RMQ.Name,
-		util.RedisConnect(context.TODO(), config),
-		errChan,
-	)
-	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("RMQ connection error")
-	}
-
-	queue, err := connection.OpenQueue("tasks")
-	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("RMQ queue open error")
-	}
 	return &Server{
-		ctx:    ctx,
-		config: config,
-		queue:  queue,
-		db:     db,
-		err:    err,
+		ctx:      ctx,
+		tasktype: tasktype,
+		config:   config,
+		queue:    brk.Incoming,
+		db:       db,
+		err:      err,
 	}
 }
 
@@ -219,26 +209,6 @@ func generateResponse(key string, value *proto.ScannerResponse, err error) (*pro
 		Value:   value,
 		Error:   "",
 	}, nil
-}
-
-// rmqLogErrors display the rmq errors log
-func rmqLogErrors(errChan <-chan error) {
-	for err := range errChan {
-		switch err := err.(type) {
-		case *rmq.HeartbeatError:
-			if err.Count == rmq.HeartbeatErrorLimit {
-				log.Error().Msgf("heartbeat error (limit): %s", err.RedisErr)
-			} else {
-				log.Error().Msgf("heartbeat error: %v", err.RedisErr)
-			}
-		case *rmq.ConsumeError:
-			log.Error().Msgf("consume error: %v", err.RedisErr)
-		case *rmq.DeliveryError:
-			log.Error().Msgf("delivery error: %v %v", err.Delivery, err.RedisErr)
-		default:
-			log.Error().Msgf("other error: %v", err.Error)
-		}
-	}
 }
 
 func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.ParamsScannerRequest {
