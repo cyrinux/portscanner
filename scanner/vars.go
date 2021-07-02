@@ -9,7 +9,7 @@ import (
 
 var (
 	appConfig = config.GetConfig()
-	log       = logger.NewConsole(appConfig.Logger.Debug)
+	log       = logger.New(appConfig.Logger.Debug, appConfig.Logger.Pretty)
 )
 
 var kaep = keepalive.EnforcementPolicy{

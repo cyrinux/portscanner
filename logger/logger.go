@@ -12,7 +12,18 @@ type Logger struct {
 	logger *zerolog.Logger
 }
 
-func New(isDebug bool) *Logger {
+// New return a new logger
+// isDebug: debug or not
+// isPretty: console or json
+func New(isDebug bool, isPretty bool) *Logger {
+	if isPretty {
+		return NewConsole(isDebug)
+	}
+	return NewJSON(isDebug)
+}
+
+// NewJSON return a JSON logger
+func NewJSON(isDebug bool) *Logger {
 	logLevel := zerolog.InfoLevel
 	if isDebug {
 		logLevel = zerolog.DebugLevel
@@ -24,6 +35,7 @@ func New(isDebug bool) *Logger {
 	return &Logger{logger: &logger}
 }
 
+// NewConsole return a pretty console logger
 func NewConsole(isDebug bool) *Logger {
 	logLevel := zerolog.InfoLevel
 	if isDebug {

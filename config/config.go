@@ -20,7 +20,8 @@ type Config struct {
 		NumConsumers int64  `default:"5" split_words:"true"`
 	}
 	Logger struct {
-		Debug bool `default:"false"`
+		Debug  bool `default:"false"`
+		Pretty bool `default:"true"`
 	}
 	ControllerServer string `default:"server:9000" split_words:"true"`
 }
