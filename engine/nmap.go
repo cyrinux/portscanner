@@ -10,7 +10,6 @@ import (
 	nmap "github.com/Ullaakut/nmap/v2"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/proto"
-	"github.com/rs/zerolog/log"
 )
 
 // Engine define a scanner engine

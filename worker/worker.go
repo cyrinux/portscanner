@@ -16,7 +16,6 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
@@ -169,22 +168,23 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 
 func (worker *Worker) startConsuming() {
 	numConsumers := worker.config.RMQ.NumConsumers
-	numConsumers++                    // we got one consumer for the returned, lets add 1 more
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
+	log.Info().Msgf("Start consuming %s with %v consumers...", worker.name, numConsumers)
 
 	worker.broker = broker.NewBroker(context.TODO(), worker.name, worker.config, worker.redisClient)
 
 	err := worker.broker.Incoming.StartConsuming(prefetchLimit, pollDuration)
 	if err != nil {
-		log.Error().Stack().Err(err).Msg("queue incoming consume error")
+		log.Error().Stack().Err(err).Msgf("%s queue incoming consume error", worker.name)
 	}
 
 	err = worker.broker.Pushed.StartConsuming(prefetchLimit, pollDurationPushed)
 	if err != nil {
-		log.Error().Stack().Err(err).Msg("queue pushed consume error")
+		log.Error().Stack().Err(err).Msgf("%s queue pushed consume error", worker.name)
 	}
 
-	for i := 0; i < int(numConsumers)+1; i++ {
+	numConsumers += 2 // we got one consumer for the returned, lets add 2 more
+	for i := 0; i < int(numConsumers); i++ {
 		tag, consumer := NewConsumer(worker.db, i, worker.name, "incoming")
 		if _, err := worker.broker.Incoming.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
@@ -204,10 +204,10 @@ func (worker *Worker) startConsuming() {
 }
 
 func (worker *Worker) stopConsuming() {
-	log.Info().Msg("Stop consumming...")
+	log.Info().Msgf("Stop consuming %s...", worker.name)
 	for _, consumer := range worker.consumers {
 		if consumer.engine != nil {
-			log.Info().Msgf("cancelling consumer %v", consumer.name)
+			log.Info().Msgf("%s cancelling consumer %v", worker.name, consumer.name)
 			consumer.state.State = worker.state.State
 			consumer.cancel()
 		}

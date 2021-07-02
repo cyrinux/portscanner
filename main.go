@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/scanner"
@@ -11,7 +10,7 @@ import (
 func main() {
 	isServer := flag.Bool("server", false, "start the gRPC server")
 	isWorker := flag.Bool("worker", false, "start the worker")
-	allConfig := config.GetConfig(context.Background())
+	allConfig := config.GetConfig()
 	flag.Parse()
 
 	if *isServer {

@@ -10,8 +10,6 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
-	// "github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog/log"
 )
 
 // Consumer define a broker consumer
@@ -30,6 +28,7 @@ type Consumer struct {
 
 // NewConsumer create a new consumer
 func NewConsumer(db database.Database, tag int, tasktype string, queue string) (string, *Consumer) {
+
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", tasktype, queue, hostname, tag)
 	log.Info().Msgf("New consumer: %s", name)
 	ctx := context.Background()

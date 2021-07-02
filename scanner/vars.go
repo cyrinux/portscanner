@@ -1,8 +1,15 @@
 package scanner
 
 import (
+	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/logger"
 	"google.golang.org/grpc/keepalive"
 	"time"
+)
+
+var (
+	appConfig = config.GetConfig()
+	log       = logger.NewConsole(appConfig.Logger.Debug)
 )
 
 var kaep = keepalive.EnforcementPolicy{

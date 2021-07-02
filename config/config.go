@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -20,10 +19,13 @@ type Config struct {
 		Name         string `default:"grpcnmapscanner"`
 		NumConsumers int64  `default:"5" split_words:"true"`
 	}
+	Logger struct {
+		Debug bool `default:"false"`
+	}
 	ControllerServer string `default:"server:9000" split_words:"true"`
 }
 
-func GetConfig(ctx context.Context) Config {
+func GetConfig() Config {
 	// Init config
 	var config Config
 	if err := envconfig.Process("", &config); err != nil {

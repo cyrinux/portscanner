@@ -1,12 +1,18 @@
 package worker
 
 import (
+	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/logger"
 	"google.golang.org/grpc/keepalive"
 	"os"
 	"time"
 )
 
-var hostname, _ = os.Hostname()
+var (
+	appConfig   = config.GetConfig()
+	log         = logger.NewConsole(appConfig.Logger.Debug)
+	hostname, _ = os.Hostname()
+)
 
 var kacp = keepalive.ClientParameters{
 	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity

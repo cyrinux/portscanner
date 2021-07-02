@@ -17,7 +17,7 @@ services:
       dockerfile: Dockerfile
     image: grpcscanner
     env_file:
-      - .envrc
+      - .env
     command: "-server"
     cap_add:
       - NET_ADMIN
@@ -35,7 +35,7 @@ services:
       dockerfile: Dockerfile
     image: grpcscanner
     env_file:
-      - .envrc
+      - .env
     command: "-worker"
     restart: always
     cap_add:
@@ -48,7 +48,7 @@ services:
   redis:
     image: "bitnami/redis:latest"
     env_file:
-      - .envrc
+      - .env
     restart: always
     volumes:
       - "redis_data:/bitnami/redis/data"
