@@ -10,6 +10,7 @@ import (
 	nmap "github.com/Ullaakut/nmap/v2"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/proto"
+	"github.com/pkg/errors"
 )
 
 // Engine define a scanner engine
@@ -18,7 +19,7 @@ type Engine struct {
 	db  database.Database
 }
 
-// NewEngine create a new nmap engine and init the database connection
+// NewEngine create a new nmap engine
 func NewEngine(ctx context.Context, db database.Database) *Engine {
 	return &Engine{ctx: ctx, db: db}
 }
@@ -101,7 +102,7 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 	if err != nil {
 		return s.Key, nil, err
 	}
-	_, err = engine.db.Set(context.TODO(), s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
+	_, err = engine.db.Set(engine.ctx, s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
 	if err != nil {
 		return s.Key, nil, err
 	}
@@ -165,26 +166,27 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 	}
 
 	if warnings != nil {
-		log.Warn().Msgf("Nmap warnings: %v", warnings)
+		log.Warn().Msgf("nmap warnings: %v", warnings)
 	}
 
-	log.Info().Msgf("Nmap done: %d/%d hosts up scanned in %3f seconds",
+	log.Info().Msgf("nmap done: %d/%d hosts up scanned in %3f seconds",
 		result.Stats.Hosts.Up,
 		result.Stats.Hosts.Total,
 		result.Stats.Finished.Elapsed,
 	)
 
-	return s.Key, result, err
+	return s.Key, result, nil
 }
 
 // ParseScanResult parse the nmap result and create the expected output
-func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult, error) {
+func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 	portList := []*proto.Port{}
 	scanResult := []*proto.HostResult{}
 	totalPorts := 0
-	if len(result.Hosts) == 0 || result == nil {
-		log.Error().Msg("Scan timeout or no result")
-		return key, nil, nil
+	if result == nil || len(result.Hosts) == 0 {
+		err := errors.New("scan timeout or not result")
+		log.Error().Err(err).Msg("")
+		return nil, err
 	}
 	for _, host := range result.Hosts {
 		var osversion string
@@ -228,5 +230,5 @@ func ParseScanResult(key string, result *nmap.Run) (string, []*proto.HostResult,
 			scanResult = append(scanResult, scan)
 		}
 	}
-	return key, scanResult, nil
+	return scanResult, nil
 }

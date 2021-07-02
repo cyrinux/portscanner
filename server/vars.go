@@ -1,4 +1,4 @@
-package scanner
+package server
 
 import (
 	"github.com/cyrinux/grpcnmapscanner/config"

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/cyrinux/grpcnmapscanner/config"
-	"github.com/cyrinux/grpcnmapscanner/scanner"
+	"github.com/cyrinux/grpcnmapscanner/server"
 	"github.com/cyrinux/grpcnmapscanner/worker"
 )
 
@@ -14,7 +14,7 @@ func main() {
 	flag.Parse()
 
 	if *isServer {
-		scanner.Listen(allConfig)
+		server.Listen(allConfig)
 	}
 
 	if *isWorker {

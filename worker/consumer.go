@@ -27,11 +27,10 @@ type Consumer struct {
 }
 
 // NewConsumer create a new consumer
-func NewConsumer(db database.Database, tag int, tasktype string, queue string) (string, *Consumer) {
+func NewConsumer(ctx context.Context, db database.Database, tag int, tasktype string, queue string) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", tasktype, queue, hostname, tag)
 	log.Info().Msgf("new consumer: %s", name)
-	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	engine := engine.NewEngine(ctx, db)
 
@@ -59,7 +58,6 @@ func NewConsumer(db database.Database, tag int, tasktype string, queue string) (
 
 // Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
-	time.Sleep(consumeDuration)
 	payload := delivery.Payload()
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
@@ -87,14 +85,14 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime <= time.Now().Unix() {
 		key, result, err := consumer.engine.StartNmapScan(request)
-		if err != nil || result == nil {
+		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
 		}
 
 		// if scan is cancel, result will be nil and we can't
 		// parse the result
 		if result != nil {
-			key, scanResult, _ := engine.ParseScanResult(key, result)
+			scanResult, _ := engine.ParseScanResult(result)
 			scannerResponse := &proto.ScannerResponse{
 				HostResult: scanResult,
 			}
@@ -131,4 +129,6 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	}
+
+	time.Sleep(consumeDuration)
 }

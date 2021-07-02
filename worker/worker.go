@@ -34,6 +34,7 @@ type Worker struct {
 
 // NewWorker create a new worker and init the database connection
 func NewWorker(config config.Config, name string) *Worker {
+	log.Info().Msgf("starting worker %s", name)
 	ctx := context.Background()
 
 	// Storage database init
@@ -185,7 +186,7 @@ func (worker *Worker) startConsuming() {
 
 	numConsumers += 2 // we got one consumer for the returned, lets add 2 more
 	for i := 0; i < int(numConsumers); i++ {
-		tag, consumer := NewConsumer(worker.db, i, worker.name, "incoming")
+		tag, consumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "incoming")
 		if _, err := worker.broker.Incoming.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
@@ -194,10 +195,12 @@ func (worker *Worker) startConsuming() {
 		// store consumer pointer to the worker struct
 		worker.consumers = append(worker.consumers, consumer)
 
-		tag, consumer = NewConsumer(worker.db, i, worker.name, "rejected")
+		tag, consumer = NewConsumer(worker.ctx, worker.db, i, worker.name, "rejected")
 		if _, err := worker.broker.Pushed.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
+
+		// worker.consumers = append(worker.consumers, consumer) //TODO or not?
 	}
 
 	worker.startReturner(worker.broker.Incoming)

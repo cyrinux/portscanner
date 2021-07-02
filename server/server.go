@@ -1,4 +1,4 @@
-package scanner
+package server
 
 import (
 	"encoding/json"
@@ -121,7 +121,7 @@ func (server *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) 
 		return generateResponse(in.Key, nil, err)
 	}
 
-	return generateResponse(in.Key, &scannerResponse, err)
+	return generateResponse(in.Key, &scannerResponse, nil)
 }
 
 // StartScan function prepare a nmap scan
@@ -134,12 +134,12 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
 
-	key, scanResult, err := newEngine.StartNmapScan(request)
-	if err != nil || scanResult == nil {
+	key, result, err := newEngine.StartNmapScan(request)
+	if err != nil {
 		return generateResponse(key, nil, err)
 	}
 
-	key, scanParsedResult, err := engine.ParseScanResult(key, scanResult)
+	scanParsedResult, err := engine.ParseScanResult(result)
 	if err != nil {
 		return generateResponse(key, nil, err)
 	}
@@ -163,7 +163,8 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 		HostResult: scanParsedResult,
 		Status:     proto.ScannerResponse_OK,
 	}
-	return generateResponse(key, &scannerResponse, err)
+
+	return generateResponse(key, &scannerResponse, nil)
 }
 
 // StartAsyncScan function prepare a nmap scan
@@ -192,7 +193,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScanne
 	}
 
 	scannerResponse = proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
-	return generateResponse(request.Key, &scannerResponse, err)
+	return generateResponse(request.Key, &scannerResponse, nil)
 }
 
 // generateResponse generate the response for the grpc return
