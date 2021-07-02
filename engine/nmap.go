@@ -25,7 +25,9 @@ func NewEngine(ctx context.Context, db database.Database) *Engine {
 	return &Engine{ctx: ctx, db: db}
 }
 
-func parseParamsScannerRequestNmapOptions(ctx context.Context, s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
+func parseParamsScannerRequestNmapOptions(
+	ctx context.Context,
+	s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
 
 	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports

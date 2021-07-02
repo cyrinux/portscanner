@@ -1,4 +1,4 @@
-package engine
+package broker
 
 import (
 	"github.com/cyrinux/grpcnmapscanner/config"

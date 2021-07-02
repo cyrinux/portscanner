@@ -33,13 +33,13 @@ func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 	log.Info().Msgf("starting worker %s", name)
 
 	// Storage database init
-	db, err := database.Factory(context.TODO(), config)
+	db, err := database.Factory(context.Background(), config)
 	if err != nil {
 		log.Fatal().Stack().Err(err).Msg("")
 	}
 
-	redisClient := util.RedisConnect(context.TODO(), config)
-	broker := broker.NewBroker(context.TODO(), name, config, redisClient)
+	redisClient := util.RedisConnect(context.Background(), config)
+	broker := broker.NewBroker(context.Background(), name, config, redisClient)
 	locker := redislock.New(redisClient)
 	consumers := make([]*Consumer, 0)
 
@@ -117,7 +117,7 @@ func (worker *Worker) StreamControlService() {
 func (worker *Worker) startReturner(queue rmq.Queue) {
 	log.Info().Msg("starting the returner routine")
 	go func() {
-		config := worker.config
+		conf := worker.config
 		for {
 			// Try to obtain lock.
 			lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
@@ -129,7 +129,7 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 					log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 				} else if ttl > 0 {
 					// Yay, I still have my lock!
-					returned, _ := queue.ReturnRejected(config.RMQ.ReturnerLimit)
+					returned, _ := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
 					if returned > 0 {
 						log.Info().Msgf("returner success requeue %v tasks messages to incoming", returned)
 					}
@@ -143,26 +143,26 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 }
 
 func (worker *Worker) startConsuming() {
-	config := worker.config
-	numConsumers := config.RMQ.NumConsumers
+	conf := worker.config
+	numConsumers := conf.RMQ.NumConsumers
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 	log.Info().Msgf("start consuming %s with %v consumers...", worker.name, numConsumers)
 
 	worker.broker = broker.NewBroker(context.TODO(), worker.name, worker.config, worker.redisClient)
 
-	err := worker.broker.Incoming.StartConsuming(prefetchLimit, config.RMQ.PollDuration*time.Millisecond)
+	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration*time.Millisecond)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s queue incoming consume error", worker.name)
 	}
 
-	err = worker.broker.Pushed.StartConsuming(prefetchLimit, config.RMQ.PollDurationPushed*time.Millisecond)
+	err = worker.broker.Pushed.StartConsuming(prefetchLimit, conf.RMQ.PollDurationPushed*time.Millisecond)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s queue pushed consume error", worker.name)
 	}
 
 	numConsumers += 2 // we got one consumer for the returned, lets add 2 more
 	for i := 0; i < int(numConsumers); i++ {
-		tag, consumer := NewConsumer(worker.ctx, config, worker.db, i, worker.name, "incoming")
+		tag, consumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "incoming")
 		if _, err := worker.broker.Incoming.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
@@ -171,7 +171,7 @@ func (worker *Worker) startConsuming() {
 		// store consumer pointer to the worker struct
 		worker.consumers = append(worker.consumers, consumer)
 
-		tag, consumer = NewConsumer(worker.ctx, config, worker.db, i, worker.name, "rejected")
+		tag, consumer = NewConsumer(worker.ctx, worker.db, i, worker.name, "rejected")
 		if _, err := worker.broker.Pushed.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}

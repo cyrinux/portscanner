@@ -7,7 +7,6 @@ import (
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog/log"
 )
 
 // Broker represent a RMQ broker
