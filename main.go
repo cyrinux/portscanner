@@ -32,7 +32,9 @@ func handleSignalServer() {
 }
 
 func startServer(ctx context.Context, config config.Config) {
-	server.Listen(ctx, config)
+	if err := server.Listen(ctx, config); err != nil {
+		os.Exit(1)
+	}
 	go handleSignalServer()
 }
 

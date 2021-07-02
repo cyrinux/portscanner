@@ -32,12 +32,14 @@ type Server struct {
 }
 
 // Listen start the grpc server
-func Listen(ctx context.Context, allConfig config.Config) {
+func Listen(ctx context.Context, allConfig config.Config) error {
 	log.Info().Msg("prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
-		log.Fatal().Err(err).Msg("can't start server, can't listen on tcp/9000")
+		log.Error().Err(err).Msg("can't start server, can't listen on tcp/9000")
+		return err
 	}
+
 	srv := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
@@ -45,9 +47,12 @@ func Listen(ctx context.Context, allConfig config.Config) {
 
 	reflection.Register(srv)
 	proto.RegisterScannerServiceServer(srv, NewServer(ctx, allConfig, "nmap"))
-	if e := srv.Serve(listener); e != nil {
-		log.Fatal().Err(err).Msg("can't serve the gRPC service")
+	if err = srv.Serve(listener); err != nil {
+		log.Error().Msg("can't serve the gRPC service")
+		return err
 	}
+
+	return nil
 }
 
 // NewServer create a new server and init the database connection

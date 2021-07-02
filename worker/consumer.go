@@ -84,9 +84,27 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime <= time.Now().Unix() {
+
 		key, result, err := consumer.engine.StartNmapScan(request)
 		if err != nil {
+			// if scan fail or cancelled, mark task as cancel
 			log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
+			scannerResponse := &proto.ScannerResponse{
+				Status: proto.ScannerResponse_CANCEL,
+			}
+			scanResultJSON, err := json.Marshal(scannerResponse)
+			if err != nil {
+				log.Error().Stack().Err(err).Msgf("%s failed to parse cancel result", consumer.name)
+			}
+			_, err = consumer.db.Set(
+				context.Background(),
+				key,
+				string(scanResultJSON),
+				time.Duration(request.GetRetentionTime())*time.Second,
+			)
+			if err != nil {
+				log.Error().Stack().Err(err).Msgf("%s: failed to insert cancel result", consumer.name)
+			}
 		}
 
 		// if scan is cancel, result will be nil and we can't
@@ -101,7 +119,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 				log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
 			}
 			_, err = consumer.db.Set(
-				context.TODO(), key, string(scanResultJSON),
+				consumer.ctx, key, string(scanResultJSON),
 				time.Duration(request.GetRetentionTime())*time.Second,
 			)
 			if err != nil {

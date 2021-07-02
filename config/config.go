@@ -30,7 +30,7 @@ func GetConfig() Config {
 	// Init config
 	var config Config
 	if err := envconfig.Process("", &config); err != nil {
-		log.Fatal().Err(errors.Wrap(err, "Unable to process config"))
+		log.Fatal().Err(errors.Wrap(err, "unable to process config"))
 	}
 
 	return config
