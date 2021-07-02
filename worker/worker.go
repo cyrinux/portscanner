@@ -93,9 +93,6 @@ func (worker *Worker) StreamControlService() {
 		log.Debug().Msg("connected to server control")
 
 		for {
-			// cpu cooling
-			time.Sleep(500 * time.Millisecond)
-
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
 				break
@@ -110,6 +107,9 @@ func (worker *Worker) StreamControlService() {
 				worker.state.State = proto.ScannerServiceControl_STOP
 				worker.StopConsuming()
 			}
+
+			// cpu cooling
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }

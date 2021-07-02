@@ -60,47 +60,36 @@ func NewConsumer(ctx context.Context, db database.Database, tag int, tasktype st
 // 	}
 // }
 
-func onCancel(ctx context.Context, consumer *Consumer) {
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info().Msg("CANCELLEDDDD")
-			switch ctx.Err() {
-			case context.Canceled:
-				log.Info().Msg("CANCELLEDDDD")
-				// if scan fail or cancelled, mark task as cancel
-				scannerResponse := &proto.ScannerResponse{
-					Status: proto.ScannerResponse_CANCEL,
-				}
-				_, err := json.Marshal(scannerResponse)
-				if err != nil {
-					log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
-				}
-			case context.DeadlineExceeded:
-				log.Info().Msg("context timeout exceeded")
-				// if scan fail or cancelled, mark task as cancel
-				scannerResponse := &proto.ScannerResponse{
-					Status: proto.ScannerResponse_TIMEOUT,
-				}
-				_, err := json.Marshal(scannerResponse)
-				if err != nil {
-					log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
-				}
-			}
-			return
-		default:
-			time.Sleep(500 * time.Millisecond)
-			fmt.Printf("I was not canceled\n")
-			return
-		}
+func onCancel(consumer *Consumer, request *proto.ParamsScannerRequest) {
+	<-consumer.ctx.Done()
+	// if scan fail or cancelled, mark task as cancel
+	scannerResponse := &proto.ScannerResponse{
+		Status: proto.ScannerResponse_CANCEL,
 	}
+	scanResultJSON, err := json.Marshal(scannerResponse)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
+	}
+	_, err = consumer.db.Set(
+		context.Background(),
+		request.Key,
+		string(scanResultJSON),
+		time.Duration(request.GetRetentionTime())*time.Second,
+	)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
+	}
+	return
 }
 
 // Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
 
-	go onCancel(consumer.ctx, consumer)
+	var request *proto.ParamsScannerRequest
+	json.Unmarshal([]byte(payload), &request)
+
+	go onCancel(consumer, request)
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
 	if consumer.state.State != proto.ScannerServiceControl_START {
@@ -120,9 +109,6 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		perSecond := time.Second / (duration / reportBatchSize)
 		log.Debug().Msgf("%s: consumed %d %s %d", consumer.name, consumer.count, payload, perSecond)
 	}
-
-	var request *proto.ParamsScannerRequest
-	json.Unmarshal([]byte(payload), &request)
 
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime <= time.Now().Unix() {
