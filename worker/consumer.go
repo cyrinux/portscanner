@@ -7,6 +7,7 @@ import (
 	"time"
 
 	rmq "github.com/adjust/rmq/v4"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
@@ -24,10 +25,11 @@ type Consumer struct {
 	engine    *engine.Engine
 	state     proto.ScannerServiceControl
 	db        database.Database
+	config    config.Config
 }
 
 // NewConsumer create a new consumer
-func NewConsumer(ctx context.Context, db database.Database, tag int, tasktype string, queue string) (string, *Consumer) {
+func NewConsumer(ctx context.Context, config config.Config, db database.Database, tag int, tasktype string, queue string) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", tasktype, queue, hostname, tag)
 	log.Info().Msgf("new consumer: %s", name)
@@ -43,6 +45,7 @@ func NewConsumer(ctx context.Context, db database.Database, tag int, tasktype st
 		before:   time.Now(),
 		engine:   engine,
 		db:       db,
+		config:   config,
 	}
 }
 
@@ -73,6 +76,7 @@ func onCancel(consumer *Consumer, request *proto.ParamsScannerRequest) {
 
 // Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
+	config := consumer.config
 	payload := delivery.Payload()
 
 	var request *proto.ParamsScannerRequest
@@ -92,10 +96,10 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	}
 
 	consumer.count++
-	if consumer.count%reportBatchSize == 0 {
+	if consumer.count%config.RMQ.ReportBatchSize == 0 {
 		duration := time.Since(consumer.before)
 		consumer.before = time.Now()
-		perSecond := time.Second / (duration / reportBatchSize)
+		perSecond := time.Second / (duration / time.Duration(config.RMQ.ReportBatchSize))
 		log.Debug().Msgf("%s: consumed %d %s %d", consumer.name, consumer.count, payload, perSecond)
 	}
 
@@ -144,7 +148,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			}
 		}
 
-		if consumer.count%reportBatchSize > 0 {
+		if consumer.count%config.RMQ.ReportBatchSize > 0 {
 			if err := delivery.Ack(); err != nil {
 				log.Error().Stack().Err(err).Msgf("%s: failed to ack %s: %s", consumer.name, payload)
 			} else {
@@ -165,5 +169,5 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		}
 	}
 
-	time.Sleep(consumeDuration)
+	time.Sleep(config.RMQ.ConsumeDuration * time.Millisecond)
 }

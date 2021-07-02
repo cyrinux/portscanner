@@ -4,8 +4,10 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"time"
 )
 
+// Config struct
 type Config struct {
 	DB struct {
 		Driver   string `default:"redis"`
@@ -14,18 +16,26 @@ type Config struct {
 		Password string `default:""`
 	}
 	RMQ struct {
-		Server       string `default:"redis:6379"`
-		Password     string `default:""`
-		Name         string `default:"grpcnmapscanner"`
-		NumConsumers int64  `default:"5" split_words:"true"`
+		Server             string        `default:"redis:6379"`
+		Password           string        `default:""`
+		Name               string        `default:"grpcnmapscanner"`
+		NumConsumers       int64         `default:"5" split_words:"true"`
+		ReturnerLimit      int64         `default:"1000" split_words:"true"`
+		ReportBatchSize    int64         `default:"10000" split_words:"true"`
+		PollDuration       time.Duration `default:"100" split_words:"true"`
+		PollDurationPushed time.Duration `default:"5000" split_words:"true"`
+		ConsumeDuration    time.Duration `default:"1000" split_words:"true"`
 	}
 	Logger struct {
 		Debug  bool `default:"false"`
 		Pretty bool `default:"true"`
 	}
-	ControllerServer string `default:"server:9000" split_words:"true"`
+	Global struct {
+		ControllerServer string `default:"server:9000" split_words:"true"`
+	}
 }
 
+// GetConfig get the configuration
 func GetConfig() Config {
 	// Init config
 	var config Config
