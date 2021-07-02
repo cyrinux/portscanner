@@ -129,7 +129,7 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 		return s.Key, nil, err
 	}
 
-	log.Info().Msgf("Starting scan %s of host: %s, port: %s, timeout: %v, retention: %v",
+	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v",
 		s.Key,
 		hosts,
 		ports,
@@ -146,16 +146,16 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 			if p < previous {
 				continue
 			} else {
-				log.Info().Msgf("Scan %s: host: %s, port: %s, timeout: %v, retention: %v: %v %%",
+				log.Info().Msgf("scan %s : %v %% - host: %s, port: %s, timeout: %v, retention: %v",
 					s.Key,
+					p,
 					hosts,
 					ports,
 					timeout,
 					retention,
-					p,
 				)
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 

@@ -13,9 +13,8 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
-	"github.com/pkg/errors"
-	// "github.com/rs/xid"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -34,10 +33,10 @@ type Server struct {
 
 // Listen start the grpc server
 func Listen(allConfig config.Config) {
-	log.Info().Msg("Prepare to serve the gRPC api")
+	log.Info().Msg("prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
-		log.Fatal().Err(err).Msg("Can't listen on tcp/9000")
+		log.Fatal().Err(err).Msg("can't start server, can't listen on tcp/9000")
 	}
 	srv := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
@@ -47,7 +46,7 @@ func Listen(allConfig config.Config) {
 	reflection.Register(srv)
 	proto.RegisterScannerServiceServer(srv, NewServer(allConfig, "nmap"))
 	if e := srv.Serve(listener); e != nil {
-		log.Fatal().Err(err).Msg("Can't serve the gRPC service")
+		log.Fatal().Err(err).Msg("can't serve the gRPC service")
 	}
 }
 
@@ -64,7 +63,7 @@ func NewServer(config config.Config, tasktype string) *Server {
 	// Storage database init
 	db, err := database.Factory(context.TODO(), config)
 	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("Can't open the database")
+		log.Fatal().Stack().Err(err).Msg("can't open the database")
 	}
 
 	return &Server{
@@ -87,7 +86,7 @@ func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerReques
 func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
 	for {
 		if err := stream.Send(&server.state); err != nil {
-			log.Error().Err(err).Msgf("streamer service control send error")
+			log.Error().Stack().Err(err).Msgf("streamer service control send error")
 			return errors.Wrap(err, "streamer service control send error")
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -118,10 +117,11 @@ func (server *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) 
 
 	err = json.Unmarshal([]byte(scanResult), &scannerResponse)
 	if err != nil {
+		log.Error().Err(err).Msg("can't read scan result")
 		return generateResponse(in.Key, nil, err)
 	}
 
-	return generateResponse(in.Key, &scannerResponse, nil)
+	return generateResponse(in.Key, &scannerResponse, err)
 }
 
 // StartScan function prepare a nmap scan
@@ -144,7 +144,10 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 		return generateResponse(key, nil, err)
 	}
 
-	scanResultJSON, _ := json.Marshal(scanParsedResult)
+	scanResultJSON, err := json.Marshal(scanParsedResult)
+	if err != nil {
+		log.Error().Err(err).Msg("")
+	}
 
 	// and write the response to the database
 	_, err = server.db.Set(
@@ -165,16 +168,15 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 
 // StartAsyncScan function prepare a nmap scan
 func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
-
 	request := parseParamsScannerRequest(in)
 
 	// and write the response to the database
 	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
 	scanResponseJSON, _ := json.Marshal(&scannerResponse)
-	log.Info().Msgf("Receive async task order: %+v", request)
+	log.Info().Msgf("receive async task order: %v", request)
 	_, err := server.db.Set(ctx, request.Key, string(scanResponseJSON), 0)
 	if err != nil {
-		log.Print(err)
+		log.Error().Err(err).Msg("")
 	}
 
 	// create scan task

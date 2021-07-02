@@ -169,7 +169,7 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 func (worker *Worker) startConsuming() {
 	numConsumers := worker.config.RMQ.NumConsumers
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
-	log.Info().Msgf("Start consuming %s with %v consumers...", worker.name, numConsumers)
+	log.Info().Msgf("start consuming %s with %v consumers...", worker.name, numConsumers)
 
 	worker.broker = broker.NewBroker(context.TODO(), worker.name, worker.config, worker.redisClient)
 
@@ -204,7 +204,7 @@ func (worker *Worker) startConsuming() {
 }
 
 func (worker *Worker) stopConsuming() {
-	log.Info().Msgf("Stop consuming %s...", worker.name)
+	log.Info().Msgf("stop consuming %s...", worker.name)
 	for _, consumer := range worker.consumers {
 		if consumer.engine != nil {
 			log.Info().Msgf("%s cancelling consumer %v", worker.name, consumer.name)

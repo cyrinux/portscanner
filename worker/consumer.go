@@ -30,7 +30,7 @@ type Consumer struct {
 func NewConsumer(db database.Database, tag int, tasktype string, queue string) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", tasktype, queue, hostname, tag)
-	log.Info().Msgf("New consumer: %s", name)
+	log.Info().Msgf("new consumer: %s", name)
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	engine := engine.NewEngine(ctx, db)
@@ -41,12 +41,21 @@ func NewConsumer(db database.Database, tag int, tasktype string, queue string) (
 		name:     name,
 		tasktype: tasktype,
 		count:    0,
-		// scanCount: make(map[int]int64), //TODO: store and incremente by scan_speed
-		before: time.Now(),
-		engine: engine,
-		db:     db,
+		before:   time.Now(),
+		engine:   engine,
+		db:       db,
 	}
 }
+
+// func (consumer *Consumer) Cancel() {
+// 			_, err := consumer.db.Set(
+// 				context.TODO(), consumer.key, string(scanResultJSON),
+// 				time.Duration(request.GetRetentionTime())*time.Second,
+// 			)
+// 			if err != nil {
+// 				log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)
+// 			}
+// }
 
 // Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
