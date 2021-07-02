@@ -150,12 +150,12 @@ func (worker *Worker) startConsuming() {
 
 	worker.broker = broker.NewBroker(context.TODO(), worker.name, worker.config, worker.redisClient)
 
-	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration*time.Millisecond)
+	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s queue incoming consume error", worker.name)
 	}
 
-	err = worker.broker.Pushed.StartConsuming(prefetchLimit, conf.RMQ.PollDurationPushed*time.Millisecond)
+	err = worker.broker.Pushed.StartConsuming(prefetchLimit, conf.RMQ.PollDurationPushed)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s queue pushed consume error", worker.name)
 	}

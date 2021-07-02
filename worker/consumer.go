@@ -168,5 +168,5 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		}
 	}
 
-	time.Sleep(conf.RMQ.ConsumeDuration * time.Millisecond)
+	time.Sleep(conf.RMQ.ConsumeDuration)
 }
