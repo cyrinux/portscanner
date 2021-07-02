@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	appConfig = config.GetConfig()
-	log       = logger.New(appConfig.Logger.Debug, appConfig.Logger.Pretty)
+	conf = config.GetConfig()
+	log  = logger.New(conf.Logger.Debug, conf.Logger.Pretty)
 )
 
 var kaep = keepalive.EnforcementPolicy{

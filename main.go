@@ -54,13 +54,13 @@ func main() {
 	allConfig := config.GetConfig()
 	flag.Parse()
 
-	ctx := context.Background()
-
 	if *wantProfiler {
 		go func() {
 			log.Println(http.ListenAndServe(":6060", nil))
 		}()
 	}
+
+	ctx := context.Background()
 
 	if *isServer {
 		startServer(ctx, allConfig)

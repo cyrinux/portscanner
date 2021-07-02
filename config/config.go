@@ -27,8 +27,8 @@ type Config struct {
 		ConsumeDuration    time.Duration `default:"1000" split_words:"true"`
 	}
 	Logger struct {
-		Debug  bool `default:"false"`
-		Pretty bool `default:"true"`
+		Debug  bool `default:"false" split_words:"true"`
+		Pretty bool `default:"true" split_words:"true"`
 	}
 	Global struct {
 		ControllerServer string `default:"server:9000" split_words:"true"`
@@ -37,10 +37,13 @@ type Config struct {
 
 // GetConfig get the configuration
 func GetConfig() Config {
+
+	log.Info().Msg("reading config")
 	// Init config
 	var config Config
+
 	if err := envconfig.Process("", &config); err != nil {
-		log.Fatal().Err(errors.Wrap(err, "unable to process config"))
+		log.Fatal().Stack().Err(errors.Wrap(err, "unable to process config"))
 	}
 
 	return config

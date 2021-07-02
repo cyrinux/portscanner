@@ -18,7 +18,7 @@ services:
     image: grpcscanner
     env_file:
       - .env
-    command: "-server -pprof"
+    command: "-server"
     cap_add:
       - NET_ADMIN
     restart: always
@@ -37,7 +37,7 @@ services:
     image: grpcscanner
     env_file:
       - .env
-    command: "-worker -pprof"
+    command: "-worker"
     restart: always
     cap_add:
       - NET_ADMIN
