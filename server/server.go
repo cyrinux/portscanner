@@ -120,7 +120,7 @@ func (server *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) 
 
 	err = json.Unmarshal([]byte(scanResult), &scannerResponse)
 	if err != nil {
-		log.Error().Err(err).Msg("can't read scan result")
+		log.Error().Stack().Err(err).Msg("can't read scan result")
 		return generateResponse(in.Key, nil, err)
 	}
 
@@ -146,8 +146,11 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 	if err != nil {
 		return generateResponse(key, nil, err)
 	}
+	scannerResponse = proto.ScannerResponse{
+		HostResult: scanParsedResult,
+	}
 
-	scanResultJSON, err := json.Marshal(scanParsedResult)
+	scanResultJSON, err := json.Marshal(&scannerResponse)
 	if err != nil {
 		log.Error().Err(err).Msg("")
 	}

@@ -15,8 +15,9 @@ import (
 
 // Engine define a scanner engine
 type Engine struct {
-	ctx context.Context
-	db  database.Database
+	ctx   context.Context
+	db    database.Database
+	State proto.ScannerResponse_Status
 }
 
 // NewEngine create a new nmap engine
@@ -143,11 +144,11 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 	go func() {
 		var previous float32
 		for p := range progress {
-			previous = p
 			if p < previous {
 				continue
 			} else {
-				log.Info().Msgf("scan %s : %v %% - host: %s, port: %s, timeout: %v, retention: %v",
+				previous = p
+				log.Debug().Msgf("scan %s : %v %% - host: %s, port: %s, timeout: %v, retention: %v",
 					s.Key,
 					p,
 					hosts,

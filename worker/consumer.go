@@ -46,23 +46,13 @@ func NewConsumer(ctx context.Context, db database.Database, tag int, tasktype st
 	}
 }
 
-// func (consumer *Consumer) Cancel(ctx context.Context) {
-// 	select {
-// 	case <-ctx.Done():
-// 		switch ctx.Err() {
-// 		case context.DeadlineExceeded:
-// 			fmt.Println("context timeout exceeded")
-// 		case context.Canceled:
-// 			fmt.Println("context cancelled by force. whole process is complete")
-// 		}
-// 	case err := <-chErr:
-// 		fmt.Println("process fail causing by some error:", err.Error())
-// 	}
-// }
-
+// onCancel is a function trigger on consumer context cancel
 func onCancel(consumer *Consumer, request *proto.ParamsScannerRequest) {
+	// waiting for cancel signal
 	<-consumer.ctx.Done()
+	log.Debug().Msgf("%s cancelled, writing state to database", consumer.name)
 	// if scan fail or cancelled, mark task as cancel
+	consumer.engine.State = proto.ScannerResponse_CANCEL
 	scannerResponse := &proto.ScannerResponse{
 		Status: proto.ScannerResponse_CANCEL,
 	}
@@ -79,7 +69,6 @@ func onCancel(consumer *Consumer, request *proto.ParamsScannerRequest) {
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
 	}
-	return
 }
 
 // Consume consume the message tasks on the redis broker
@@ -114,7 +103,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	if deferTime <= time.Now().Unix() {
 
 		key, result, err := consumer.engine.StartNmapScan(request)
-		if err != nil {
+		if err != nil && consumer.engine.State != proto.ScannerResponse_CANCEL {
 			// if scan fail or cancelled, mark task as cancel
 			log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
 			scannerResponse := &proto.ScannerResponse{
