@@ -104,13 +104,13 @@ func (worker *Worker) StreamControlService() {
 	for {
 		// wait before try to reconnect
 		reconnectTime := 5 * time.Second
-		log.Info().Msgf("trying to connect in %v to server control", reconnectTime)
+		log.Debug().Msgf("trying to connect in %v to server control", reconnectTime)
 		time.Sleep(reconnectTime)
 		stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
 			break
 		}
-		log.Info().Msg("connected to server control")
+		log.Debug().Msg("connected to server control")
 
 		for {
 			// cpu cooling
@@ -140,7 +140,7 @@ func (worker *Worker) StreamControlService() {
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue) {
-	log.Info().Msg("Starting the returner")
+	log.Info().Msg("starting the returner routine")
 	go func() {
 		for {
 			// Try to obtain lock.
@@ -150,12 +150,12 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 			} else if err != redislock.ErrNotObtained {
 				// Sleep and check the remaining TTL.
 				if ttl, err := lock.TTL(worker.ctx); err != nil {
-					log.Error().Stack().Err(err).Msgf("Returner error, ttl: %v", ttl)
+					log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 				} else if ttl > 0 {
 					// Yay, I still have my lock!
 					returned, _ := queue.ReturnRejected(returnerLimit)
 					if returned > 0 {
-						log.Error().Msgf("Returner success requeue %v tasks messages to incoming", returned)
+						log.Info().Msgf("returner success requeue %v tasks messages to incoming", returned)
 					}
 					lock.Refresh(worker.ctx, 5*time.Second, nil)
 				}
