@@ -32,7 +32,7 @@ type Server struct {
 }
 
 // Listen start the grpc server
-func Listen(allConfig config.Config) {
+func Listen(ctx context.Context, allConfig config.Config) {
 	log.Info().Msg("prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
@@ -44,16 +44,14 @@ func Listen(allConfig config.Config) {
 	)
 
 	reflection.Register(srv)
-	proto.RegisterScannerServiceServer(srv, NewServer(allConfig, "nmap"))
+	proto.RegisterScannerServiceServer(srv, NewServer(ctx, allConfig, "nmap"))
 	if e := srv.Serve(listener); e != nil {
 		log.Fatal().Err(err).Msg("can't serve the gRPC service")
 	}
 }
 
 // NewServer create a new server and init the database connection
-func NewServer(config config.Config, tasktype string) *Server {
-	ctx := context.Background()
-
+func NewServer(ctx context.Context, config config.Config, tasktype string) *Server {
 	errChan := make(chan error, 10) //TODO: arbitrary, to be change
 	go broker.RmqLogErrors(errChan)
 

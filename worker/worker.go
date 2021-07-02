@@ -3,9 +3,6 @@ package worker
 import (
 	"context"
 	"io"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	rmq "github.com/adjust/rmq/v4"
@@ -33,9 +30,8 @@ type Worker struct {
 }
 
 // NewWorker create a new worker and init the database connection
-func NewWorker(config config.Config, name string) *Worker {
+func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 	log.Info().Msgf("starting worker %s", name)
-	ctx := context.Background()
 
 	// Storage database init
 	db, err := database.Factory(context.TODO(), config)
@@ -60,25 +56,8 @@ func NewWorker(config config.Config, name string) *Worker {
 	}
 }
 
-// handleSignal handle the worker exit signal
-func (worker *Worker) handleSignal() {
-	// open tasks queues and connection
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT)
-	defer signal.Stop(signals)
-
-	<-signals // wait for signal
-	go func() {
-		<-signals // hard exit on second signal (in case shutdown gets stuck)
-		os.Exit(1)
-	}()
-	worker.stopConsuming() // wait for all Consume() calls to finish
-}
-
 // StartWorker start a scanner worker
 func (worker *Worker) StartWorker() {
-	// handle exit signal
-	go worker.handleSignal()
 
 	// start the worker on boot
 	worker.startConsuming()
@@ -124,16 +103,12 @@ func (worker *Worker) StreamControlService() {
 			if err != nil {
 				break
 			}
-			if serviceControl == nil {
-				continue
-			} else {
-				if serviceControl.State == 1 && worker.state.State != 1 { //proto.ScannerServiceControl_START
-					worker.state.State = proto.ScannerServiceControl_START
-					worker.startConsuming()
-				} else if serviceControl.State == 2 && worker.state.State != 2 { //proto.ScannerServiceControl_STOP
-					worker.state.State = proto.ScannerServiceControl_STOP
-					worker.stopConsuming()
-				}
+			if serviceControl.State == 1 && worker.state.State != 1 { //proto.ScannerServiceControl_START
+				worker.state.State = proto.ScannerServiceControl_START
+				worker.startConsuming()
+			} else if serviceControl.State == 2 && worker.state.State != 2 { //proto.ScannerServiceControl_STOP
+				worker.state.State = proto.ScannerServiceControl_STOP
+				worker.StopConsuming()
 			}
 		}
 	}
@@ -206,7 +181,8 @@ func (worker *Worker) startConsuming() {
 	worker.startReturner(worker.broker.Incoming)
 }
 
-func (worker *Worker) stopConsuming() {
+// StopConsuming stop consumer messages on the broker
+func (worker *Worker) StopConsuming() {
 	log.Info().Msgf("stop consuming %s...", worker.name)
 	for _, consumer := range worker.consumers {
 		if consumer.engine != nil {

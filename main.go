@@ -1,11 +1,46 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/server"
 	"github.com/cyrinux/grpcnmapscanner/worker"
+	"os"
+	"os/signal"
+	"syscall"
 )
+
+func handleSignalWorker(worker *worker.Worker) {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT)
+	defer signal.Stop(signals)
+	go func() {
+		<-signals // hard exit on second signal (in case shutdown gets stuck)
+		os.Exit(1)
+	}()
+	<-signals              // wait for signal
+	worker.StopConsuming() // wait for all Consume() calls to finish
+}
+
+func handleSignalServer() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT)
+	defer signal.Stop(signals)
+	<-signals // hard exit on second signal (in case shutdown gets stuck)
+	os.Exit(1)
+}
+
+func startServer(ctx context.Context, config config.Config) {
+	server.Listen(ctx, config)
+	go handleSignalServer()
+}
+
+func startWorker(ctx context.Context, config config.Config, tasktype string) {
+	w := worker.NewWorker(ctx, config, tasktype)
+	w.StartWorker()
+	go handleSignalWorker(w)
+}
 
 func main() {
 	isServer := flag.Bool("server", false, "start the gRPC server")
@@ -13,12 +48,14 @@ func main() {
 	allConfig := config.GetConfig()
 	flag.Parse()
 
+	ctx := context.Background()
+
 	if *isServer {
-		server.Listen(allConfig)
+		startServer(ctx, allConfig)
+	} else if *isWorker {
+		startWorker(ctx, allConfig, "nmap")
+	} else {
+		startServer(ctx, allConfig)
 	}
 
-	if *isWorker {
-		workerNMAP := worker.NewWorker(allConfig, "nmap")
-		workerNMAP.StartWorker()
-	}
 }
