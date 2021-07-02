@@ -27,7 +27,7 @@ type Config struct {
 		ConsumeDuration    time.Duration `default:"1000" split_words:"true"`
 	}
 	Logger struct {
-		Debug  bool `default:"true"`
+		Debug  bool `default:"false"`
 		Pretty bool `default:"true"`
 	}
 	Global struct {
