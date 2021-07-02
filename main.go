@@ -6,6 +6,9 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/server"
 	"github.com/cyrinux/grpcnmapscanner/worker"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -47,10 +50,17 @@ func startWorker(ctx context.Context, config config.Config, tasktype string) {
 func main() {
 	isServer := flag.Bool("server", false, "start the gRPC server")
 	isWorker := flag.Bool("worker", false, "start the worker")
+	wantProfiler := flag.Bool("pprof", false, "start pprof profiler")
 	allConfig := config.GetConfig()
 	flag.Parse()
 
 	ctx := context.Background()
+
+	if *wantProfiler {
+		go func() {
+			log.Println(http.ListenAndServe(":6060", nil))
+		}()
+	}
 
 	if *isServer {
 		startServer(ctx, allConfig)
@@ -58,6 +68,7 @@ func main() {
 		startWorker(ctx, allConfig, "nmap")
 	} else {
 		startServer(ctx, allConfig)
+		startWorker(ctx, allConfig, "nmap")
 	}
 
 }

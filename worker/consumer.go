@@ -46,19 +46,61 @@ func NewConsumer(ctx context.Context, db database.Database, tag int, tasktype st
 	}
 }
 
-// func (consumer *Consumer) Cancel() {
-// 			_, err := consumer.db.Set(
-// 				context.TODO(), consumer.key, string(scanResultJSON),
-// 				time.Duration(request.GetRetentionTime())*time.Second,
-// 			)
-// 			if err != nil {
-// 				log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)
-// 			}
+// func (consumer *Consumer) Cancel(ctx context.Context) {
+// 	select {
+// 	case <-ctx.Done():
+// 		switch ctx.Err() {
+// 		case context.DeadlineExceeded:
+// 			fmt.Println("context timeout exceeded")
+// 		case context.Canceled:
+// 			fmt.Println("context cancelled by force. whole process is complete")
+// 		}
+// 	case err := <-chErr:
+// 		fmt.Println("process fail causing by some error:", err.Error())
+// 	}
 // }
+
+func onCancel(ctx context.Context, consumer *Consumer) {
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info().Msg("CANCELLEDDDD")
+			switch ctx.Err() {
+			case context.Canceled:
+				log.Info().Msg("CANCELLEDDDD")
+				// if scan fail or cancelled, mark task as cancel
+				scannerResponse := &proto.ScannerResponse{
+					Status: proto.ScannerResponse_CANCEL,
+				}
+				_, err := json.Marshal(scannerResponse)
+				if err != nil {
+					log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
+				}
+			case context.DeadlineExceeded:
+				log.Info().Msg("context timeout exceeded")
+				// if scan fail or cancelled, mark task as cancel
+				scannerResponse := &proto.ScannerResponse{
+					Status: proto.ScannerResponse_TIMEOUT,
+				}
+				_, err := json.Marshal(scannerResponse)
+				if err != nil {
+					log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
+				}
+			}
+			return
+		default:
+			time.Sleep(500 * time.Millisecond)
+			fmt.Printf("I was not canceled\n")
+			return
+		}
+	}
+}
 
 // Consume consume the message tasks on the redis broker
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
+
+	go onCancel(consumer.ctx, consumer)
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
 	if consumer.state.State != proto.ScannerServiceControl_START {
@@ -90,11 +132,11 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			// if scan fail or cancelled, mark task as cancel
 			log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
 			scannerResponse := &proto.ScannerResponse{
-				Status: proto.ScannerResponse_CANCEL,
+				Status: proto.ScannerResponse_ERROR,
 			}
 			scanResultJSON, err := json.Marshal(scannerResponse)
 			if err != nil {
-				log.Error().Stack().Err(err).Msgf("%s failed to parse cancel result", consumer.name)
+				log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
 			}
 			_, err = consumer.db.Set(
 				context.Background(),
@@ -103,7 +145,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 				time.Duration(request.GetRetentionTime())*time.Second,
 			)
 			if err != nil {
-				log.Error().Stack().Err(err).Msgf("%s: failed to insert cancel result", consumer.name)
+				log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
 			}
 		}
 

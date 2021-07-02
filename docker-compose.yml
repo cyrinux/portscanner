@@ -18,7 +18,7 @@ services:
     image: grpcscanner
     env_file:
       - .env
-    command: "-server"
+    command: "-server -pprof"
     cap_add:
       - NET_ADMIN
     restart: always
@@ -26,6 +26,7 @@ services:
       - redis
     ports:
       - "127.0.0.1:9000:9000"
+      - "127.0.0.1:6060:6060"
     networks:
       - backend
 
@@ -36,7 +37,7 @@ services:
     image: grpcscanner
     env_file:
       - .env
-    command: "-worker"
+    command: "-worker -pprof"
     restart: always
     cap_add:
       - NET_ADMIN

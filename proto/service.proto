@@ -42,6 +42,7 @@ message ScannerResponse {
         OK = 3;
         ERROR = 4;
         CANCEL = 5;
+        TIMEOUT= 6;
       }
     Status status = 6;
 }
