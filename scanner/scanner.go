@@ -14,7 +14,8 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/pkg/errors"
-	"github.com/rs/xid"
+	// "github.com/rs/xid"
+	"github.com/google/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -213,7 +214,7 @@ func generateResponse(key string, value *proto.ScannerResponse, err error) (*pro
 func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.ParamsScannerRequest {
 
 	// if the Key is not forced, we generate one unique
-	guid := xid.New()
+	guid := uuid.New()
 	if request.Key == "" {
 		request.Key = guid.String()
 	}
