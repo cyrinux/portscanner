@@ -39,10 +39,10 @@ func NewConsumer(
 
 	return name, &Consumer{
 		ctx:      ctx,
+		name:     name,
 		cancel:   cancel,
 		db:       db,
 		engine:   engine,
-		name:     name,
 		tasktype: tasktype,
 		success:  make(chan int64),
 		failed:   make(chan int64),
@@ -97,58 +97,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime <= time.Now().Unix() {
-		key, result, err := consumer.engine.StartNmapScan(request)
-		if err != nil && consumer.engine.State != pb.ScannerResponse_CANCEL {
-			// scan failed
-			consumer.failed <- 1
-			// if scan fail or cancelled, mark task as cancel
-			log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
-			scannerResponse := &pb.ScannerResponse{
-				Status: pb.ScannerResponse_ERROR,
-			}
-			scanResultJSON, err := json.Marshal(scannerResponse)
-			if err != nil {
-				log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
-			}
-			_, err = consumer.db.Set(
-				consumer.ctx,
-				key,
-				string(scanResultJSON),
-				time.Duration(request.GetRetentionTime())*time.Second,
-			)
-			if err != nil {
-				log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
-			}
-		} else {
-			// success scan
-			consumer.success <- 1
-		}
-
-		// if scan is cancel, result will be nil and we can't
-		// parse the result
-		if result != nil {
-			scanResult, _ := engine.ParseScanResult(result)
-			scannerResponse := &pb.ScannerResponse{
-				HostResult: scanResult,
-			}
-			scanResultJSON, err := json.Marshal(scannerResponse)
-			if err != nil {
-				log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
-			}
-			_, err = consumer.db.Set(
-				consumer.ctx, key, string(scanResultJSON),
-				time.Duration(request.GetRetentionTime())*time.Second,
-			)
-			if err != nil {
-				log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)
-			}
-
-		}
-		if err := delivery.Ack(); err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to ack %s: %s", consumer.name, payload)
-		} else {
-			log.Info().Msgf("%s: acked %s", consumer.name, payload)
-		}
+		consumer.consumeNow(delivery, request, payload)
 	} else {
 		if err := delivery.Reject(); err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to reject %s", consumer.name, payload)
@@ -157,4 +106,60 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		}
 	}
 	time.Sleep(conf.RMQ.ConsumeDuration)
+}
+
+// consumeNow really consume the message
+func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
+	key, result, err := consumer.engine.StartNmapScan(request)
+	if err != nil && consumer.engine.State != pb.ScannerResponse_CANCEL {
+		// scan failed
+		consumer.failed <- 1
+		// if scan fail or cancelled, mark task as cancel
+		log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
+		scannerResponse := &pb.ScannerResponse{
+			Status: pb.ScannerResponse_ERROR,
+		}
+		scanResultJSON, err := json.Marshal(scannerResponse)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
+		}
+		_, err = consumer.db.Set(
+			consumer.ctx,
+			key,
+			string(scanResultJSON),
+			time.Duration(request.GetRetentionTime())*time.Second,
+		)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
+		}
+	} else {
+		// success scan
+		consumer.success <- 1
+	}
+
+	// if scan is cancel, result will be nil and we can't
+	// parse the result
+	if result != nil {
+		scanResult, _ := engine.ParseScanResult(result)
+		scannerResponse := &pb.ScannerResponse{
+			HostResult: scanResult,
+		}
+		scanResultJSON, err := json.Marshal(scannerResponse)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
+		}
+		_, err = consumer.db.Set(
+			consumer.ctx, key, string(scanResultJSON),
+			time.Duration(request.GetRetentionTime())*time.Second,
+		)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)
+		}
+
+	}
+	if err := delivery.Ack(); err != nil {
+		log.Error().Stack().Err(err).Msgf("%s: failed to ack %s: %s", consumer.name, payload)
+	} else {
+		log.Info().Msgf("%s: acked %s", consumer.name, payload)
+	}
 }

@@ -2,3 +2,4 @@ grpcnmapscanner
 *.png
 gen
 vendor
+proto/*.pb.go

@@ -2,6 +2,11 @@ package worker
 
 import (
 	"context"
+	"io"
+	"os"
+	"sync"
+	"time"
+
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/broker"
@@ -13,10 +18,6 @@ import (
 	redis "github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
-	"io"
-	"os"
-	"sync"
-	"time"
 )
 
 var (
@@ -49,7 +50,7 @@ type Worker struct {
 
 // NewWorker create a new worker and init the database connection
 func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
-	log.Info().Msgf("starting worker %s", name)
+	log.Info().Msgf("%s worker is starting %s", name)
 
 	// Storage database connection init, dedicated context to keep access to the database
 	db, err := database.Factory(context.Background(), config)
@@ -71,7 +72,7 @@ func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 		grpc.WithKeepaliveParams(kacp),
 	)
 	if err != nil {
-		log.Error().Stack().Err(err).Msg("could not connect to server")
+		log.Error().Stack().Err(err).Msgf("%s could not connect to server", name)
 	}
 
 	return &Worker{
@@ -136,7 +137,7 @@ func (worker *Worker) StreamControlService() {
 }
 
 // Locker help to lock some tasks
-func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
+func (worker *Worker) startReturner(queue rmq.Queue) {
 	log.Info().Msg("starting the returner routine")
 	conf := worker.config
 	for {
@@ -153,7 +154,7 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 				r, _ := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
 				if r > 0 {
 					log.Info().Msgf("returner success requeue %v tasks messages to incoming", r)
-					returned <- r
+					worker.returned <- r
 				}
 				lock.Refresh(worker.ctx, 5*time.Second, nil)
 			}
@@ -193,21 +194,21 @@ func (worker *Worker) startConsuming() {
 		// store consumer pointer to the worker struct
 		worker.consumers = append(worker.consumers, consumer)
 
-		// start prometheus collector
-		go worker.collectConsumerStats(consumer.success, consumer.failed, worker.returned)
-
 		tag, consumer = NewConsumer(worker.ctx, worker.db, i, worker.name, "rejected")
 		if _, err := worker.broker.Pushed.AddConsumer(tag, consumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
+
+		// start prometheus collector
+		go worker.collectConsumerStats(consumer.success, consumer.failed, worker.returned)
 	}
 
-	go worker.startReturner(worker.broker.Incoming, worker.returned)
+	go worker.startReturner(worker.broker.Incoming)
 }
 
 // StopConsuming stop consumer messages on the broker
 func (worker *Worker) StopConsuming() {
-	log.Info().Msgf("stop consuming %s...", worker.name)
+	log.Info().Msgf("%s stop consuming...", worker.name)
 	for _, consumer := range worker.consumers {
 		if consumer != nil || consumer.engine != nil {
 			log.Info().Msgf("%s cancelling consumer %v", worker.name, consumer.name)
@@ -237,7 +238,11 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 			case r = <-returned:
 			default:
 			}
-			err = stream.Send(&pb.PrometheusStatus{TasksStatus: &pb.TasksStatus{Success: s, Failed: f, Returned: r}})
+			err = stream.Send(&pb.PrometheusStatus{
+				TasksStatus: &pb.TasksStatus{
+					Success: s, Failed: f, Returned: r,
+				},
+			})
 			if err != nil {
 				break
 			}
