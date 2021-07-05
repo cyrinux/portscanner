@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -36,16 +37,16 @@ var (
 		Name: "scanner_processed_ops_failed",
 		Help: "The total number of failed tasks",
 	})
-	opsReturned = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "scanner_processed_ops_returned",
+	opsReturned = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "scanner_size_ops_returned",
 		Help: "The total number of returned tasks",
 	})
-	opsReady = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "scanner_processed_queue_ready",
+	opsReady = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "scanner_size_queue_ready",
 		Help: "The total number of ready tasks tasks",
 	})
-	opsRejected = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "scanner_processed_queue_rejected",
+	opsRejected = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "scanner_size_queue_rejected",
 		Help: "The total number of rejected tasks tasks",
 	})
 )
@@ -116,7 +117,7 @@ func Listen(ctx context.Context, allConfig config.Config) error {
 }
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus
-func brokerStatsToProm(brk *broker.Broker) {
+func brokerStatsToProm(brk *broker.Broker, name string) {
 	for {
 		stats, err := broker.GetStats(brk)
 		if err != nil {
@@ -124,11 +125,12 @@ func brokerStatsToProm(brk *broker.Broker) {
 			time.Sleep(2000 * time.Millisecond)
 			continue
 		}
-		s := stats.QueueStats["nmap-incoming"]
+		queue := fmt.Sprintf("%s-incoming", name)
+		s := stats.QueueStats[queue]
 		if s.ReadyCount > 0 || s.RejectedCount > 0 {
-			opsReady.Add(float64(s.ReadyCount))
-			opsRejected.Add(float64(s.RejectedCount))
-			log.Debug().Msgf("broker incoming queue ready: %v, rejected: %v", s.ReadyCount, s.RejectedCount)
+			opsReady.Set(float64(s.ReadyCount))
+			opsRejected.Set(float64(s.RejectedCount))
+			log.Debug().Msgf("broker %s incoming queue ready: %v, rejected: %v", name, s.ReadyCount, s.RejectedCount)
 		}
 		time.Sleep(1000 * time.Millisecond)
 	}
@@ -136,7 +138,7 @@ func brokerStatsToProm(brk *broker.Broker) {
 
 // NewServer create a new server and init the database connection
 func NewServer(ctx context.Context, config config.Config, tasktype string) *Server {
-	errChan := make(chan error, 10) //TODO: arbitrary, to be change
+	errChan := make(chan error)
 	go broker.RmqLogErrors(errChan)
 
 	// Broker init nmap queue
@@ -149,7 +151,7 @@ func NewServer(ctx context.Context, config config.Config, tasktype string) *Serv
 	}
 
 	// start the rmq stats to prometheus
-	go brokerStatsToProm(&brk)
+	go brokerStatsToProm(&brk, "nmap")
 
 	return &Server{
 		ctx:      ctx,
@@ -188,24 +190,15 @@ func (server *Server) StreamTasksStatus(stream pb.ScannerService_StreamTasksStat
 		if err != nil {
 			return err
 		}
-		if tasksStatus.Success > 0 {
-			server.tasksStatus.success += tasksStatus.Success
-			opsSuccess.Add(float64(tasksStatus.Success))
-		}
-		if tasksStatus.Failed > 0 {
-			server.tasksStatus.failed += tasksStatus.Failed
-			opsFailed.Add(float64(tasksStatus.Failed))
-		}
-		if tasksStatus.Returned > 0 {
-			server.tasksStatus.returned += tasksStatus.Returned
-			opsReturned.Add(float64(tasksStatus.Returned))
-		}
-		if tasksStatus.Success > 0 || tasksStatus.Failed > 0 || tasksStatus.Returned > 0 {
-			stream.Send(&pb.TasksStatus{Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned})
-			log.Debug().Msgf("prometheus tasks status: %+v", tasksStatus)
-		}
+		server.tasksStatus.success += tasksStatus.Success
+		opsSuccess.Add(float64(tasksStatus.Success))
+		server.tasksStatus.failed += tasksStatus.Failed
+		opsFailed.Add(float64(tasksStatus.Failed))
+		server.tasksStatus.returned += tasksStatus.Returned
+		opsReturned.Set(float64(tasksStatus.Returned))
+		stream.Send(&pb.TasksStatus{Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned})
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 

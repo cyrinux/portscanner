@@ -35,6 +35,7 @@ var kacp = keepalive.ClientParameters{
 type Worker struct {
 	sync.Mutex
 	ctx         context.Context
+	name        string
 	broker      broker.Broker
 	config      config.Config
 	locker      *redislock.Client
@@ -42,7 +43,6 @@ type Worker struct {
 	state       pb.ScannerServiceControl
 	consumers   []*Consumer
 	db          database.Database
-	name        string
 	grpcServer  *grpc.ClientConn
 	returned    chan int64
 }
@@ -60,7 +60,7 @@ func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 	redisClient := util.RedisConnect(context.Background(), config)
 	broker := broker.NewBroker(context.Background(), name, config, redisClient)
 	locker := redislock.New(redisClient)
-	consumers := make([]*Consumer, 1)
+	consumers := make([]*Consumer, 0)
 
 	grpcServer, err := grpc.Dial(
 		config.Global.ControllerServer,
@@ -102,13 +102,13 @@ func (worker *Worker) StreamControlService() {
 	for {
 		// wait before try to reconnect
 		reconnectTime := 5 * time.Second
-		log.Debug().Msgf("trying to connect in %v to server control", reconnectTime)
+		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, reconnectTime)
 		time.Sleep(reconnectTime)
 		stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
 			break
 		}
-		log.Debug().Msg("connected to server control")
+		log.Debug().Msgf("%s connected to server control", worker.name)
 
 		for {
 			serviceControl, err := stream.Recv()
@@ -150,7 +150,6 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 				r, _ := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
 				if r > 0 {
 					log.Info().Msgf("returner success requeue %v tasks messages to incoming", r)
-
 					returned <- r
 				}
 				lock.Refresh(worker.ctx, 5*time.Second, nil)
@@ -207,7 +206,7 @@ func (worker *Worker) startConsuming() {
 func (worker *Worker) StopConsuming() {
 	log.Info().Msgf("stop consuming %s...", worker.name)
 	for _, consumer := range worker.consumers {
-		if consumer.engine != nil {
+		if consumer != nil || consumer.engine != nil {
 			log.Info().Msgf("%s cancelling consumer %v", worker.name, consumer.name)
 			consumer.state.State = worker.state.State
 			consumer.cancel()
@@ -226,16 +225,13 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 		if err != nil {
 			break
 		}
-		log.Debug().Msg("connected to server control")
+		log.Debug().Msgf("%s stats collector connected to server control", worker.name)
 		for {
 			var s, f, r int64
 			select {
 			case s = <-success:
-				// log.Debug().Msgf("DEBUG success %+v", s)
 			case f = <-failed:
-				// log.Debug().Msgf("DEBUG failed %+v", f)
 			case r = <-returned:
-				// log.Debug().Msgf("DEBUG returned %+v", r)
 			default:
 			}
 			err = stream.Send(&pb.TasksStatus{Success: s, Failed: f, Returned: r})
@@ -246,7 +242,7 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 		}
 		// wait before try to reconnect
 		reconnectTime := 5 * time.Second
-		log.Debug().Msgf("trying to reconnect in %v to server control", reconnectTime)
+		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, reconnectTime)
 		time.Sleep(reconnectTime)
 	}
 }

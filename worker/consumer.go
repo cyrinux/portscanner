@@ -39,15 +39,13 @@ func NewConsumer(
 
 	return name, &Consumer{
 		ctx:      ctx,
-		before:   time.Now(),
 		cancel:   cancel,
-		count:    0,
 		db:       db,
 		engine:   engine,
 		name:     name,
 		tasktype: tasktype,
-		success:  make(chan int64, 1),
-		failed:   make(chan int64, 1),
+		success:  make(chan int64),
+		failed:   make(chan int64),
 	}
 }
 
