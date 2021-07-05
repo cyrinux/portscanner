@@ -150,7 +150,7 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 				continue
 			} else {
 				previous = p
-				log.Debug().Msgf("scan %s : %v %% - host: %s, port: %s, timeout: %v, retention: %v",
+				log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s, timeout: %v, retention: %v",
 					s.Key,
 					p,
 					hosts,

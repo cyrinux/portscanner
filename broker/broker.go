@@ -14,6 +14,7 @@ type Broker struct {
 	Incoming   rmq.Queue
 	Pushed     rmq.Queue
 	Connection rmq.Connection
+	Stats      rmq.Stats
 	tasktype   string
 }
 
@@ -64,4 +65,18 @@ func RmqLogErrors(errChan <-chan error) {
 			log.Error().Stack().Err(err).Msg("other error")
 		}
 	}
+}
+
+// GetStats return RMQ broker connection stats
+func GetStats(broker *Broker) (rmq.Stats, error) {
+	queues, err := broker.Connection.GetOpenQueues()
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("")
+	}
+	stats, err := broker.Connection.CollectStats(queues)
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("")
+	}
+
+	return stats, err
 }

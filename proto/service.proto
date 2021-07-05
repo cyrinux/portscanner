@@ -66,6 +66,14 @@ message ParamsScannerRequest {
     int32 scan_speed = 16;
 }
 
+message TasksStatus {
+    int64 success = 1;
+    int64 failed = 2;
+    int64 returned = 3;
+    int64 ready = 4;
+    int64 rejected = 5;
+}
+
 message ScannerServiceControl {
     enum ServiceState {
         UNKNOWN = 0;
@@ -94,5 +102,6 @@ service ScannerService {
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
     rpc ServiceControl(ScannerServiceControl) returns (ScannerServiceControl);
     rpc StreamServiceControl(ScannerServiceControl) returns (stream ScannerServiceControl);
+    rpc StreamTasksStatus(stream TasksStatus) returns (stream TasksStatus);
 }
 

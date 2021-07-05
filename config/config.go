@@ -30,6 +30,9 @@ type Config struct {
 		Debug  bool `default:"false"`
 		Pretty bool `default:"true"`
 	}
+	Prometheus struct {
+		Server string `default:"prometheus:8140"`
+	}
 	Global struct {
 		ControllerServer string `default:"server:9000" split_words:"true"`
 	}

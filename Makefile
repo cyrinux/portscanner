@@ -1,3 +1,5 @@
+export DOCKER_BUILDKIT=1
+
 all: up
 
 up: build-docker
@@ -6,7 +8,7 @@ up: build-docker
 	docker-compose logs -f --tail=50
 
 build:
-	 DOCKER_BUILDKIT=1 CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -mod vendor -installsuffix cgo -o grpcnmapscanner .
+	 CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -mod vendor -installsuffix cgo -o grpcnmapscanner .
 
 .PHONY: vendor
 vendor:
@@ -21,7 +23,7 @@ proto:
 	@rm ./gen -rf
 
 build-docker: proto
-	DOCKER_BUILDKIT=1 docker-compose build
+	docker-compose build
 
 .PHONY: server
 server:

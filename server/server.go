@@ -2,33 +2,86 @@ package server
 
 import (
 	"encoding/json"
-	"net"
-	"strings"
-	"time"
-
-	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
-	"github.com/cyrinux/grpcnmapscanner/proto"
+	"github.com/cyrinux/grpcnmapscanner/logger"
+	pb "github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/cyrinux/grpcnmapscanner/util"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
+	"io"
+	"net"
+	"net/http"
+	"strings"
+	"time"
 )
+
+var (
+	conf       = config.GetConfig()
+	log        = logger.New(conf.Logger.Debug, conf.Logger.Pretty)
+	opsSuccess = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "scanner_processed_ops_success",
+		Help: "The total number of success tasks",
+	})
+	opsFailed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "scanner_processed_ops_failed",
+		Help: "The total number of failed tasks",
+	})
+	opsReturned = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "scanner_processed_ops_returned",
+		Help: "The total number of returned tasks",
+	})
+	opsReady = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "scanner_processed_queue_ready",
+		Help: "The total number of ready tasks tasks",
+	})
+	opsRejected = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "scanner_processed_queue_rejected",
+		Help: "The total number of rejected tasks tasks",
+	})
+)
+
+var kaep = keepalive.EnforcementPolicy{
+	MinTime:             5 * time.Second, // If a client pings more than once every 5 seconds, terminate the connection
+	PermitWithoutStream: true,            // Allow pings even when there are no active streams
+}
+
+var kasp = keepalive.ServerParameters{
+	MaxConnectionIdle:     3600 * time.Second, // If a client is idle for 3600 seconds, send a GOAWAY
+	MaxConnectionAge:      1800 * time.Second, // If any connection is alive for more than 1800 seconds, send a GOAWAY
+	MaxConnectionAgeGrace: 5 * time.Second,    // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
+	Time:                  5 * time.Second,    // Ping the client if it is idle for 5 seconds to ensure the connection is still active
+	Timeout:               2 * time.Second,    // Wait 1 second for the ping ack before assuming the connection is dead
+}
+
+// TasksStatus define the status of all tasks
+type TasksStatus struct {
+	success  int64 //tassks success
+	failed   int64 //tasks failure
+	returned int64 //tasks returned
+	ready    int64 //queue tasks ready
+	rejected int64 //queue tasks rejected
+}
 
 // Server define the grpc server struct
 type Server struct {
-	ctx      context.Context
-	config   config.Config
-	db       database.Database
-	err      error
-	queue    rmq.Queue
-	state    proto.ScannerServiceControl
-	tasktype string
+	ctx         context.Context
+	config      config.Config
+	db          database.Database
+	err         error
+	broker      broker.Broker
+	state       pb.ScannerServiceControl
+	tasktype    string
+	tasksStatus TasksStatus
 }
 
 // Listen start the grpc server
@@ -40,19 +93,45 @@ func Listen(ctx context.Context, allConfig config.Config) error {
 		return err
 	}
 
+	//prometheus endpoint
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":2112", nil)
+	}()
+
+	//grpc endpoint
 	srv := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 	)
 
 	reflection.Register(srv)
-	proto.RegisterScannerServiceServer(srv, NewServer(ctx, allConfig, "nmap"))
+	pb.RegisterScannerServiceServer(srv, NewServer(ctx, allConfig, "nmap"))
 	if err = srv.Serve(listener); err != nil {
 		log.Error().Msg("can't serve the gRPC service")
 		return err
 	}
 
 	return nil
+}
+
+// brokerStatsToProm read broker stats each 2s and write to prometheus
+func brokerStatsToProm(brk *broker.Broker) {
+	for {
+		stats, err := broker.GetStats(brk)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't get RMQ stats")
+			time.Sleep(2000 * time.Millisecond)
+			continue
+		}
+		s := stats.QueueStats["nmap-incoming"]
+		if s.ReadyCount > 0 || s.RejectedCount > 0 {
+			opsReady.Add(float64(s.ReadyCount))
+			opsRejected.Add(float64(s.RejectedCount))
+			log.Debug().Msgf("broker incoming queue ready: %v, rejected: %v", s.ReadyCount, s.RejectedCount)
+		}
+		time.Sleep(1000 * time.Millisecond)
+	}
 }
 
 // NewServer create a new server and init the database connection
@@ -69,24 +148,27 @@ func NewServer(ctx context.Context, config config.Config, tasktype string) *Serv
 		log.Fatal().Stack().Err(err).Msg("can't open the database")
 	}
 
+	// start the rmq stats to prometheus
+	go brokerStatsToProm(&brk)
+
 	return &Server{
 		ctx:      ctx,
 		tasktype: tasktype,
 		config:   config,
-		queue:    brk.Incoming,
+		broker:   brk,
 		db:       db,
 		err:      err,
 	}
 }
 
 // DeleteScan delele a scan from the database
-func (server *Server) DeleteScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
+func (server *Server) DeleteScan(ctx context.Context, in *pb.GetScannerRequest) (*pb.ServerResponse, error) {
 	_, err := server.db.Delete(ctx, in.Key)
 	return generateResponse(in.Key, nil, err)
 }
 
 // StreamServiceControl control the service
-func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stream proto.ScannerService_StreamServiceControlServer) error {
+func (server *Server) StreamServiceControl(in *pb.ScannerServiceControl, stream pb.ScannerService_StreamServiceControlServer) error {
 	for {
 		if err := stream.Send(&server.state); err != nil {
 			log.Error().Stack().Err(err).Msgf("streamer service control send error")
@@ -96,22 +178,53 @@ func (server *Server) StreamServiceControl(in *proto.ScannerServiceControl, stre
 	}
 }
 
+// StreamTasksStatus manage the tasks counter
+func (server *Server) StreamTasksStatus(stream pb.ScannerService_StreamTasksStatusServer) error {
+	for {
+		tasksStatus, err := stream.Recv()
+		if err == io.EOF {
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		if tasksStatus.Success > 0 {
+			server.tasksStatus.success += tasksStatus.Success
+			opsSuccess.Add(float64(tasksStatus.Success))
+		}
+		if tasksStatus.Failed > 0 {
+			server.tasksStatus.failed += tasksStatus.Failed
+			opsFailed.Add(float64(tasksStatus.Failed))
+		}
+		if tasksStatus.Returned > 0 {
+			server.tasksStatus.returned += tasksStatus.Returned
+			opsReturned.Add(float64(tasksStatus.Returned))
+		}
+		if tasksStatus.Success > 0 || tasksStatus.Failed > 0 || tasksStatus.Returned > 0 {
+			stream.Send(&pb.TasksStatus{Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned})
+			log.Debug().Msgf("prometheus tasks status: %+v", tasksStatus)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 // ServiceControl control the service
-func (server *Server) ServiceControl(ctx context.Context, in *proto.ScannerServiceControl) (*proto.ScannerServiceControl, error) {
-	if in.GetState() == proto.ScannerServiceControl_UNKNOWN {
-		return &proto.ScannerServiceControl{State: server.state.State}, nil
+func (server *Server) ServiceControl(ctx context.Context, in *pb.ScannerServiceControl) (*pb.ScannerServiceControl, error) {
+	if in.GetState() == pb.ScannerServiceControl_UNKNOWN {
+		return &pb.ScannerServiceControl{State: server.state.State}, nil
 	}
 
 	if server.state.State != in.GetState() {
 		server.state.State = in.GetState()
 	}
 
-	return &proto.ScannerServiceControl{State: server.state.State}, nil
+	return &pb.ScannerServiceControl{State: server.state.State}, nil
 }
 
-// GetScan return the engine scan resultt
-func (server *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) (*proto.ServerResponse, error) {
-	var scannerResponse proto.ScannerResponse
+// GetScan return the engine scan result
+func (server *Server) GetScan(ctx context.Context, in *pb.GetScannerRequest) (*pb.ServerResponse, error) {
+	var scannerResponse pb.ScannerResponse
 
 	scanResult, err := server.db.Get(ctx, in.Key)
 	if err != nil {
@@ -128,14 +241,14 @@ func (server *Server) GetScan(ctx context.Context, in *proto.GetScannerRequest) 
 }
 
 // StartScan function prepare a nmap scan
-func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
+func (server *Server) StartScan(ctx context.Context, in *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
 	// sanitize
 	request := parseParamsScannerRequest(in)
 
 	// we start the scan
 	newEngine := engine.NewEngine(ctx, server.db)
 
-	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
+	scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_ERROR}
 
 	key, result, err := newEngine.StartNmapScan(request)
 	if err != nil {
@@ -146,7 +259,7 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 	if err != nil {
 		return generateResponse(key, nil, err)
 	}
-	scannerResponse = proto.ScannerResponse{
+	scannerResponse = pb.ScannerResponse{
 		HostResult: scanParsedResult,
 	}
 
@@ -165,20 +278,20 @@ func (server *Server) StartScan(ctx context.Context, in *proto.ParamsScannerRequ
 		return generateResponse(key, &scannerResponse, err)
 	}
 
-	scannerResponse = proto.ScannerResponse{
+	scannerResponse = pb.ScannerResponse{
 		HostResult: scanParsedResult,
-		Status:     proto.ScannerResponse_OK,
+		Status:     pb.ScannerResponse_OK,
 	}
 
 	return generateResponse(key, &scannerResponse, nil)
 }
 
 // StartAsyncScan function prepare a nmap scan
-func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScannerRequest) (*proto.ServerResponse, error) {
+func (server *Server) StartAsyncScan(ctx context.Context, in *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
 	request := parseParamsScannerRequest(in)
 
 	// and write the response to the database
-	scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
+	scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_QUEUED}
 	scanResponseJSON, _ := json.Marshal(&scannerResponse)
 	log.Info().Msgf("receive async task order: %v", request)
 	_, err := server.db.Set(ctx, request.Key, string(scanResponseJSON), 0)
@@ -189,30 +302,30 @@ func (server *Server) StartAsyncScan(ctx context.Context, in *proto.ParamsScanne
 	// create scan task
 	taskScanBytes, err := json.Marshal(request)
 	if err != nil {
-		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
+		scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_ERROR}
 		return generateResponse(request.Key, &scannerResponse, err)
 	}
-	err = server.queue.PublishBytes(taskScanBytes)
+	err = server.broker.Incoming.PublishBytes(taskScanBytes)
 	if err != nil {
-		scannerResponse := proto.ScannerResponse{Status: proto.ScannerResponse_ERROR}
+		scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_ERROR}
 		return generateResponse(request.Key, &scannerResponse, err)
 	}
 
-	scannerResponse = proto.ScannerResponse{Status: proto.ScannerResponse_QUEUED}
+	scannerResponse = pb.ScannerResponse{Status: pb.ScannerResponse_QUEUED}
 	return generateResponse(request.Key, &scannerResponse, nil)
 }
 
 // generateResponse generate the response for the grpc return
-func generateResponse(key string, value *proto.ScannerResponse, err error) (*proto.ServerResponse, error) {
+func generateResponse(key string, value *pb.ScannerResponse, err error) (*pb.ServerResponse, error) {
 	if err != nil {
-		return &proto.ServerResponse{
+		return &pb.ServerResponse{
 			Success: false,
 			Key:     key,
 			Value:   value,
 			Error:   err.Error(),
 		}, nil
 	}
-	return &proto.ServerResponse{
+	return &pb.ServerResponse{
 		Success: true,
 		Key:     key,
 		Value:   value,
@@ -220,7 +333,7 @@ func generateResponse(key string, value *proto.ScannerResponse, err error) (*pro
 	}, nil
 }
 
-func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.ParamsScannerRequest {
+func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
 
 	// if the Key is not forced, we generate one unique
 	guid := uuid.New()
@@ -230,6 +343,9 @@ func parseParamsScannerRequest(request *proto.ParamsScannerRequest) *proto.Param
 
 	// If timeout < 10s, fallback to 1h
 	if request.Timeout < 30 && request.Timeout > 0 {
+		request.Timeout = 60 * 60
+		// if timeout not set
+	} else if request.Timeout == 0 {
 		request.Timeout = 60 * 60
 	}
 

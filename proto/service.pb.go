@@ -131,7 +131,7 @@ func (x ScannerServiceControl_ServiceState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScannerServiceControl_ServiceState.Descriptor instead.
 func (ScannerServiceControl_ServiceState) EnumDescriptor() ([]byte, []int) {
-	return file_proto_service_proto_rawDescGZIP(), []int{6, 0}
+	return file_proto_service_proto_rawDescGZIP(), []int{7, 0}
 }
 
 type Host struct {
@@ -664,6 +664,85 @@ func (x *ParamsScannerRequest) GetScanSpeed() int32 {
 	return 0
 }
 
+type TasksStatus struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Success  int64 `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Failed   int64 `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"`
+	Returned int64 `protobuf:"varint,3,opt,name=returned,proto3" json:"returned,omitempty"`
+	Ready    int64 `protobuf:"varint,4,opt,name=ready,proto3" json:"ready,omitempty"`
+	Rejected int64 `protobuf:"varint,5,opt,name=rejected,proto3" json:"rejected,omitempty"`
+}
+
+func (x *TasksStatus) Reset() {
+	*x = TasksStatus{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_proto_service_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TasksStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TasksStatus) ProtoMessage() {}
+
+func (x *TasksStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_service_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TasksStatus.ProtoReflect.Descriptor instead.
+func (*TasksStatus) Descriptor() ([]byte, []int) {
+	return file_proto_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TasksStatus) GetSuccess() int64 {
+	if x != nil {
+		return x.Success
+	}
+	return 0
+}
+
+func (x *TasksStatus) GetFailed() int64 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *TasksStatus) GetReturned() int64 {
+	if x != nil {
+		return x.Returned
+	}
+	return 0
+}
+
+func (x *TasksStatus) GetReady() int64 {
+	if x != nil {
+		return x.Ready
+	}
+	return 0
+}
+
+func (x *TasksStatus) GetRejected() int64 {
+	if x != nil {
+		return x.Rejected
+	}
+	return 0
+}
+
 type ScannerServiceControl struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -675,7 +754,7 @@ type ScannerServiceControl struct {
 func (x *ScannerServiceControl) Reset() {
 	*x = ScannerServiceControl{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_service_proto_msgTypes[6]
+		mi := &file_proto_service_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -688,7 +767,7 @@ func (x *ScannerServiceControl) String() string {
 func (*ScannerServiceControl) ProtoMessage() {}
 
 func (x *ScannerServiceControl) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_service_proto_msgTypes[6]
+	mi := &file_proto_service_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -701,7 +780,7 @@ func (x *ScannerServiceControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScannerServiceControl.ProtoReflect.Descriptor instead.
 func (*ScannerServiceControl) Descriptor() ([]byte, []int) {
-	return file_proto_service_proto_rawDescGZIP(), []int{6}
+	return file_proto_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ScannerServiceControl) GetState() ScannerServiceControl_ServiceState {
@@ -722,7 +801,7 @@ type GetScannerRequest struct {
 func (x *GetScannerRequest) Reset() {
 	*x = GetScannerRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_service_proto_msgTypes[7]
+		mi := &file_proto_service_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -735,7 +814,7 @@ func (x *GetScannerRequest) String() string {
 func (*GetScannerRequest) ProtoMessage() {}
 
 func (x *GetScannerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_service_proto_msgTypes[7]
+	mi := &file_proto_service_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -748,7 +827,7 @@ func (x *GetScannerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScannerRequest.ProtoReflect.Descriptor instead.
 func (*GetScannerRequest) Descriptor() ([]byte, []int) {
-	return file_proto_service_proto_rawDescGZIP(), []int{7}
+	return file_proto_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetScannerRequest) GetKey() string {
@@ -772,7 +851,7 @@ type ServerResponse struct {
 func (x *ServerResponse) Reset() {
 	*x = ServerResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_service_proto_msgTypes[8]
+		mi := &file_proto_service_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -785,7 +864,7 @@ func (x *ServerResponse) String() string {
 func (*ServerResponse) ProtoMessage() {}
 
 func (x *ServerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_service_proto_msgTypes[8]
+	mi := &file_proto_service_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -798,7 +877,7 @@ func (x *ServerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerResponse.ProtoReflect.Descriptor instead.
 func (*ServerResponse) Descriptor() ([]byte, []int) {
-	return file_proto_service_proto_rawDescGZIP(), []int{8}
+	return file_proto_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ServerResponse) GetSuccess() bool {
@@ -922,6 +1001,15 @@ var file_proto_service_proto_rawDesc = []byte{
 	0x6e, 0x74, 0x61, 0x62, 0x18, 0x0f, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x63, 0x72, 0x6f, 0x6e,
 	0x74, 0x61, 0x62, 0x12, 0x1d, 0x0a, 0x0a, 0x73, 0x63, 0x61, 0x6e, 0x5f, 0x73, 0x70, 0x65, 0x65,
 	0x64, 0x18, 0x10, 0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x73, 0x63, 0x61, 0x6e, 0x53, 0x70, 0x65,
+	0x65, 0x64, 0x22, 0x8d, 0x01, 0x0a, 0x0b, 0x54, 0x61, 0x73, 0x6b, 0x73, 0x53, 0x74, 0x61, 0x74,
+	0x75, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x03, 0x52, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73, 0x12, 0x16, 0x0a, 0x06,
+	0x66, 0x61, 0x69, 0x6c, 0x65, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x66, 0x61,
+	0x69, 0x6c, 0x65, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x65, 0x64,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x72, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x65, 0x64,
+	0x12, 0x14, 0x0a, 0x05, 0x72, 0x65, 0x61, 0x64, 0x79, 0x18, 0x04, 0x20, 0x01, 0x28, 0x03, 0x52,
+	0x05, 0x72, 0x65, 0x61, 0x64, 0x79, 0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65, 0x6a, 0x65, 0x63, 0x74,
+	0x65, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x72, 0x65, 0x6a, 0x65, 0x63, 0x74,
 	0x65, 0x64, 0x22, 0x8a, 0x01, 0x0a, 0x15, 0x53, 0x63, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65,
 	0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x12, 0x3f, 0x0a, 0x05,
 	0x73, 0x74, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x29, 0x2e, 0x70, 0x72,
@@ -941,7 +1029,7 @@ var file_proto_service_proto_rawDesc = []byte{
 	0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61,
 	0x6e, 0x6e, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x05, 0x76, 0x61,
 	0x6c, 0x75, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x18, 0x04, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x32, 0xb6, 0x03, 0x0a, 0x0e, 0x53, 0x63,
+	0x28, 0x09, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x32, 0xf7, 0x03, 0x0a, 0x0e, 0x53, 0x63,
 	0x61, 0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x44, 0x0a, 0x0e,
 	0x53, 0x74, 0x61, 0x72, 0x74, 0x41, 0x73, 0x79, 0x6e, 0x63, 0x53, 0x63, 0x61, 0x6e, 0x12, 0x1b,
 	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x53, 0x63, 0x61,
@@ -969,8 +1057,12 @@ var file_proto_service_proto_rawDesc = []byte{
 	0x6e, 0x6e, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72,
 	0x6f, 0x6c, 0x1a, 0x1c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x61, 0x6e, 0x6e,
 	0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c,
-	0x30, 0x01, 0x42, 0x08, 0x5a, 0x06, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x30, 0x01, 0x12, 0x3f, 0x0a, 0x11, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x54, 0x61, 0x73, 0x6b,
+	0x73, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x12, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e,
+	0x54, 0x61, 0x73, 0x6b, 0x73, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x1a, 0x12, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x2e, 0x54, 0x61, 0x73, 0x6b, 0x73, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x28,
+	0x01, 0x30, 0x01, 0x42, 0x08, 0x5a, 0x06, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -986,7 +1078,7 @@ func file_proto_service_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_service_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_proto_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_proto_service_proto_goTypes = []interface{}{
 	(ScannerResponse_Status)(0),             // 0: proto.ScannerResponse.Status
 	(ScannerServiceControl_ServiceState)(0), // 1: proto.ScannerServiceControl.ServiceState
@@ -996,9 +1088,10 @@ var file_proto_service_proto_goTypes = []interface{}{
 	(*HostResult)(nil),                      // 5: proto.HostResult
 	(*ScannerResponse)(nil),                 // 6: proto.ScannerResponse
 	(*ParamsScannerRequest)(nil),            // 7: proto.ParamsScannerRequest
-	(*ScannerServiceControl)(nil),           // 8: proto.ScannerServiceControl
-	(*GetScannerRequest)(nil),               // 9: proto.GetScannerRequest
-	(*ServerResponse)(nil),                  // 10: proto.ServerResponse
+	(*TasksStatus)(nil),                     // 8: proto.TasksStatus
+	(*ScannerServiceControl)(nil),           // 9: proto.ScannerServiceControl
+	(*GetScannerRequest)(nil),               // 10: proto.GetScannerRequest
+	(*ServerResponse)(nil),                  // 11: proto.ServerResponse
 }
 var file_proto_service_proto_depIdxs = []int32{
 	3,  // 0: proto.Port.version:type_name -> proto.PortVersion
@@ -1010,18 +1103,20 @@ var file_proto_service_proto_depIdxs = []int32{
 	6,  // 6: proto.ServerResponse.value:type_name -> proto.ScannerResponse
 	7,  // 7: proto.ScannerService.StartAsyncScan:input_type -> proto.ParamsScannerRequest
 	7,  // 8: proto.ScannerService.StartScan:input_type -> proto.ParamsScannerRequest
-	9,  // 9: proto.ScannerService.GetScan:input_type -> proto.GetScannerRequest
-	9,  // 10: proto.ScannerService.DeleteScan:input_type -> proto.GetScannerRequest
-	8,  // 11: proto.ScannerService.ServiceControl:input_type -> proto.ScannerServiceControl
-	8,  // 12: proto.ScannerService.StreamServiceControl:input_type -> proto.ScannerServiceControl
-	10, // 13: proto.ScannerService.StartAsyncScan:output_type -> proto.ServerResponse
-	10, // 14: proto.ScannerService.StartScan:output_type -> proto.ServerResponse
-	10, // 15: proto.ScannerService.GetScan:output_type -> proto.ServerResponse
-	10, // 16: proto.ScannerService.DeleteScan:output_type -> proto.ServerResponse
-	8,  // 17: proto.ScannerService.ServiceControl:output_type -> proto.ScannerServiceControl
-	8,  // 18: proto.ScannerService.StreamServiceControl:output_type -> proto.ScannerServiceControl
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
+	10, // 9: proto.ScannerService.GetScan:input_type -> proto.GetScannerRequest
+	10, // 10: proto.ScannerService.DeleteScan:input_type -> proto.GetScannerRequest
+	9,  // 11: proto.ScannerService.ServiceControl:input_type -> proto.ScannerServiceControl
+	9,  // 12: proto.ScannerService.StreamServiceControl:input_type -> proto.ScannerServiceControl
+	8,  // 13: proto.ScannerService.StreamTasksStatus:input_type -> proto.TasksStatus
+	11, // 14: proto.ScannerService.StartAsyncScan:output_type -> proto.ServerResponse
+	11, // 15: proto.ScannerService.StartScan:output_type -> proto.ServerResponse
+	11, // 16: proto.ScannerService.GetScan:output_type -> proto.ServerResponse
+	11, // 17: proto.ScannerService.DeleteScan:output_type -> proto.ServerResponse
+	9,  // 18: proto.ScannerService.ServiceControl:output_type -> proto.ScannerServiceControl
+	9,  // 19: proto.ScannerService.StreamServiceControl:output_type -> proto.ScannerServiceControl
+	8,  // 20: proto.ScannerService.StreamTasksStatus:output_type -> proto.TasksStatus
+	14, // [14:21] is the sub-list for method output_type
+	7,  // [7:14] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1106,7 +1201,7 @@ func file_proto_service_proto_init() {
 			}
 		}
 		file_proto_service_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ScannerServiceControl); i {
+			switch v := v.(*TasksStatus); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1118,7 +1213,7 @@ func file_proto_service_proto_init() {
 			}
 		}
 		file_proto_service_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetScannerRequest); i {
+			switch v := v.(*ScannerServiceControl); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1130,6 +1225,18 @@ func file_proto_service_proto_init() {
 			}
 		}
 		file_proto_service_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetScannerRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_proto_service_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ServerResponse); i {
 			case 0:
 				return &v.state
@@ -1148,7 +1255,7 @@ func file_proto_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_proto_service_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -1181,6 +1288,7 @@ type ScannerServiceClient interface {
 	DeleteScan(ctx context.Context, in *GetScannerRequest, opts ...grpc.CallOption) (*ServerResponse, error)
 	ServiceControl(ctx context.Context, in *ScannerServiceControl, opts ...grpc.CallOption) (*ScannerServiceControl, error)
 	StreamServiceControl(ctx context.Context, in *ScannerServiceControl, opts ...grpc.CallOption) (ScannerService_StreamServiceControlClient, error)
+	StreamTasksStatus(ctx context.Context, opts ...grpc.CallOption) (ScannerService_StreamTasksStatusClient, error)
 }
 
 type scannerServiceClient struct {
@@ -1268,6 +1376,37 @@ func (x *scannerServiceStreamServiceControlClient) Recv() (*ScannerServiceContro
 	return m, nil
 }
 
+func (c *scannerServiceClient) StreamTasksStatus(ctx context.Context, opts ...grpc.CallOption) (ScannerService_StreamTasksStatusClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_ScannerService_serviceDesc.Streams[1], "/proto.ScannerService/StreamTasksStatus", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &scannerServiceStreamTasksStatusClient{stream}
+	return x, nil
+}
+
+type ScannerService_StreamTasksStatusClient interface {
+	Send(*TasksStatus) error
+	Recv() (*TasksStatus, error)
+	grpc.ClientStream
+}
+
+type scannerServiceStreamTasksStatusClient struct {
+	grpc.ClientStream
+}
+
+func (x *scannerServiceStreamTasksStatusClient) Send(m *TasksStatus) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *scannerServiceStreamTasksStatusClient) Recv() (*TasksStatus, error) {
+	m := new(TasksStatus)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // ScannerServiceServer is the server API for ScannerService service.
 type ScannerServiceServer interface {
 	StartAsyncScan(context.Context, *ParamsScannerRequest) (*ServerResponse, error)
@@ -1276,6 +1415,7 @@ type ScannerServiceServer interface {
 	DeleteScan(context.Context, *GetScannerRequest) (*ServerResponse, error)
 	ServiceControl(context.Context, *ScannerServiceControl) (*ScannerServiceControl, error)
 	StreamServiceControl(*ScannerServiceControl, ScannerService_StreamServiceControlServer) error
+	StreamTasksStatus(ScannerService_StreamTasksStatusServer) error
 }
 
 // UnimplementedScannerServiceServer can be embedded to have forward compatible implementations.
@@ -1299,6 +1439,9 @@ func (*UnimplementedScannerServiceServer) ServiceControl(context.Context, *Scann
 }
 func (*UnimplementedScannerServiceServer) StreamServiceControl(*ScannerServiceControl, ScannerService_StreamServiceControlServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamServiceControl not implemented")
+}
+func (*UnimplementedScannerServiceServer) StreamTasksStatus(ScannerService_StreamTasksStatusServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamTasksStatus not implemented")
 }
 
 func RegisterScannerServiceServer(s *grpc.Server, srv ScannerServiceServer) {
@@ -1416,6 +1559,32 @@ func (x *scannerServiceStreamServiceControlServer) Send(m *ScannerServiceControl
 	return x.ServerStream.SendMsg(m)
 }
 
+func _ScannerService_StreamTasksStatus_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ScannerServiceServer).StreamTasksStatus(&scannerServiceStreamTasksStatusServer{stream})
+}
+
+type ScannerService_StreamTasksStatusServer interface {
+	Send(*TasksStatus) error
+	Recv() (*TasksStatus, error)
+	grpc.ServerStream
+}
+
+type scannerServiceStreamTasksStatusServer struct {
+	grpc.ServerStream
+}
+
+func (x *scannerServiceStreamTasksStatusServer) Send(m *TasksStatus) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *scannerServiceStreamTasksStatusServer) Recv() (*TasksStatus, error) {
+	m := new(TasksStatus)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 var _ScannerService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "proto.ScannerService",
 	HandlerType: (*ScannerServiceServer)(nil),
@@ -1446,6 +1615,12 @@ var _ScannerService_serviceDesc = grpc.ServiceDesc{
 			StreamName:    "StreamServiceControl",
 			Handler:       _ScannerService_StreamServiceControl_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamTasksStatus",
+			Handler:       _ScannerService_StreamTasksStatus_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "proto/service.proto",

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/server"
+
 	"github.com/cyrinux/grpcnmapscanner/worker"
 	"log"
 	"net/http"
@@ -70,5 +71,4 @@ func main() {
 		startServer(ctx, allConfig)
 		startWorker(ctx, allConfig, "nmap")
 	}
-
 }

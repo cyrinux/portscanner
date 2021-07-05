@@ -4,26 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
-	"github.com/cyrinux/grpcnmapscanner/proto"
+	pb "github.com/cyrinux/grpcnmapscanner/proto"
+	"sync"
+	"time"
 )
 
 // Consumer define a broker consumer
 type Consumer struct {
-	name      string
-	tasktype  string
-	count     int64
-	scanCount map[int]int64
-	before    time.Time
-	ctx       context.Context
-	cancel    context.CancelFunc
-	engine    *engine.Engine
-	state     proto.ScannerServiceControl
-	db        database.Database
+	sync.Mutex
+	name     string
+	before   time.Time
+	cancel   context.CancelFunc
+	count    int64
+	ctx      context.Context
+	db       database.Database
+	engine   *engine.Engine
+	state    pb.ScannerServiceControl
+	tasktype string
+	success  chan int64
+	failed   chan int64
 }
 
 // NewConsumer create a new consumer
@@ -33,31 +35,33 @@ func NewConsumer(
 	queue string) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", tasktype, queue, hostname, tag)
-	log.Info().Msgf("new consumer: %s", name)
+	log.Info().Msgf("new: %s", name)
 	ctx, cancel := context.WithCancel(ctx)
 	engine := engine.NewEngine(ctx, db)
 
 	return name, &Consumer{
 		ctx:      ctx,
+		before:   time.Now(),
 		cancel:   cancel,
+		count:    0,
+		db:       db,
+		engine:   engine,
 		name:     name,
 		tasktype: tasktype,
-		count:    0,
-		before:   time.Now(),
-		engine:   engine,
-		db:       db,
+		success:  make(chan int64, 1),
+		failed:   make(chan int64, 1),
 	}
 }
 
 // onCancel is a function trigger on consumer context cancel
-func onCancel(consumer *Consumer, request *proto.ParamsScannerRequest) {
+func onCancel(consumer *Consumer, request *pb.ParamsScannerRequest) {
 	// waiting for cancel signal
 	<-consumer.ctx.Done()
 	log.Debug().Msgf("%s cancelled, writing state to database", consumer.name)
 	// if scan fail or cancelled, mark task as cancel
-	consumer.engine.State = proto.ScannerResponse_CANCEL
-	scannerResponse := &proto.ScannerResponse{
-		Status: proto.ScannerResponse_CANCEL,
+	consumer.engine.State = pb.ScannerResponse_CANCEL
+	scannerResponse := &pb.ScannerResponse{
+		Status: pb.ScannerResponse_CANCEL,
 	}
 	scanResultJSON, err := json.Marshal(scannerResponse)
 	if err != nil {
@@ -78,13 +82,13 @@ func onCancel(consumer *Consumer, request *proto.ParamsScannerRequest) {
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
 
-	var request *proto.ParamsScannerRequest
+	var request *pb.ParamsScannerRequest
 	json.Unmarshal([]byte(payload), &request)
 
 	go onCancel(consumer, request)
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
-	if consumer.state.State != proto.ScannerServiceControl_START {
+	if consumer.state.State != pb.ScannerServiceControl_START {
 		log.Info().Msgf("%s: start consume %s", consumer.name, payload)
 		if err := delivery.Reject(); err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to requeue %s: %s", consumer.name, payload, err)
@@ -104,13 +108,14 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime <= time.Now().Unix() {
-
 		key, result, err := consumer.engine.StartNmapScan(request)
-		if err != nil && consumer.engine.State != proto.ScannerResponse_CANCEL {
+		if err != nil && consumer.engine.State != pb.ScannerResponse_CANCEL {
+			// scan failed
+			consumer.failed <- 1
 			// if scan fail or cancelled, mark task as cancel
 			log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
-			scannerResponse := &proto.ScannerResponse{
-				Status: proto.ScannerResponse_ERROR,
+			scannerResponse := &pb.ScannerResponse{
+				Status: pb.ScannerResponse_ERROR,
 			}
 			scanResultJSON, err := json.Marshal(scannerResponse)
 			if err != nil {
@@ -125,13 +130,16 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			if err != nil {
 				log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
 			}
+		} else {
+			// success scan
+			consumer.success <- 1
 		}
 
 		// if scan is cancel, result will be nil and we can't
 		// parse the result
 		if result != nil {
 			scanResult, _ := engine.ParseScanResult(result)
-			scannerResponse := &proto.ScannerResponse{
+			scannerResponse := &pb.ScannerResponse{
 				HostResult: scanResult,
 			}
 			scanResultJSON, err := json.Marshal(scannerResponse)
@@ -145,6 +153,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			if err != nil {
 				log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)
 			}
+
 		}
 
 		if consumer.count%conf.RMQ.ReportBatchSize > 0 {
@@ -167,6 +176,5 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	}
-
 	time.Sleep(conf.RMQ.ConsumeDuration)
 }
