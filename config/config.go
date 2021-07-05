@@ -20,7 +20,7 @@ type Config struct {
 		Password           string        `default:""`
 		Name               string        `default:"grpcnmapscanner"`
 		NumConsumers       int64         `default:"5" split_words:"true"`
-		ReturnerLimit      int64         `default:"1000" split_words:"true"`
+		ReturnerLimit      int64         `default:"200" split_words:"true"`
 		PollDuration       time.Duration `default:"100ms" split_words:"true"`
 		PollDurationPushed time.Duration `default:"5000ms" split_words:"true"`
 		ConsumeDuration    time.Duration `default:"1000ms" split_words:"true"`

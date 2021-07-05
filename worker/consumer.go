@@ -49,10 +49,11 @@ func NewConsumer(
 	}
 }
 
-// onCancel is a function trigger on consumer context cancel
-func onCancel(consumer *Consumer, request *pb.ParamsScannerRequest) {
-	// waiting for cancel signal
+// Cancel is a function trigger on consumer context cancel
+func (consumer *Consumer) onCancel(request *pb.ParamsScannerRequest) {
 	<-consumer.ctx.Done()
+
+	// waiting for cancel signal
 	log.Debug().Msgf("%s cancelled, writing state to database", consumer.name)
 	// if scan fail or cancelled, mark task as cancel
 	consumer.engine.State = pb.ScannerResponse_CANCEL
@@ -64,7 +65,7 @@ func onCancel(consumer *Consumer, request *pb.ParamsScannerRequest) {
 		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
 	}
 	_, err = consumer.db.Set(
-		context.Background(),
+		context.Background(), //
 		request.Key,
 		string(scanResultJSON),
 		time.Duration(request.GetRetentionTime())*time.Second,
@@ -81,7 +82,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	var request *pb.ParamsScannerRequest
 	json.Unmarshal([]byte(payload), &request)
 
-	go onCancel(consumer, request)
+	go consumer.onCancel(request)
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
 	if consumer.state.State != pb.ScannerServiceControl_START {
@@ -110,7 +111,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 				log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
 			}
 			_, err = consumer.db.Set(
-				context.Background(),
+				consumer.ctx,
 				key,
 				string(scanResultJSON),
 				time.Duration(request.GetRetentionTime())*time.Second,

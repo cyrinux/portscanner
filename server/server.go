@@ -43,11 +43,19 @@ var (
 	})
 	opsReady = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "scanner_size_queue_ready",
-		Help: "The total number of ready tasks tasks",
+		Help: "The total number of ready tasks",
 	})
 	opsRejected = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "scanner_size_queue_rejected",
-		Help: "The total number of rejected tasks tasks",
+		Help: "The total number of rejected tasks",
+	})
+	workersCount = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "scanner_workers_count",
+		Help: "The total number of scanner workers",
+	})
+	consumersCount = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "scanner_consumers_count",
+		Help: "The total number of scanner consumers",
 	})
 )
 
@@ -121,15 +129,16 @@ func brokerStatsToProm(brk *broker.Broker, name string) {
 	for {
 		stats, err := broker.GetStats(brk)
 		if err != nil {
-			log.Error().Stack().Err(err).Msg("can't get RMQ stats")
+			log.Error().Stack().Err(err).Msg("can't get RMQ statistics")
 			time.Sleep(2000 * time.Millisecond)
 			continue
 		}
 		queue := fmt.Sprintf("%s-incoming", name)
 		s := stats.QueueStats[queue]
+		opsReady.Set(float64(s.ReadyCount))
+		opsRejected.Set(float64(s.RejectedCount))
+		consumersCount.Set(float64(s.ConsumerCount()))
 		if s.ReadyCount > 0 || s.RejectedCount > 0 {
-			opsReady.Set(float64(s.ReadyCount))
-			opsRejected.Set(float64(s.RejectedCount))
 			log.Debug().Msgf("broker %s incoming queue ready: %v, rejected: %v", name, s.ReadyCount, s.RejectedCount)
 		}
 		time.Sleep(1000 * time.Millisecond)
@@ -142,16 +151,16 @@ func NewServer(ctx context.Context, config config.Config, tasktype string) *Serv
 	go broker.RmqLogErrors(errChan)
 
 	// Broker init nmap queue
-	brk := broker.NewBroker(context.TODO(), tasktype, config, util.RedisConnect(ctx, config))
+	brk := broker.NewBroker(ctx, tasktype, config, util.RedisConnect(ctx, config))
 
 	// Storage database init
-	db, err := database.Factory(context.TODO(), config)
+	db, err := database.Factory(ctx, config)
 	if err != nil {
 		log.Fatal().Stack().Err(err).Msg("can't open the database")
 	}
 
 	// start the rmq stats to prometheus
-	go brokerStatsToProm(&brk, "nmap")
+	go brokerStatsToProm(&brk, tasktype)
 
 	return &Server{
 		ctx:      ctx,
@@ -183,20 +192,22 @@ func (server *Server) StreamServiceControl(in *pb.ScannerServiceControl, stream 
 // StreamTasksStatus manage the tasks counter
 func (server *Server) StreamTasksStatus(stream pb.ScannerService_StreamTasksStatusServer) error {
 	for {
-		tasksStatus, err := stream.Recv()
+		promStatus, err := stream.Recv()
 		if err == io.EOF {
 			return err
 		}
 		if err != nil {
 			return err
 		}
-		server.tasksStatus.success += tasksStatus.Success
-		opsSuccess.Add(float64(tasksStatus.Success))
-		server.tasksStatus.failed += tasksStatus.Failed
-		opsFailed.Add(float64(tasksStatus.Failed))
-		server.tasksStatus.returned += tasksStatus.Returned
-		opsReturned.Set(float64(tasksStatus.Returned))
-		stream.Send(&pb.TasksStatus{Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned})
+		server.tasksStatus.success += promStatus.TasksStatus.Success
+		opsSuccess.Add(float64(promStatus.TasksStatus.Success))
+		server.tasksStatus.failed += promStatus.TasksStatus.Failed
+		opsFailed.Add(float64(promStatus.TasksStatus.Failed))
+		server.tasksStatus.returned += promStatus.TasksStatus.Returned
+		opsReturned.Set(float64(promStatus.TasksStatus.Returned))
+		stream.Send(&pb.PrometheusStatus{TasksStatus: &pb.TasksStatus{
+			Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned}},
+		)
 
 		time.Sleep(500 * time.Millisecond)
 	}

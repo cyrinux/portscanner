@@ -74,6 +74,12 @@ message TasksStatus {
     int64 rejected = 5;
 }
 
+message PrometheusStatus {
+    TasksStatus tasks_status = 1;
+    int64 worker_count = 2;
+    int64 consumer_count = 3;
+}
+
 message ScannerServiceControl {
     enum ServiceState {
         UNKNOWN = 0;
@@ -102,6 +108,6 @@ service ScannerService {
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
     rpc ServiceControl(ScannerServiceControl) returns (ScannerServiceControl);
     rpc StreamServiceControl(ScannerServiceControl) returns (stream ScannerServiceControl);
-    rpc StreamTasksStatus(stream TasksStatus) returns (stream TasksStatus);
+    rpc StreamTasksStatus(stream PrometheusStatus) returns (stream PrometheusStatus);
 }
 

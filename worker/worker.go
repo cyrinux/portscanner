@@ -51,17 +51,20 @@ type Worker struct {
 func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 	log.Info().Msgf("starting worker %s", name)
 
-	// Storage database init
+	// Storage database connection init, dedicated context to keep access to the database
 	db, err := database.Factory(context.Background(), config)
 	if err != nil {
 		log.Fatal().Stack().Err(err).Msg("")
 	}
 
-	redisClient := util.RedisConnect(context.Background(), config)
-	broker := broker.NewBroker(context.Background(), name, config, redisClient)
+	// redis
+	redisClient := util.RedisConnect(ctx, config)
+	// broker - with redis
+	broker := broker.NewBroker(ctx, name, config, redisClient)
+	// distributed lock - with redis
 	locker := redislock.New(redisClient)
-	consumers := make([]*Consumer, 0)
 
+	consumers := make([]*Consumer, 0)
 	grpcServer, err := grpc.Dial(
 		config.Global.ControllerServer,
 		grpc.WithInsecure(),
@@ -166,7 +169,7 @@ func (worker *Worker) startConsuming() {
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 	log.Info().Msgf("start consuming %s with %v consumers...", worker.name, numConsumers)
 
-	worker.broker = broker.NewBroker(context.Background(), worker.name, worker.config, worker.redisClient)
+	worker.broker = broker.NewBroker(worker.ctx, worker.name, worker.config, worker.redisClient)
 
 	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration)
 	if err != nil {
@@ -234,7 +237,7 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 			case r = <-returned:
 			default:
 			}
-			err = stream.Send(&pb.TasksStatus{Success: s, Failed: f, Returned: r})
+			err = stream.Send(&pb.PrometheusStatus{TasksStatus: &pb.TasksStatus{Success: s, Failed: f, Returned: r}})
 			if err != nil {
 				break
 			}
