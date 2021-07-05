@@ -179,7 +179,8 @@ func (worker *Worker) startConsuming() {
 		log.Error().Stack().Err(err).Msgf("%s queue pushed consume error", worker.name)
 	}
 
-	numConsumers += 1 // we got one consumer for the returned, lets add 2 more
+	numConsumers++ // we got one consumer for the returned, lets add 2 more
+
 	for i := 0; i < int(numConsumers); i++ {
 		tag, consumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "incoming")
 		if _, err := worker.broker.Incoming.AddConsumer(tag, consumer); err != nil {

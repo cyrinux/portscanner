@@ -16,9 +16,7 @@ import (
 type Consumer struct {
 	sync.Mutex
 	name     string
-	before   time.Time
 	cancel   context.CancelFunc
-	count    int64
 	ctx      context.Context
 	db       database.Database
 	engine   *engine.Engine
@@ -98,14 +96,6 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		return
 	}
 
-	consumer.count++
-	if consumer.count%conf.RMQ.ReportBatchSize == 0 {
-		duration := time.Since(consumer.before)
-		consumer.before = time.Now()
-		perSecond := time.Second / (duration / time.Duration(conf.RMQ.ReportBatchSize))
-		log.Debug().Msgf("%s: consumed %d %s %d", consumer.name, consumer.count, payload, perSecond)
-	}
-
 	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
 	if deferTime <= time.Now().Unix() {
 		key, result, err := consumer.engine.StartNmapScan(request)
@@ -155,19 +145,10 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			}
 
 		}
-
-		if consumer.count%conf.RMQ.ReportBatchSize > 0 {
-			if err := delivery.Ack(); err != nil {
-				log.Error().Stack().Err(err).Msgf("%s: failed to ack %s: %s", consumer.name, payload)
-			} else {
-				log.Info().Msgf("%s: acked %s", consumer.name, payload)
-			}
-		} else { // reject one per batch
-			if err := delivery.Reject(); err != nil {
-				log.Error().Stack().Err(err).Msgf("%s: failed to reject %s", consumer.name, payload)
-			} else {
-				log.Info().Msgf("%s: rejected %s", consumer.name, payload)
-			}
+		if err := delivery.Ack(); err != nil {
+			log.Error().Stack().Err(err).Msgf("%s: failed to ack %s: %s", consumer.name, payload)
+		} else {
+			log.Info().Msgf("%s: acked %s", consumer.name, payload)
 		}
 	} else {
 		if err := delivery.Reject(); err != nil {
