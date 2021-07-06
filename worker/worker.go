@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"sync"
 	"time"
 
 	rmq "github.com/adjust/rmq/v4"
@@ -34,7 +33,6 @@ var kacp = keepalive.ClientParameters{
 
 // Worker define the worker struct
 type Worker struct {
-	sync.Mutex
 	ctx         context.Context
 	name        string
 	broker      brk.Broker
@@ -42,7 +40,7 @@ type Worker struct {
 	locker      *redislock.Client
 	redisClient *redis.Client
 	state       pb.ScannerServiceControl
-	consumers   []*Consumer
+	consumers   []Consumer
 	db          database.Database
 	grpcServer  *grpc.ClientConn
 	returned    chan int64
@@ -65,7 +63,7 @@ func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 	// distributed lock - with redis
 	locker := redislock.New(redisClient)
 
-	consumers := make([]*Consumer, 0)
+	consumers := make([]Consumer, 0)
 	grpcServer, err := grpc.Dial(
 		config.Global.ControllerServer,
 		grpc.WithInsecure(),
@@ -152,10 +150,10 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 				log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 			} else if ttl > 0 {
 				// Yay, I still have my lock!
-				r, _ := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
-				if r > 0 {
-					log.Info().Msgf("returner success requeue %v tasks messages to incoming", r)
-					returned <- r
+				rtr, _ := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
+				if rtr > 0 {
+					log.Info().Msgf("returner success requeue %d tasks messages to incoming", rtr)
+					returned <- rtr
 				}
 				lock.Refresh(worker.ctx, 5*time.Second, nil)
 			}
@@ -169,7 +167,7 @@ func (worker *Worker) startConsuming() *Worker {
 	conf := worker.config
 	numConsumers := conf.RMQ.NumConsumers
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
-	log.Info().Msgf("start consuming %s with %v consumers...", worker.name, numConsumers)
+	log.Info().Msgf("start consuming %s with %d consumers...", worker.name, numConsumers)
 
 	worker.broker = brk.NewBroker(worker.ctx, worker.name, worker.config, worker.redisClient)
 
@@ -193,7 +191,7 @@ func (worker *Worker) startConsuming() *Worker {
 		incConsumer.state.State = pb.ScannerServiceControl_START
 
 		// store consumer pointer to the worker struct
-		worker.consumers = append(worker.consumers, incConsumer)
+		worker.consumers = append(worker.consumers, *incConsumer)
 
 		// start prometheus collector
 		go worker.collectConsumerStats(incConsumer.success, incConsumer.failed, worker.returned)
@@ -213,8 +211,8 @@ func (worker *Worker) startConsuming() *Worker {
 func (worker *Worker) StopConsuming() *Worker {
 	log.Info().Msgf("%s stop consuming...", worker.name)
 	for _, consumer := range worker.consumers {
-		if consumer != nil || consumer.engine != nil {
-			log.Info().Msgf("%s cancelling consumer %v", worker.name, consumer.name)
+		if consumer.engine != nil {
+			log.Info().Msgf("%s cancelling consumer %s", worker.name, consumer.name)
 			consumer.state.State = worker.state.State
 			consumer.cancel()
 		}

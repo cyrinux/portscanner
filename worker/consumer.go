@@ -8,13 +8,11 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	pb "github.com/cyrinux/grpcnmapscanner/proto"
-	"sync"
 	"time"
 )
 
 // Consumer define a broker consumer
 type Consumer struct {
-	sync.Mutex
 	name     string
 	cancel   context.CancelFunc
 	ctx      context.Context
