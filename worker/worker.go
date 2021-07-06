@@ -50,7 +50,7 @@ type Worker struct {
 
 // NewWorker create a new worker and init the database connection
 func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
-	log.Info().Msgf("%s worker is starting %s", name)
+	log.Info().Msgf("%s worker is starting", name)
 
 	// Storage database connection init, dedicated context to keep access to the database
 	db, err := database.Factory(context.Background(), config)
@@ -104,10 +104,6 @@ func (worker *Worker) StreamControlService() {
 	client := pb.NewScannerServiceClient(worker.grpcServer)
 	getState := &pb.ScannerServiceControl{State: 0}
 	for {
-		// wait before try to reconnect
-		reconnectTime := 5 * time.Second
-		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, reconnectTime)
-		time.Sleep(reconnectTime)
 		stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
 			break
@@ -133,6 +129,11 @@ func (worker *Worker) StreamControlService() {
 			// cpu cooling
 			time.Sleep(500 * time.Millisecond)
 		}
+
+		// wait before try to reconnect
+		reconnectTime := 5000 * time.Millisecond
+		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, reconnectTime)
+		time.Sleep(reconnectTime)
 	}
 }
 
@@ -164,7 +165,7 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 	}
 }
 
-func (worker *Worker) startConsuming() {
+func (worker *Worker) startConsuming() *Worker {
 	conf := worker.config
 	numConsumers := conf.RMQ.NumConsumers
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
@@ -185,29 +186,31 @@ func (worker *Worker) startConsuming() {
 	numConsumers++ // we got one consumer for the returned, lets add 2 more
 
 	for i := 0; i < int(numConsumers); i++ {
-		tag, consumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "incoming")
-		if _, err := worker.broker.Incoming.AddConsumer(tag, consumer); err != nil {
+		tag, incConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "incoming")
+		if _, err := worker.broker.Incoming.AddConsumer(tag, incConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
-		consumer.state.State = pb.ScannerServiceControl_START
+		incConsumer.state.State = pb.ScannerServiceControl_START
 
 		// store consumer pointer to the worker struct
-		worker.consumers = append(worker.consumers, consumer)
-
-		tag, consumer = NewConsumer(worker.ctx, worker.db, i, worker.name, "rejected")
-		if _, err := worker.broker.Pushed.AddConsumer(tag, consumer); err != nil {
-			log.Error().Stack().Err(err).Msg("")
-		}
+		worker.consumers = append(worker.consumers, incConsumer)
 
 		// start prometheus collector
-		go worker.collectConsumerStats(consumer.success, consumer.failed, worker.returned)
+		go worker.collectConsumerStats(incConsumer.success, incConsumer.failed, worker.returned)
+
+		tag, rConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "rejected")
+		if _, err := worker.broker.Pushed.AddConsumer(tag, rConsumer); err != nil {
+			log.Error().Stack().Err(err).Msg("")
+		}
 	}
 
 	go worker.startReturner(worker.broker.Incoming, worker.returned)
+
+	return worker
 }
 
 // StopConsuming stop consumer messages on the broker
-func (worker *Worker) StopConsuming() {
+func (worker *Worker) StopConsuming() *Worker {
 	log.Info().Msgf("%s stop consuming...", worker.name)
 	for _, consumer := range worker.consumers {
 		if consumer != nil || consumer.engine != nil {
@@ -219,6 +222,8 @@ func (worker *Worker) StopConsuming() {
 	<-worker.broker.Incoming.StopConsuming()
 	<-worker.broker.Pushed.StopConsuming()
 	<-worker.broker.Connection.StopAllConsuming() // wait for all Consume() calls to finish
+
+	return worker
 }
 
 // collectConsumerStats manage the tasks prometheus counters

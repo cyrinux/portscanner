@@ -126,11 +126,10 @@ func Listen(ctx context.Context, allConfig config.Config) error {
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus
 func brokerStatsToProm(brk *broker.Broker, name string) {
-	for {
+	for range time.Tick(1000 * time.Millisecond) {
 		stats, err := broker.GetStats(brk)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't get RMQ statistics")
-			time.Sleep(2000 * time.Millisecond)
 			continue
 		}
 		queue := fmt.Sprintf("%s-incoming", name)
@@ -141,7 +140,6 @@ func brokerStatsToProm(brk *broker.Broker, name string) {
 		if s.ReadyCount > 0 || s.RejectedCount > 0 {
 			log.Debug().Msgf("broker %s incoming queue ready: %v, rejected: %v", name, s.ReadyCount, s.RejectedCount)
 		}
-		time.Sleep(1000 * time.Millisecond)
 	}
 }
 
