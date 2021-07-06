@@ -137,7 +137,7 @@ func (worker *Worker) StreamControlService() {
 }
 
 // Locker help to lock some tasks
-func (worker *Worker) startReturner(queue rmq.Queue) {
+func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 	log.Info().Msg("starting the returner routine")
 	conf := worker.config
 	for {
@@ -154,7 +154,7 @@ func (worker *Worker) startReturner(queue rmq.Queue) {
 				r, _ := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
 				if r > 0 {
 					log.Info().Msgf("returner success requeue %v tasks messages to incoming", r)
-					worker.returned <- r
+					returned <- r
 				}
 				lock.Refresh(worker.ctx, 5*time.Second, nil)
 			}
@@ -203,7 +203,7 @@ func (worker *Worker) startConsuming() {
 		go worker.collectConsumerStats(consumer.success, consumer.failed, worker.returned)
 	}
 
-	go worker.startReturner(worker.broker.Incoming)
+	go worker.startReturner(worker.broker.Incoming, worker.returned)
 }
 
 // StopConsuming stop consumer messages on the broker
