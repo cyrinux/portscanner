@@ -149,7 +149,9 @@ func NewServer(ctx context.Context, config config.Config, tasktype string) *Serv
 	go broker.RmqLogErrors(errChan)
 
 	// Broker init nmap queue
-	brk := broker.NewBroker(ctx, tasktype, config, util.RedisConnect(ctx, config))
+	brker := broker.NewBroker(ctx, tasktype, config, util.RedisConnect(ctx, config))
+	// clean the queues
+	go brker.Cleaner()
 
 	// Storage database init
 	db, err := database.Factory(ctx, config)
@@ -158,13 +160,13 @@ func NewServer(ctx context.Context, config config.Config, tasktype string) *Serv
 	}
 
 	// start the rmq stats to prometheus
-	go brokerStatsToProm(&brk, tasktype)
+	go brokerStatsToProm(&brker, tasktype)
 
 	return &Server{
 		ctx:      ctx,
 		tasktype: tasktype,
 		config:   config,
-		broker:   brk,
+		broker:   brker,
 		db:       db,
 		err:      err,
 	}

@@ -9,7 +9,7 @@ import (
 
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
-	"github.com/cyrinux/grpcnmapscanner/broker"
+	brk "github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/logger"
@@ -37,7 +37,7 @@ type Worker struct {
 	sync.Mutex
 	ctx         context.Context
 	name        string
-	broker      broker.Broker
+	broker      brk.Broker
 	config      config.Config
 	locker      *redislock.Client
 	redisClient *redis.Client
@@ -61,7 +61,7 @@ func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 	// redis
 	redisClient := util.RedisConnect(ctx, config)
 	// broker - with redis
-	broker := broker.NewBroker(ctx, name, config, redisClient)
+	broker := brk.NewBroker(ctx, name, config, redisClient)
 	// distributed lock - with redis
 	locker := redislock.New(redisClient)
 
@@ -171,7 +171,7 @@ func (worker *Worker) startConsuming() *Worker {
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 	log.Info().Msgf("start consuming %s with %v consumers...", worker.name, numConsumers)
 
-	worker.broker = broker.NewBroker(worker.ctx, worker.name, worker.config, worker.redisClient)
+	worker.broker = brk.NewBroker(worker.ctx, worker.name, worker.config, worker.redisClient)
 
 	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration)
 	if err != nil {

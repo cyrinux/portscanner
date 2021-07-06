@@ -7,10 +7,12 @@ import (
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
+	"time"
 )
 
 // Broker represent a RMQ broker
 type Broker struct {
+	ctx        context.Context
 	Incoming   rmq.Queue
 	Pushed     rmq.Queue
 	Connection rmq.Connection
@@ -44,7 +46,13 @@ func NewBroker(ctx context.Context, tasktype string, config config.Config, redis
 
 	queueIncoming.SetPushQueue(queuePushed)
 
-	return Broker{Incoming: queueIncoming, Pushed: queuePushed, Connection: connection, tasktype: tasktype}
+	return Broker{
+		ctx:        context.TODO(),
+		Incoming:   queueIncoming,
+		Pushed:     queuePushed,
+		Connection: connection,
+		tasktype:   tasktype,
+	}
 }
 
 // RmqLogErrors display the rmq errors log
@@ -79,4 +87,19 @@ func GetStats(broker *Broker) (rmq.Stats, error) {
 	}
 
 	return stats, err
+}
+
+// Cleaner clean the queues
+func (broker *Broker) Cleaner() {
+	cleaner := rmq.NewCleaner(broker.Connection)
+	for range time.Tick(1000 * time.Millisecond) {
+		returned, err := cleaner.Clean()
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("failed to clean")
+			continue
+		}
+		if returned > 0 {
+			log.Debug().Msgf("broker cleaned %d tasks", returned)
+		}
+	}
 }
