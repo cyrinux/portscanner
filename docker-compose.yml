@@ -8,6 +8,8 @@ networks:
 volumes:
   redis_data:
     driver: local
+  prometheus_data:
+    driver: local
 
 services:
   server:
@@ -54,5 +56,21 @@ services:
     restart: always
     volumes:
       - "redis_data:/bitnami/redis/data"
+    networks:
+      - backend
+
+  prometheus:
+    image: prom/prometheus:v2.26.0
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./config/prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "127.0.0.1:9090:9090"
     networks:
       - backend
