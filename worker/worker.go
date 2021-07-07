@@ -11,12 +11,12 @@ import (
 	brk "github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto"
 	redis "github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
-	"strconv"
 )
 
 var (
@@ -56,16 +56,11 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		log.Fatal().Stack().Err(err).Msg("")
 	}
 
-	// redis
-	rmqDB, _ := strconv.ParseInt(conf.RMQ.Database, 10, 0)
-	redisClient := redis.NewFailoverClient(&redis.FailoverOptions{
-		SentinelAddrs:    conf.RMQ.Redis.SentinelServers,
-		MasterName:       conf.RMQ.Redis.MasterName,
-		Password:         conf.RMQ.Redis.Password,
-		SentinelPassword: conf.RMQ.Redis.SentinelPassword,
-		DB:               int(rmqDB),
-		MaxRetries:       5,
-	})
+	//redis
+	redisClient, err := helpers.NewRedisClient(ctx, conf)
+	if err != nil {
+		log.Fatal().Stack().Err(err).Msg("")
+	}
 
 	// broker - with redis
 	broker := brk.NewBroker(ctx, name, conf.RMQ, redisClient)

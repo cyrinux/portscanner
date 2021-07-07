@@ -35,9 +35,8 @@ func handleSignalServer() {
 	os.Exit(1)
 }
 
-func startServer(ctx context.Context, config config.Config, wantPrometheus bool) {
-	_, err := server.GRPCListen(ctx, config, wantPrometheus)
-	if err != nil {
+func startServer(ctx context.Context, conf config.Config, wantPrometheus bool) {
+	if _, err := server.GRPCListen(ctx, conf, wantPrometheus); err != nil {
 		os.Exit(1)
 	}
 
@@ -51,9 +50,10 @@ func startServer(ctx context.Context, config config.Config, wantPrometheus bool)
 	go handleSignalServer()
 }
 
-func startWorker(ctx context.Context, config config.Config, tasktype string) {
-	w := worker.NewWorker(ctx, config, tasktype)
+func startWorker(ctx context.Context, conf config.Config, tasktype string) {
+	w := worker.NewWorker(ctx, conf, tasktype)
 	w.StartWorker()
+
 	go handleSignalWorker(w)
 }
 

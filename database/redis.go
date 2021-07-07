@@ -16,10 +16,11 @@ type redisDatabase struct {
 func createRedisDatabase(ctx context.Context, conf config.DBConfig) (Database, error) {
 	database, _ := strconv.ParseInt(conf.Redis.Database, 10, 0)
 	client := redis.NewClient(&redis.Options{
-		Addr:       conf.Redis.Server,
-		Password:   conf.Redis.Password,
-		DB:         int(database),
-		MaxRetries: 5,
+		Addr:         conf.Redis.Server,
+		Password:     conf.Redis.Password,
+		DB:           int(database),
+		MaxRetries:   10,
+		MinIdleConns: 10,
 	})
 	_, err := client.Ping(ctx).Result() // makes sure database is connected
 	if err != nil {

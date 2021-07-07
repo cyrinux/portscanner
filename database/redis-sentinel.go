@@ -21,7 +21,8 @@ func createRedisSentinelDatabase(ctx context.Context, conf config.DBConfig) (Dat
 		Password:         conf.Redis.Password,
 		SentinelPassword: conf.Redis.SentinelPassword,
 		DB:               int(database),
-		MaxRetries:       5,
+		MaxRetries:       10,
+		MinIdleConns:     10,
 	})
 	_, err := client.Ping(ctx).Result() // makes sure database is connected
 	if err != nil {

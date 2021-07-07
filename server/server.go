@@ -7,9 +7,9 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
+	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto"
-	redis "github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,7 +22,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -151,16 +150,11 @@ func NewServer(ctx context.Context, conf config.Config, tasktype string, wantPro
 	errChan := make(chan error)
 	go broker.RmqLogErrors(errChan)
 
-	// redis
-	rmqDB, _ := strconv.ParseInt(conf.RMQ.Database, 10, 0)
-	redisClient := redis.NewFailoverClient(&redis.FailoverOptions{
-		SentinelAddrs:    conf.RMQ.Redis.SentinelServers,
-		MasterName:       conf.RMQ.Redis.MasterName,
-		Password:         conf.RMQ.Redis.Password,
-		SentinelPassword: conf.RMQ.Redis.SentinelPassword,
-		DB:               int(rmqDB),
-		MaxRetries:       5,
-	})
+	//redis
+	redisClient, err := helpers.NewRedisClient(ctx, conf)
+	if err != nil {
+		log.Fatal().Stack().Err(err).Msg("")
+	}
 
 	// Broker init nmap queue
 	brker := broker.NewBroker(ctx, tasktype, conf.RMQ, redisClient)
