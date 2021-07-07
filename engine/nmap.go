@@ -8,9 +8,16 @@ import (
 	"time"
 
 	nmap "github.com/Ullaakut/nmap/v2"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/cyrinux/grpcnmapscanner/logger"
 	"github.com/cyrinux/grpcnmapscanner/proto"
 	"github.com/pkg/errors"
+)
+
+var (
+	confLogger = config.GetConfig().Logger
+	log        = logger.New(confLogger.Debug, confLogger.Pretty)
 )
 
 // Engine define a scanner engine

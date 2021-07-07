@@ -9,7 +9,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto"
-	"github.com/cyrinux/grpcnmapscanner/util"
+	redis "github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,13 +22,14 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
 
 var (
-	conf       = config.GetConfig()
-	log        = logger.New(conf.Logger.Debug, conf.Logger.Pretty)
+	confLogger = config.GetConfig().Logger
+	log        = logger.New(confLogger.Debug, confLogger.Pretty)
 	opsSuccess = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "scanner_processed_ops_success",
 		Help: "The total number of success tasks",
@@ -94,19 +95,13 @@ type Server struct {
 }
 
 // Listen start the grpc server
-func Listen(ctx context.Context, allConfig config.Config) error {
+func GRPCListen(ctx context.Context, conf config.Config, wantPrometheus bool) (*grpc.Server, error) {
 	log.Info().Msg("prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
 		log.Error().Err(err).Msg("can't start server, can't listen on tcp/9000")
-		return err
+		return nil, err
 	}
-
-	//prometheus endpoint
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(":2112", nil)
-	}()
 
 	//grpc endpoint
 	srv := grpc.NewServer(
@@ -115,13 +110,21 @@ func Listen(ctx context.Context, allConfig config.Config) error {
 	)
 
 	reflection.Register(srv)
-	pb.RegisterScannerServiceServer(srv, NewServer(ctx, allConfig, "nmap"))
+	pb.RegisterScannerServiceServer(srv, NewServer(ctx, conf, "nmap", wantPrometheus))
 	if err = srv.Serve(listener); err != nil {
 		log.Error().Msg("can't serve the gRPC service")
-		return err
+		return nil, err
 	}
 
-	return nil
+	return srv, nil
+}
+
+func PrometheusListen() {
+	//prometheus endpoint
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":2112", nil)
+	}()
 }
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus
@@ -144,28 +147,41 @@ func brokerStatsToProm(brk *broker.Broker, name string) {
 }
 
 // NewServer create a new server and init the database connection
-func NewServer(ctx context.Context, config config.Config, tasktype string) *Server {
+func NewServer(ctx context.Context, conf config.Config, tasktype string, wantPrometheus bool) *Server {
 	errChan := make(chan error)
 	go broker.RmqLogErrors(errChan)
 
+	// redis
+	rmqDB, _ := strconv.ParseInt(conf.RMQ.Database, 10, 0)
+	redisClient := redis.NewFailoverClient(&redis.FailoverOptions{
+		SentinelAddrs:    conf.RMQ.Redis.SentinelServers,
+		MasterName:       conf.RMQ.Redis.MasterName,
+		Password:         conf.RMQ.Redis.Password,
+		SentinelPassword: conf.RMQ.Redis.SentinelPassword,
+		DB:               int(rmqDB),
+		MaxRetries:       5,
+	})
+
 	// Broker init nmap queue
-	brker := broker.NewBroker(ctx, tasktype, config, util.RedisConnect(ctx, config))
+	brker := broker.NewBroker(ctx, tasktype, conf.RMQ, redisClient)
 	// clean the queues
 	go brker.Cleaner()
 
 	// Storage database init
-	db, err := database.Factory(ctx, config)
+	db, err := database.Factory(ctx, conf)
 	if err != nil {
 		log.Fatal().Stack().Err(err).Msg("can't open the database")
 	}
 
 	// start the rmq stats to prometheus
-	go brokerStatsToProm(&brker, tasktype)
+	if wantPrometheus {
+		go brokerStatsToProm(&brker, tasktype)
+	}
 
 	return &Server{
 		ctx:      ctx,
 		tasktype: tasktype,
-		config:   config,
+		config:   conf,
 		broker:   brker,
 		db:       db,
 		err:      err,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	rmq "github.com/adjust/rmq/v4"
+	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	pb "github.com/cyrinux/grpcnmapscanner/proto"
@@ -19,6 +20,7 @@ type Consumer struct {
 	db       database.Database
 	engine   *engine.Engine
 	state    pb.ScannerServiceControl
+	conf     config.Config
 	tasktype string
 	success  chan int64
 	failed   chan int64
@@ -41,6 +43,7 @@ func NewConsumer(
 		cancel:   cancel,
 		db:       db,
 		engine:   engine,
+		conf:     config.GetConfig(),
 		tasktype: tasktype,
 		success:  make(chan int64),
 		failed:   make(chan int64),
@@ -103,7 +106,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	}
-	time.Sleep(conf.RMQ.ConsumeDuration)
+	time.Sleep(consumer.conf.RMQ.ConsumeDuration)
 }
 
 // consumeNow really consume the message

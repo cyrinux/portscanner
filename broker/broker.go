@@ -7,6 +7,7 @@ import (
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
+	"strconv"
 	"time"
 )
 
@@ -21,12 +22,24 @@ type Broker struct {
 }
 
 // NewBroker open the broker queues
-func NewBroker(ctx context.Context, tasktype string, config config.Config, redisClient *redis.Client) Broker {
+func NewBroker(ctx context.Context, tasktype string, conf config.RMQConfig, redisClient *redis.Client) Broker {
 	errChan := make(chan error, 10)
 	go RmqLogErrors(errChan)
 
+	if redisClient == nil {
+		rmqDB, _ := strconv.ParseInt(conf.Database, 10, 0)
+		redisClient = redis.NewFailoverClient(&redis.FailoverOptions{
+			SentinelAddrs:    conf.Redis.SentinelServers,
+			MasterName:       conf.Redis.MasterName,
+			Password:         conf.Redis.Password,
+			SentinelPassword: conf.Redis.SentinelPassword,
+			DB:               int(rmqDB),
+			MaxRetries:       5,
+		})
+	}
+
 	connection, err := rmq.OpenConnectionWithRedisClient(
-		config.RMQ.Name, redisClient, errChan,
+		conf.Name, redisClient, errChan,
 	)
 	if err != nil {
 		log.Fatal().Stack().Err(err).Msg("can't open RMQ connection")

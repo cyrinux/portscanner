@@ -13,15 +13,15 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto"
-	"github.com/cyrinux/grpcnmapscanner/util"
 	redis "github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+	"strconv"
 )
 
 var (
-	conf        = config.GetConfig()
-	log         = logger.New(conf.Logger.Debug, conf.Logger.Pretty)
+	conf        = config.GetConfig().Logger
+	log         = logger.New(conf.Debug, conf.Pretty)
 	hostname, _ = os.Hostname()
 )
 
@@ -36,36 +36,45 @@ type Worker struct {
 	ctx         context.Context
 	name        string
 	broker      brk.Broker
-	config      config.Config
+	conf        config.Config
 	locker      *redislock.Client
 	redisClient *redis.Client
 	state       pb.ScannerServiceControl
-	consumers   []Consumer
+	consumers   []*Consumer
 	db          database.Database
 	grpcServer  *grpc.ClientConn
 	returned    chan int64
 }
 
 // NewWorker create a new worker and init the database connection
-func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
+func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	log.Info().Msgf("%s worker is starting", name)
 
 	// Storage database connection init, dedicated context to keep access to the database
-	db, err := database.Factory(context.Background(), config)
+	db, err := database.Factory(context.Background(), conf)
 	if err != nil {
 		log.Fatal().Stack().Err(err).Msg("")
 	}
 
 	// redis
-	redisClient := util.RedisConnect(ctx, config)
+	rmqDB, _ := strconv.ParseInt(conf.RMQ.Database, 10, 0)
+	redisClient := redis.NewFailoverClient(&redis.FailoverOptions{
+		SentinelAddrs:    conf.RMQ.Redis.SentinelServers,
+		MasterName:       conf.RMQ.Redis.MasterName,
+		Password:         conf.RMQ.Redis.Password,
+		SentinelPassword: conf.RMQ.Redis.SentinelPassword,
+		DB:               int(rmqDB),
+		MaxRetries:       5,
+	})
+
 	// broker - with redis
-	broker := brk.NewBroker(ctx, name, config, redisClient)
+	broker := brk.NewBroker(ctx, name, conf.RMQ, redisClient)
+
 	// distributed lock - with redis
 	locker := redislock.New(redisClient)
 
-	consumers := make([]Consumer, 0)
 	grpcServer, err := grpc.Dial(
-		config.Global.ControllerServer,
+		conf.Global.ControllerServer,
 		grpc.WithInsecure(),
 		grpc.WithKeepaliveParams(kacp),
 	)
@@ -74,12 +83,12 @@ func NewWorker(ctx context.Context, config config.Config, name string) *Worker {
 	}
 
 	return &Worker{
-		config:      config,
+		conf:        conf,
 		name:        name,
 		ctx:         ctx,
 		broker:      broker,
 		locker:      locker,
-		consumers:   consumers,
+		consumers:   make([]*Consumer, 0),
 		db:          db,
 		redisClient: redisClient,
 		grpcServer:  grpcServer,
@@ -108,7 +117,7 @@ func (worker *Worker) StreamControlService() {
 		}
 		log.Debug().Msgf("%s connected to server control", worker.name)
 
-		for {
+		for range time.Tick(500 * time.Millisecond) {
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
 				break
@@ -123,13 +132,10 @@ func (worker *Worker) StreamControlService() {
 				worker.state.State = pb.ScannerServiceControl_STOP
 				worker.StopConsuming()
 			}
-
-			// cpu cooling
-			time.Sleep(500 * time.Millisecond)
 		}
 
 		// wait before try to reconnect
-		reconnectTime := 5000 * time.Millisecond
+		reconnectTime := 1000 * time.Millisecond
 		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, reconnectTime)
 		time.Sleep(reconnectTime)
 	}
@@ -138,7 +144,7 @@ func (worker *Worker) StreamControlService() {
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 	log.Info().Msg("starting the returner routine")
-	conf := worker.config
+	conf := worker.conf
 	for {
 		// Try to obtain lock.
 		lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
@@ -164,12 +170,12 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 }
 
 func (worker *Worker) startConsuming() *Worker {
-	conf := worker.config
+	conf := worker.conf
 	numConsumers := conf.RMQ.NumConsumers
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 	log.Info().Msgf("start consuming %s with %d consumers...", worker.name, numConsumers)
 
-	worker.broker = brk.NewBroker(worker.ctx, worker.name, worker.config, worker.redisClient)
+	worker.broker = brk.NewBroker(worker.ctx, worker.name, conf.RMQ, worker.redisClient)
 
 	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration)
 	if err != nil {
@@ -191,7 +197,7 @@ func (worker *Worker) startConsuming() *Worker {
 		incConsumer.state.State = pb.ScannerServiceControl_START
 
 		// store consumer pointer to the worker struct
-		worker.consumers = append(worker.consumers, *incConsumer)
+		worker.consumers = append(worker.consumers, incConsumer)
 
 		// start prometheus collector
 		go worker.collectConsumerStats(incConsumer.success, incConsumer.failed, worker.returned)

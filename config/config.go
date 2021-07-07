@@ -7,34 +7,54 @@ import (
 	"time"
 )
 
-// Config struct
+// Redis
+type Redis struct {
+	Name             string   `default:"scanner"`
+	Database         string   `default:"0"`
+	MasterName       string   `default:"mymasterrrr" split_words:"true"`
+	Password         string   `default:""`
+	MasterPassword   string   `default:"" split_words:"true" `
+	SentinelPassword string   `default:"" split_words:"true"`
+	SentinelServers  []string `default:"redis-sentinel:26379,redis-sentinel:26380,redis-sentinel:26381" split_words:"true"`
+	Server           string   `default:"redis:6379"`
+}
+
+// DBConfig struct
+type DBConfig struct {
+	Driver string `default:"redis-sentinel"`
+	Redis  Redis
+}
+
+type RMQConfig struct {
+	Name               string        `default:"broker"`
+	Database           string        `default:"0"`
+	NumConsumers       int64         `default:"5" split_words:"true"`
+	ReturnerLimit      int64         `default:"200" split_words:"true"`
+	PollDuration       time.Duration `default:"100ms" split_words:"true"`
+	PollDurationPushed time.Duration `default:"5000ms" split_words:"true"`
+	ConsumeDuration    time.Duration `default:"1000ms" split_words:"true"`
+	Redis              Redis
+}
+
+type LoggerConfig struct {
+	Debug  bool `default:"false"`
+	Pretty bool `default:"true"`
+}
+
+type PrometheusConfig struct {
+	Server string `default:"prometheus:8140"`
+}
+
+type GlobalConfig struct {
+	ControllerServer string `default:"server:9000" split_words:"true"`
+}
+
 type Config struct {
-	DB struct {
-		Driver   string `default:"redis"`
-		Server   string `default:"redis:6379"`
-		Name     string `default:"scanner"`
-		Password string `default:""`
-	}
-	RMQ struct {
-		Server             string        `default:"redis:6379"`
-		Password           string        `default:""`
-		Name               string        `default:"grpcnmapscanner"`
-		NumConsumers       int64         `default:"5" split_words:"true"`
-		ReturnerLimit      int64         `default:"200" split_words:"true"`
-		PollDuration       time.Duration `default:"100ms" split_words:"true"`
-		PollDurationPushed time.Duration `default:"5000ms" split_words:"true"`
-		ConsumeDuration    time.Duration `default:"1000ms" split_words:"true"`
-	}
-	Logger struct {
-		Debug  bool `default:"false"`
-		Pretty bool `default:"true"`
-	}
-	Prometheus struct {
-		Server string `default:"prometheus:8140"`
-	}
-	Global struct {
-		ControllerServer string `default:"server:9000" split_words:"true"`
-	}
+	DB         DBConfig
+	RMQ        RMQConfig
+	Logger     LoggerConfig
+	Prometheus PrometheusConfig
+	Global     GlobalConfig
 }
 
 // GetConfig get the configuration

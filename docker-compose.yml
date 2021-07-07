@@ -20,12 +20,12 @@ services:
     image: grpcscanner
     env_file:
       - .env
-    command: "-server"
+    command: "-server -prometheus -pprof"
     cap_add:
       - NET_ADMIN
     restart: always
     depends_on:
-      - redis
+      - redis-primary
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:6060:6060"
@@ -45,19 +45,65 @@ services:
     cap_add:
       - NET_ADMIN
     depends_on:
-      - redis
+      - redis-primary
+    networks:
+      - backend
+    deploy:
+      mode: replicated
+      replicas: 5
+
+  redis-primary:
+    image: docker.io/bitnami/redis:6.2
+    ports:
+      - "6379"
+    env_file:
+      - .env
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    volumes:
+      - "redis_data:/bitnami/redis/data"
+    restart: always
     networks:
       - backend
 
-  redis:
-    image: "bitnami/redis:latest"
+  redis-secondary:
+    image: docker.io/bitnami/redis:6.2
+    ports:
+      - "6379"
+    depends_on:
+      - redis-primary
     env_file:
       - .env
+    environment:
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_HOST=redis-primary
+      - REDIS_MASTER_PORT_NUMBER=6379
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
     restart: always
-    volumes:
-      - "redis_data:/bitnami/redis/data"
     networks:
       - backend
+    deploy:
+      mode: replicated
+      replicas: 4
+
+  redis-sentinel:
+    image: "bitnami/redis-sentinel:latest"
+    env_file:
+      - .env
+    environment:
+      - REDIS_MASTER_HOST=redis-primary
+    ports:
+      - "26379-26381:26379"
+    depends_on:
+      - redis-primary
+      - redis-secondary
+    restart: always
+    networks:
+      - backend
+    deploy:
+      mode: replicated
+      replicas: 1
 
   prometheus:
     image: prom/prometheus:v2.26.0

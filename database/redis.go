@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
+	"strconv"
 	"time"
 )
 
@@ -12,11 +13,12 @@ type redisDatabase struct {
 }
 
 // createRedisDatabase creates the redis database
-func createRedisDatabase(ctx context.Context, config config.Config) (Database, error) {
+func createRedisDatabase(ctx context.Context, conf config.DBConfig) (Database, error) {
+	database, _ := strconv.ParseInt(conf.Redis.Database, 10, 0)
 	client := redis.NewClient(&redis.Options{
-		Addr:       config.DB.Server,
-		Password:   config.DB.Password,
-		DB:         0,
+		Addr:       conf.Redis.Server,
+		Password:   conf.Redis.Password,
+		DB:         int(database),
 		MaxRetries: 5,
 	})
 	_, err := client.Ping(ctx).Result() // makes sure database is connected
@@ -48,11 +50,4 @@ func (r redisDatabase) Delete(ctx context.Context, key string) (string, error) {
 		return generateError("delete", err)
 	}
 	return key, nil
-}
-
-func generateError(operation string, err error) (string, error) {
-	if err == redis.Nil {
-		return "", &OperationError{operation}
-	}
-	return "", &DownError{}
 }
