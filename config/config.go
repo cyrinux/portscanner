@@ -11,7 +11,7 @@ import (
 type Redis struct {
 	Name             string   `default:"scanner"`
 	Database         int      `default:"0"`
-	MasterName       string   `default:"mymasterrrr" split_words:"true"`
+	MasterName       string   `default:"mymaster" split_words:"true"`
 	Password         string   `default:""`
 	MasterPassword   string   `default:"" split_words:"true" `
 	SentinelPassword string   `default:"" split_words:"true"`

@@ -6,7 +6,6 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/server"
 	"github.com/cyrinux/grpcnmapscanner/worker"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -39,12 +38,9 @@ func startServer(ctx context.Context, conf config.Config, wantPrometheus bool) {
 	if _, err := server.GRPCListen(ctx, conf, wantPrometheus); err != nil {
 		os.Exit(1)
 	}
-
 	if wantPrometheus {
-		go func() {
-			http.Handle("/metrics", promhttp.Handler())
-			http.ListenAndServe(":2112", nil)
-		}()
+		log.Print("starting prometheus")
+		server.PrometheusListen()
 	}
 
 	go handleSignalServer()
