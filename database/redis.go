@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
-	"strconv"
 	"time"
 )
 
@@ -14,11 +13,10 @@ type redisDatabase struct {
 
 // createRedisDatabase creates the redis database
 func createRedisDatabase(ctx context.Context, conf config.DBConfig) (Database, error) {
-	database, _ := strconv.ParseInt(conf.Redis.Database, 10, 0)
 	client := redis.NewClient(&redis.Options{
 		Addr:         conf.Redis.Server,
 		Password:     conf.Redis.Password,
-		DB:           int(database),
+		DB:           conf.Redis.Database,
 		MaxRetries:   10,
 		MinIdleConns: 10,
 	})

@@ -50,7 +50,7 @@ services:
       - backend
     deploy:
       mode: replicated
-      replicas: 5
+      replicas: 3
 
   redis-primary:
     image: docker.io/bitnami/redis:6.2
@@ -88,7 +88,7 @@ services:
       replicas: 5
 
   redis-sentinel:
-    image: "bitnami/redis-sentinel:latest"
+    image: "bitnami/redis-sentinel:6.2"
     env_file:
       - .env
     environment:
