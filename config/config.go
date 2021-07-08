@@ -10,7 +10,7 @@ import (
 // Redis
 type Redis struct {
 	Name             string   `default:"scanner"`
-	Database         string   `default:"0"`
+	Database         int      `default:"0"`
 	MasterName       string   `default:"mymasterrrr" split_words:"true"`
 	Password         string   `default:""`
 	MasterPassword   string   `default:"" split_words:"true" `
@@ -19,12 +19,13 @@ type Redis struct {
 	Server           string   `default:"redis:6379"`
 }
 
-// DBConfig struct
+// DBConfig is the global database struct
 type DBConfig struct {
 	Driver string `default:"redis-sentinel"`
 	Redis  Redis
 }
 
+// RMQConfig  contains the redis broker config
 type RMQConfig struct {
 	Name               string        `default:"broker"`
 	Database           string        `default:"0"`
@@ -36,19 +37,23 @@ type RMQConfig struct {
 	Redis              Redis
 }
 
+// LoggerConfig contains the logger config
 type LoggerConfig struct {
 	Debug  bool `default:"false"`
 	Pretty bool `default:"true"`
 }
 
+// PrometheusConfig contains the prometheus config
 type PrometheusConfig struct {
 	Server string `default:"prometheus:8140"`
 }
 
+// GlobalConfig contains some others params
 type GlobalConfig struct {
 	ControllerServer string `default:"server:9000" split_words:"true"`
 }
 
+// Config is the main global config struct
 type Config struct {
 	DB         DBConfig
 	RMQ        RMQConfig
@@ -60,7 +65,7 @@ type Config struct {
 // GetConfig get the configuration
 func GetConfig() Config {
 
-	log.Info().Msg("reading config")
+	log.Debug().Msg("reading config")
 	// Init config
 	var conf Config
 
