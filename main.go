@@ -36,9 +36,8 @@ func handleSignalServer() {
 }
 
 func startServer(ctx context.Context, conf config.Config) {
-	if _, err := server.GRPCListen(ctx, conf); err != nil {
-		os.Exit(1)
-	}
+
+	server.Listen(ctx, conf)
 
 	go handleSignalServer()
 }

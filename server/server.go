@@ -91,31 +91,48 @@ type Server struct {
 	tasksStatus TasksStatus
 }
 
-// Listen start the grpc server
-func GRPCListen(ctx context.Context, conf config.Config) (*grpc.Server, error) {
+// ScannerListen start the frontend grpc server
+func Listen(ctx context.Context, conf config.Config) {
 	log.Info().Msg("prepare to serve the gRPC api")
-	listener, err := net.Listen("tcp", ":9000")
-	if err != nil {
-		log.Error().Err(err).Msg("can't start server, can't listen on tcp/9000")
-		return nil, err
-	}
 
-	//grpc endpoint
-	srv := grpc.NewServer(
+	// Start the server
+	server := NewServer(ctx, conf, "nmap")
+
+	// Serve the frontend
+	go func(s *Server) {
+		frontListener, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.FrontendListenPort))
+		if err != nil {
+			log.Fatal().Err(err).Msgf(
+				"can't start frontend server, can't listen on tcp/%d", conf.FrontendListenPort,
+			)
+		}
+		srvFrontend := grpc.NewServer(
+			grpc.KeepaliveEnforcementPolicy(kaep),
+			grpc.KeepaliveParams(kasp),
+		)
+		reflection.Register(srvFrontend)
+		pb.RegisterScannerServiceServer(srvFrontend, server)
+		if err = srvFrontend.Serve(frontListener); err != nil {
+			log.Fatal().Msg("can't serve the gRPC frontend service")
+		}
+	}(server)
+
+	// Serve the backend
+	backendListener, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.BackendListenPort))
+	if err != nil {
+		log.Fatal().Err(err).Msgf(
+			"can't start backend server, can't listen on tcp/%d", conf.BackendListenPort,
+		)
+	}
+	srvBackend := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 	)
-
-	reflection.Register(srv)
-	server := NewServer(ctx, conf, "nmap")
-	pb.RegisterScannerServiceServer(srv, server)
-	pb.RegisterBackendServiceServer(srv, server)
-	if err = srv.Serve(listener); err != nil {
-		log.Error().Msg("can't serve the gRPC service")
-		return nil, err
+	reflection.Register(srvBackend)
+	pb.RegisterBackendServiceServer(srvBackend, server)
+	if err = srvBackend.Serve(backendListener); err != nil {
+		log.Fatal().Msg("can't serve the gRPC backend service")
 	}
-
-	return srv, nil
 }
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus

@@ -69,12 +69,12 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	locker := redislock.New(redisClient)
 
 	grpcServer, err := grpc.Dial(
-		conf.Global.ControllerServer,
+		conf.BackendServer,
 		grpc.WithInsecure(),
 		grpc.WithKeepaliveParams(kacp),
 	)
 	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s could not connect to server", name)
+		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
 	}
 
 	return &Worker{

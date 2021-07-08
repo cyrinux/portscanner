@@ -49,8 +49,10 @@ type PrometheusConfig struct {
 }
 
 // GlobalConfig contains some others params
-type GlobalConfig struct {
-	ControllerServer string `default:"server:9000" split_words:"true"`
+type Global struct {
+	BackendServer      string `default:"server:9001" split_words:"true"`
+	FrontendListenPort int    `default:"9000" split_words:"true"`
+	BackendListenPort  int    `default:"9001" split_words:"true"`
 }
 
 // Config is the main global config struct
@@ -59,7 +61,7 @@ type Config struct {
 	RMQ        RMQConfig
 	Logger     LoggerConfig
 	Prometheus PrometheusConfig
-	Global     GlobalConfig
+	Global
 }
 
 // GetConfig get the configuration
@@ -72,5 +74,6 @@ func GetConfig() Config {
 	if err := envconfig.Process("", &conf); err != nil {
 		log.Fatal().Stack().Err(errors.Wrap(err, "unable to process config"))
 	}
+
 	return conf
 }

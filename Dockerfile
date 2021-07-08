@@ -11,5 +11,5 @@ LABEL Name=grpcnmapscanner Version=0.0.3
 RUN apk --no-cache add ca-certificates nmap nmap-scripts && rm -f /var/cache/apk/*
 WORKDIR /app
 COPY --from=builder /app/grpcnmapscanner /usr/local/bin/grpcnmapscanner
-EXPOSE 9000 6060
+EXPOSE 9000 9001 6060 2112
 ENTRYPOINT ["grpcnmapscanner"]

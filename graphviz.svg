@@ -83,9 +83,9 @@
 </g>
 </g>
 <!-- Node_Ja_117&#45;&gt;Node_Ja_118 -->
-<g id="edge4" class="edge">
+<g id="edge17" class="edge">
 <title>Node_Ja_117:e&#45;&gt;Node_Ja_118:header</title>
-<g id="a_edge4"><a xlink:title="Ja_117 &#45;&#45;&gt; Ja_118">
+<g id="a_edge17"><a xlink:title="Ja_117 &#45;&#45;&gt; Ja_118">
 <path fill="none" stroke="#000000" d="M509.5,-606C555.85,-606 561.85,-644.73 602.37,-650.33"/>
 <polygon fill="#000000" stroke="#000000" points="602.29,-653.83 612.5,-651 602.75,-646.85 602.29,-653.83"/>
 </a>
@@ -116,27 +116,27 @@
 </g>
 </g>
 <!-- Node_Ja_119&#45;&gt;Node_Ja_117 -->
-<g id="edge10" class="edge">
+<g id="edge4" class="edge">
 <title>Node_Ja_119:e&#45;&gt;Node_Ja_117:header</title>
-<g id="a_edge10"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_117">
+<g id="a_edge4"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_117">
 <path fill="none" stroke="#000000" d="M277.5,-605C300.95,-605 307.64,-616.92 326.5,-620.18"/>
 <polygon fill="#000000" stroke="#000000" points="326.25,-623.68 336.5,-621 326.82,-616.7 326.25,-623.68"/>
 </a>
 </g>
 </g>
 <!-- Node_Ja_119&#45;&gt;Node_Ja_117 -->
-<g id="edge19" class="edge">
+<g id="edge22" class="edge">
 <title>Node_Ja_119:e&#45;&gt;Node_Ja_117:header</title>
-<g id="a_edge19"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_117">
+<g id="a_edge22"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_117">
 <path fill="none" stroke="#000000" d="M277.5,-590C303.3,-590 306.44,-613.52 326.41,-619.59"/>
 <polygon fill="#000000" stroke="#000000" points="326.11,-623.08 336.5,-621 327.08,-616.15 326.11,-623.08"/>
 </a>
 </g>
 </g>
 <!-- Node_Ja_109 -->
-<g id="node4" class="node">
+<g id="node7" class="node">
 <title>Node_Ja_109</title>
-<g id="a_node4"><a xlink:title="proto.ServiceStateValues">
+<g id="a_node7"><a xlink:title="proto.ServiceStateValues">
 <polygon fill="#fffaf0" stroke="transparent" points="364,-488 364,-520 481,-520 481,-488 364,-488"/>
 <polygon fill="#e31a1c" stroke="transparent" points="365.5,-504 365.5,-519 480.5,-519 480.5,-504 365.5,-504"/>
 <text text-anchor="start" x="367.5" y="-510" font-family="Ubuntu" font-weight="bold" font-size="10.00">ServiceStateValues</text>
@@ -149,114 +149,27 @@
 </g>
 </g>
 <!-- Node_Ja_119&#45;&gt;Node_Ja_109 -->
-<g id="edge9" class="edge">
+<g id="edge5" class="edge">
 <title>Node_Ja_119:e&#45;&gt;Node_Ja_109:header</title>
-<g id="a_edge9"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_109">
+<g id="a_edge5"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_109">
 <path fill="none" stroke="#000000" d="M277.5,-636C318.76,-636 296.19,-586.96 321,-554 334.76,-535.72 337.14,-518.12 354.14,-513.29"/>
 <polygon fill="#000000" stroke="#000000" points="355.01,-516.71 364.5,-512 354.14,-509.77 355.01,-516.71"/>
 </a>
 </g>
 </g>
 <!-- Node_Ja_119&#45;&gt;Node_Ja_109 -->
-<g id="edge14" class="edge">
+<g id="edge18" class="edge">
 <title>Node_Ja_119:e&#45;&gt;Node_Ja_109:header</title>
-<g id="a_edge14"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_109">
+<g id="a_edge18"><a xlink:title="Ja_119 &#45;&#45;&gt; Ja_109">
 <path fill="none" stroke="#000000" d="M277.5,-620C312.63,-620 298.56,-581.03 321,-554 335.62,-536.39 337.4,-518.32 354.2,-513.34"/>
 <polygon fill="#000000" stroke="#000000" points="355.03,-516.76 364.5,-512 354.13,-509.82 355.03,-516.76"/>
 </a>
 </g>
 </g>
-<!-- Node_Ja_110 -->
-<g id="node15" class="node">
-<title>Node_Ja_110</title>
-<g id="a_node15"><a xlink:title="ServiceState">
-<polygon fill="#b2df8a" stroke="transparent" points="801,-723 801,-785 911,-785 911,-723 801,-723"/>
-<polygon fill="#33a02c" stroke="transparent" points="802,-769 802,-784 910,-784 910,-769 802,-769"/>
-<text text-anchor="start" x="804" y="-775" font-family="Ubuntu" font-size="10.00">enum </text>
-<text text-anchor="start" x="835" y="-775" font-family="Ubuntu" font-weight="bold" font-size="10.00">ServiceState</text>
-<polygon fill="#b2df8a" stroke="transparent" points="802,-754 802,-769 880,-769 880,-754 802,-754"/>
-<text text-anchor="start" x="804" y="-759" font-family="Ubuntu" font-size="10.00">UNKNOWN</text>
-<polygon fill="#b2df8a" stroke="transparent" points="880,-754 880,-769 910,-769 910,-754 880,-754"/>
-<text text-anchor="start" x="882" y="-759" font-family="Ubuntu" font-size="10.00">0</text>
-<polygon fill="#b2df8a" stroke="transparent" points="802,-739 802,-754 880,-754 880,-739 802,-739"/>
-<text text-anchor="start" x="804" y="-744" font-family="Ubuntu" font-size="10.00">START</text>
-<polygon fill="#b2df8a" stroke="transparent" points="880,-739 880,-754 910,-754 910,-739 880,-739"/>
-<text text-anchor="start" x="882" y="-744" font-family="Ubuntu" font-size="10.00">1</text>
-<polygon fill="#b2df8a" stroke="transparent" points="802,-724 802,-739 880,-739 880,-724 802,-724"/>
-<text text-anchor="start" x="804" y="-729" font-family="Ubuntu" font-size="10.00">STOP</text>
-<polygon fill="#b2df8a" stroke="transparent" points="880,-724 880,-739 910,-739 910,-724 880,-724"/>
-<text text-anchor="start" x="882" y="-729" font-family="Ubuntu" font-size="10.00">2</text>
-<polygon fill="none" stroke="black" points="801,-723 801,-785 911,-785 911,-723 801,-723"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_109&#45;&gt;Node_Ja_110 -->
-<g id="edge12" class="edge">
-<title>Node_Ja_109:e&#45;&gt;Node_Ja_110</title>
-<g id="a_edge12"><a xlink:title="Ja_109 &#45;&#45;&gt; Ja_110">
-<path fill="none" stroke="#008000" d="M481.5,-496C606.63,-496 669.85,-464.21 757,-554 806.06,-604.55 745.6,-651.61 785,-710 785.44,-710.65 785.89,-711.29 786.35,-711.92"/>
-<polygon fill="#008000" stroke="#008000" points="783.83,-714.36 792.98,-719.71 789.16,-709.82 783.83,-714.36"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111 -->
-<g id="node5" class="node">
-<title>Node_Ja_111</title>
-<g id="a_node5"><a xlink:title="ScannerService">
-<polygon fill="#ffd700" stroke="transparent" points="33.5,-117.5 33.5,-284.5 251.5,-284.5 251.5,-117.5 33.5,-117.5"/>
-<polygon fill="#ff7f50" stroke="transparent" points="34.5,-268 34.5,-283 250.5,-283 250.5,-268 34.5,-268"/>
-<text text-anchor="start" x="159.5" y="-274" font-family="Ubuntu" font-weight="bold" font-size="10.00">ScannerService</text>
-<text text-anchor="start" x="36.5" y="-259" font-family="Ubuntu" font-weight="bold" font-size="10.00">StartAsyncScan</text>
-<text text-anchor="start" x="133.5" y="-258" font-family="Ubuntu" font-size="10.00">ParamsScannerRequest</text>
-<polygon fill="#ff7f50" stroke="transparent" points="127.5,-238 127.5,-253 131.5,-253 131.5,-238 127.5,-238"/>
-<polygon fill="#ff7f50" stroke="transparent" points="131.5,-238 131.5,-253 250.5,-253 250.5,-238 131.5,-238"/>
-<text text-anchor="start" x="169.5" y="-243" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
-<text text-anchor="start" x="36.5" y="-229" font-family="Ubuntu" font-weight="bold" font-size="10.00">StartScan</text>
-<text text-anchor="start" x="133.5" y="-228" font-family="Ubuntu" font-size="10.00">ParamsScannerRequest</text>
-<polygon fill="#ff7f50" stroke="transparent" points="127.5,-208 127.5,-223 131.5,-223 131.5,-208 127.5,-208"/>
-<polygon fill="#ff7f50" stroke="transparent" points="131.5,-208 131.5,-223 250.5,-223 250.5,-208 131.5,-208"/>
-<text text-anchor="start" x="169.5" y="-213" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
-<text text-anchor="start" x="36.5" y="-199" font-family="Ubuntu" font-weight="bold" font-size="10.00">GetScan</text>
-<text text-anchor="start" x="151.5" y="-198" font-family="Ubuntu" font-size="10.00">GetScannerRequest</text>
-<polygon fill="#ff7f50" stroke="transparent" points="127.5,-178 127.5,-193 131.5,-193 131.5,-178 127.5,-178"/>
-<polygon fill="#ff7f50" stroke="transparent" points="131.5,-178 131.5,-193 250.5,-193 250.5,-178 131.5,-178"/>
-<text text-anchor="start" x="169.5" y="-183" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
-<text text-anchor="start" x="36.5" y="-169" font-family="Ubuntu" font-weight="bold" font-size="10.00">DeleteScan</text>
-<text text-anchor="start" x="151.5" y="-168" font-family="Ubuntu" font-size="10.00">GetScannerRequest</text>
-<polygon fill="#ff7f50" stroke="transparent" points="127.5,-148 127.5,-163 131.5,-163 131.5,-148 127.5,-148"/>
-<polygon fill="#ff7f50" stroke="transparent" points="131.5,-148 131.5,-163 250.5,-163 250.5,-148 131.5,-148"/>
-<text text-anchor="start" x="169.5" y="-153" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
-<text text-anchor="start" x="36.5" y="-139" font-family="Ubuntu" font-weight="bold" font-size="10.00">ServiceControl</text>
-<text text-anchor="start" x="154.5" y="-138" font-family="Ubuntu" font-size="10.00">ServiceStateValues</text>
-<polygon fill="#ff7f50" stroke="transparent" points="127.5,-118 127.5,-133 131.5,-133 131.5,-118 127.5,-118"/>
-<polygon fill="#ff7f50" stroke="transparent" points="131.5,-118 131.5,-133 250.5,-133 250.5,-118 131.5,-118"/>
-<text text-anchor="start" x="154.5" y="-123" font-family="Ubuntu" font-size="10.00">ServiceStateValues</text>
-<polygon fill="none" stroke="black" points="33.5,-117.5 33.5,-284.5 251.5,-284.5 251.5,-117.5 33.5,-117.5"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_109 -->
-<g id="edge17" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_109:header</title>
-<g id="a_edge17"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_109">
-<path fill="none" stroke="#000000" d="M251.5,-140C420.75,-140 201.08,-496.9 354.37,-511.54"/>
-<polygon fill="#000000" stroke="#000000" points="354.35,-515.04 364.5,-512 354.67,-508.05 354.35,-515.04"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_109 -->
-<g id="edge18" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_109:header</title>
-<g id="a_edge18"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_109">
-<path fill="none" stroke="#000000" d="M251.5,-125C330.8,-125 280.84,-406.62 321,-475 331.94,-493.64 337.39,-507.36 354.44,-511.03"/>
-<polygon fill="#000000" stroke="#000000" points="354.21,-514.52 364.5,-512 354.88,-507.55 354.21,-514.52"/>
-</a>
-</g>
-</g>
 <!-- Node_Ja_106 -->
-<g id="node8" class="node">
+<g id="node4" class="node">
 <title>Node_Ja_106</title>
-<g id="a_node8"><a xlink:title="proto.ParamsScannerRequest">
+<g id="a_node4"><a xlink:title="proto.ParamsScannerRequest">
 <polygon fill="#fffaf0" stroke="transparent" points="329,-204.5 329,-461.5 516,-461.5 516,-204.5 329,-204.5"/>
 <polygon fill="#e31a1c" stroke="transparent" points="330.5,-445 330.5,-460 515.5,-460 515.5,-445 330.5,-445"/>
 <text text-anchor="start" x="379.5" y="-451" font-family="Ubuntu" font-weight="bold" font-size="10.00">ParamsScannerRequest</text>
@@ -328,207 +241,10 @@
 </a>
 </g>
 </g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_106 -->
-<g id="edge2" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_106:header</title>
-<g id="a_edge2"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_106">
-<path fill="none" stroke="#000000" d="M251.5,-231C352.4,-231 233.85,-437.67 319.32,-452.2"/>
-<polygon fill="#000000" stroke="#000000" points="319.26,-455.7 329.5,-453 319.81,-448.72 319.26,-455.7"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_106 -->
-<g id="edge13" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_106:header</title>
-<g id="a_edge13"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_106">
-<path fill="none" stroke="#000000" d="M251.5,-261C339.83,-261 245.77,-437.57 319.14,-452.06"/>
-<polygon fill="#000000" stroke="#000000" points="319.22,-455.58 329.5,-453 319.86,-448.61 319.22,-455.58"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_107 -->
-<g id="node9" class="node">
-<title>Node_Ja_107</title>
-<g id="a_node9"><a xlink:title="proto.GetScannerRequest">
-<polygon fill="#fffaf0" stroke="transparent" points="363.5,-43 363.5,-75 481.5,-75 481.5,-43 363.5,-43"/>
-<polygon fill="#e31a1c" stroke="transparent" points="364.5,-59 364.5,-74 480.5,-74 480.5,-59 364.5,-59"/>
-<text text-anchor="start" x="366.5" y="-65" font-family="Ubuntu" font-weight="bold" font-size="10.00">GetScannerRequest</text>
-<text text-anchor="start" x="405.5" y="-49" font-family="Ubuntu" font-size="10.00">1</text>
-<text text-anchor="start" x="416.5" y="-49" font-family="Ubuntu" font-size="10.00">key</text>
-<polygon fill="#a6cee3" stroke="transparent" points="442.5,-44 442.5,-59 480.5,-59 480.5,-44 442.5,-44"/>
-<text text-anchor="start" x="450.5" y="-50" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<polygon fill="none" stroke="black" points="363.5,-43 363.5,-75 481.5,-75 481.5,-43 363.5,-43"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_107 -->
-<g id="edge8" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_107:header</title>
-<g id="a_edge8"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_107">
-<path fill="none" stroke="#000000" d="M251.5,-200C310.08,-200 277.63,-127.38 321,-88 333.8,-76.38 340.02,-69.69 353.47,-67.67"/>
-<polygon fill="#000000" stroke="#000000" points="353.75,-71.15 363.5,-67 353.29,-64.17 353.75,-71.15"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_107 -->
-<g id="edge21" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_107:header</title>
-<g id="a_edge21"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_107">
-<path fill="none" stroke="#000000" d="M251.5,-170C299.27,-170 283.36,-117.42 321,-88 334.49,-77.46 340.21,-70.18 353.18,-67.83"/>
-<polygon fill="#000000" stroke="#000000" points="353.81,-71.29 363.5,-67 353.25,-64.31 353.81,-71.29"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_108 -->
-<g id="node11" class="node">
-<title>Node_Ja_108</title>
-<g id="a_node11"><a xlink:title="proto.ServerResponse">
-<polygon fill="#fffaf0" stroke="transparent" points="340.5,-101.5 340.5,-178.5 504.5,-178.5 504.5,-101.5 340.5,-101.5"/>
-<polygon fill="#e31a1c" stroke="transparent" points="341.5,-162 341.5,-177 503.5,-177 503.5,-162 341.5,-162"/>
-<text text-anchor="start" x="408.5" y="-168" font-family="Ubuntu" font-weight="bold" font-size="10.00">ServerResponse</text>
-<text text-anchor="start" x="347.5" y="-152" font-family="Ubuntu" font-size="10.00">1</text>
-<text text-anchor="start" x="358.5" y="-152" font-family="Ubuntu" font-size="10.00">success</text>
-<polygon fill="#a6cee3" stroke="transparent" points="399.5,-147 399.5,-162 503.5,-162 503.5,-147 399.5,-147"/>
-<text text-anchor="start" x="479.5" y="-153" font-family="Ubuntu" font-style="italic" font-size="10.00">bool</text>
-<text text-anchor="start" x="347.5" y="-137" font-family="Ubuntu" font-size="10.00">2</text>
-<text text-anchor="start" x="358.5" y="-137" font-family="Ubuntu" font-size="10.00">key</text>
-<polygon fill="#a6cee3" stroke="transparent" points="399.5,-132 399.5,-147 503.5,-147 503.5,-132 399.5,-132"/>
-<text text-anchor="start" x="473.5" y="-138" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<text text-anchor="start" x="347.5" y="-122" font-family="Ubuntu" font-size="10.00">3</text>
-<text text-anchor="start" x="358.5" y="-122" font-family="Ubuntu" font-size="10.00">value</text>
-<polygon fill="#fb9a99" stroke="transparent" points="399.5,-117 399.5,-132 503.5,-132 503.5,-117 399.5,-117"/>
-<text text-anchor="start" x="401.5" y="-123" font-family="Ubuntu" font-weight="bold" font-size="10.00">ScannerResponse</text>
-<text text-anchor="start" x="347.5" y="-107" font-family="Ubuntu" font-size="10.00">4</text>
-<text text-anchor="start" x="358.5" y="-107" font-family="Ubuntu" font-size="10.00">error</text>
-<polygon fill="#a6cee3" stroke="transparent" points="399.5,-102 399.5,-117 503.5,-117 503.5,-102 399.5,-102"/>
-<text text-anchor="start" x="473.5" y="-108" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<polygon fill="none" stroke="black" points="340.5,-101.5 340.5,-178.5 504.5,-178.5 504.5,-101.5 340.5,-101.5"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
-<g id="edge1" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
-<g id="a_edge1"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
-<path fill="none" stroke="#000000" d="M251.5,-246C299.86,-246 290.27,-180.31 330.48,-171.07"/>
-<polygon fill="#000000" stroke="#000000" points="330.93,-174.55 340.5,-170 330.18,-167.59 330.93,-174.55"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
-<g id="edge3" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
-<g id="a_edge3"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
-<path fill="none" stroke="#000000" d="M251.5,-216C292.37,-216 295.68,-177.24 330.39,-170.88"/>
-<polygon fill="#000000" stroke="#000000" points="330.84,-174.35 340.5,-170 330.23,-167.38 330.84,-174.35"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
-<g id="edge16" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
-<g id="a_edge16"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
-<path fill="none" stroke="#000000" d="M251.5,-185C288.01,-185 298.56,-172.57 330.4,-170.34"/>
-<polygon fill="#000000" stroke="#000000" points="330.62,-173.84 340.5,-170 330.39,-166.84 330.62,-173.84"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
-<g id="edge22" class="edge">
-<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
-<g id="a_edge22"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
-<path fill="none" stroke="#000000" d="M251.5,-155C288.01,-155 298.56,-167.43 330.4,-169.66"/>
-<polygon fill="#000000" stroke="#000000" points="330.39,-173.16 340.5,-170 330.62,-166.16 330.39,-173.16"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_100 -->
-<g id="node6" class="node">
-<title>Node_Ja_100</title>
-<g id="a_node6"><a xlink:title="proto.Host">
-<polygon fill="#fffaf0" stroke="transparent" points="990.5,-332.5 990.5,-409.5 1096.5,-409.5 1096.5,-332.5 990.5,-332.5"/>
-<polygon fill="#e31a1c" stroke="transparent" points="991.5,-393 991.5,-408 1095.5,-408 1095.5,-393 991.5,-393"/>
-<text text-anchor="start" x="1067.5" y="-399" font-family="Ubuntu" font-weight="bold" font-size="10.00">Host</text>
-<text text-anchor="start" x="997.5" y="-383" font-family="Ubuntu" font-size="10.00">1</text>
-<text text-anchor="start" x="1008.5" y="-383" font-family="Ubuntu" font-size="10.00">address</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-378 1063.5,-393 1095.5,-393 1095.5,-378 1063.5,-378"/>
-<text text-anchor="start" x="1065.5" y="-384" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<text text-anchor="start" x="997.5" y="-368" font-family="Ubuntu" font-size="10.00">2</text>
-<text text-anchor="start" x="1008.5" y="-368" font-family="Ubuntu" font-size="10.00">os_version</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-363 1063.5,-378 1095.5,-378 1095.5,-363 1063.5,-363"/>
-<text text-anchor="start" x="1065.5" y="-369" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<text text-anchor="start" x="997.5" y="-353" font-family="Ubuntu" font-size="10.00">3</text>
-<text text-anchor="start" x="1008.5" y="-353" font-family="Ubuntu" font-size="10.00">state</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-348 1063.5,-363 1095.5,-363 1095.5,-348 1063.5,-348"/>
-<text text-anchor="start" x="1065.5" y="-354" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<text text-anchor="start" x="997.5" y="-338" font-family="Ubuntu" font-size="10.00">4</text>
-<text text-anchor="start" x="1008.5" y="-338" font-family="Ubuntu" font-size="10.00">fqdn</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-333 1063.5,-348 1095.5,-348 1095.5,-333 1063.5,-333"/>
-<text text-anchor="start" x="1065.5" y="-339" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<polygon fill="none" stroke="black" points="990.5,-332.5 990.5,-409.5 1096.5,-409.5 1096.5,-332.5 990.5,-332.5"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_101 -->
-<g id="node7" class="node">
-<title>Node_Ja_101</title>
-<g id="a_node7"><a xlink:title="proto.PortVersion">
-<polygon fill="#fffaf0" stroke="transparent" points="1176,-153.5 1176,-230.5 1292,-230.5 1292,-153.5 1176,-153.5"/>
-<polygon fill="#e31a1c" stroke="transparent" points="1177,-214 1177,-229 1291,-229 1291,-214 1177,-214"/>
-<text text-anchor="start" x="1222" y="-220" font-family="Ubuntu" font-weight="bold" font-size="10.00">PortVersion</text>
-<text text-anchor="start" x="1183" y="-204" font-family="Ubuntu" font-size="10.00">1</text>
-<text text-anchor="start" x="1194" y="-204" font-family="Ubuntu" font-size="10.00">low_version</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1259,-199 1259,-214 1291,-214 1291,-199 1259,-199"/>
-<text text-anchor="start" x="1261" y="-205" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<text text-anchor="start" x="1183" y="-189" font-family="Ubuntu" font-size="10.00">2</text>
-<text text-anchor="start" x="1194" y="-189" font-family="Ubuntu" font-size="10.00">high_version</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1259,-184 1259,-199 1291,-199 1291,-184 1259,-184"/>
-<text text-anchor="start" x="1261" y="-190" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<text text-anchor="start" x="1183" y="-174" font-family="Ubuntu" font-size="10.00">3</text>
-<text text-anchor="start" x="1194" y="-174" font-family="Ubuntu" font-size="10.00">extra_infos</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1259,-169 1259,-184 1291,-184 1291,-169 1259,-169"/>
-<text text-anchor="start" x="1261" y="-175" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<text text-anchor="start" x="1183" y="-159" font-family="Ubuntu" font-size="10.00">4</text>
-<text text-anchor="start" x="1194" y="-159" font-family="Ubuntu" font-size="10.00">product</text>
-<polygon fill="#a6cee3" stroke="transparent" points="1259,-154 1259,-169 1291,-169 1291,-154 1259,-154"/>
-<text text-anchor="start" x="1261" y="-160" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
-<polygon fill="none" stroke="black" points="1176,-153.5 1176,-230.5 1292,-230.5 1292,-153.5 1176,-153.5"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_103 -->
-<g id="node10" class="node">
-<title>Node_Ja_103</title>
-<g id="a_node10"><a xlink:title="proto.HostResult">
-<polygon fill="#fffaf0" stroke="transparent" points="809.5,-334.5 809.5,-381.5 902.5,-381.5 902.5,-334.5 809.5,-334.5"/>
-<polygon fill="#e31a1c" stroke="transparent" points="811,-365 811,-380 902,-380 902,-365 811,-365"/>
-<text text-anchor="start" x="839" y="-371" font-family="Ubuntu" font-weight="bold" font-size="10.00">HostResult</text>
-<text text-anchor="start" x="834" y="-355" font-family="Ubuntu" font-size="10.00">1</text>
-<text text-anchor="start" x="845" y="-355" font-family="Ubuntu" font-size="10.00">host</text>
-<polygon fill="#fb9a99" stroke="transparent" points="872,-350 872,-365 902,-365 902,-350 872,-350"/>
-<text text-anchor="start" x="874" y="-356" font-family="Ubuntu" font-weight="bold" font-size="10.00">Host</text>
-<text text-anchor="start" x="813" y="-340" font-family="Ubuntu" font-size="10.00">[...]</text>
-<text text-anchor="start" x="834" y="-340" font-family="Ubuntu" font-size="10.00">2</text>
-<text text-anchor="start" x="845" y="-340" font-family="Ubuntu" font-size="10.00">ports</text>
-<polygon fill="#fb9a99" stroke="transparent" points="872,-335 872,-350 902,-350 902,-335 872,-335"/>
-<text text-anchor="start" x="875" y="-341" font-family="Ubuntu" font-weight="bold" font-size="10.00">Port</text>
-<polygon fill="none" stroke="black" points="809.5,-334.5 809.5,-381.5 902.5,-381.5 902.5,-334.5 809.5,-334.5"/>
-</a>
-</g>
-</g>
-<!-- Node_Ja_103&#45;&gt;Node_Ja_100 -->
-<g id="edge6" class="edge">
-<title>Node_Ja_103:e&#45;&gt;Node_Ja_100:header</title>
-<g id="a_edge6"><a xlink:title="Ja_103 &#45;&#45;&gt; Ja_100">
-<path fill="none" stroke="#000000" d="M903,-357C942.79,-357 946.58,-393.76 980.18,-400.08"/>
-<polygon fill="#000000" stroke="#000000" points="980.23,-403.6 990.5,-401 980.85,-396.63 980.23,-403.6"/>
-</a>
-</g>
-</g>
 <!-- Node_Ja_102 -->
-<g id="node12" class="node">
+<g id="node5" class="node">
 <title>Node_Ja_102</title>
-<g id="a_node12"><a xlink:title="proto.Port">
+<g id="a_node5"><a xlink:title="proto.Port">
 <polygon fill="#fffaf0" stroke="transparent" points="963,-214 963,-306 1124,-306 1124,-214 963,-214"/>
 <polygon fill="#e31a1c" stroke="transparent" points="964.5,-290 964.5,-305 1123.5,-305 1123.5,-290 964.5,-290"/>
 <text text-anchor="start" x="1096.5" y="-296" font-family="Ubuntu" font-weight="bold" font-size="10.00">Port</text>
@@ -556,19 +272,73 @@
 </a>
 </g>
 </g>
-<!-- Node_Ja_103&#45;&gt;Node_Ja_102 -->
-<g id="edge20" class="edge">
-<title>Node_Ja_103:e&#45;&gt;Node_Ja_102:header</title>
-<g id="a_edge20"><a xlink:title="Ja_103 &#45;&#45;&gt; Ja_102">
-<path fill="none" stroke="#000000" d="M903,-342C932.48,-342 931.11,-307.4 953.6,-299.57"/>
-<polygon fill="#000000" stroke="#000000" points="954.17,-303.02 963.5,-298 953.08,-296.11 954.17,-303.02"/>
+<!-- Node_Ja_101 -->
+<g id="node9" class="node">
+<title>Node_Ja_101</title>
+<g id="a_node9"><a xlink:title="proto.PortVersion">
+<polygon fill="#fffaf0" stroke="transparent" points="1176,-153.5 1176,-230.5 1292,-230.5 1292,-153.5 1176,-153.5"/>
+<polygon fill="#e31a1c" stroke="transparent" points="1177,-214 1177,-229 1291,-229 1291,-214 1177,-214"/>
+<text text-anchor="start" x="1222" y="-220" font-family="Ubuntu" font-weight="bold" font-size="10.00">PortVersion</text>
+<text text-anchor="start" x="1183" y="-204" font-family="Ubuntu" font-size="10.00">1</text>
+<text text-anchor="start" x="1194" y="-204" font-family="Ubuntu" font-size="10.00">low_version</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1259,-199 1259,-214 1291,-214 1291,-199 1259,-199"/>
+<text text-anchor="start" x="1261" y="-205" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<text text-anchor="start" x="1183" y="-189" font-family="Ubuntu" font-size="10.00">2</text>
+<text text-anchor="start" x="1194" y="-189" font-family="Ubuntu" font-size="10.00">high_version</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1259,-184 1259,-199 1291,-199 1291,-184 1259,-184"/>
+<text text-anchor="start" x="1261" y="-190" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<text text-anchor="start" x="1183" y="-174" font-family="Ubuntu" font-size="10.00">3</text>
+<text text-anchor="start" x="1194" y="-174" font-family="Ubuntu" font-size="10.00">extra_infos</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1259,-169 1259,-184 1291,-184 1291,-169 1259,-169"/>
+<text text-anchor="start" x="1261" y="-175" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<text text-anchor="start" x="1183" y="-159" font-family="Ubuntu" font-size="10.00">4</text>
+<text text-anchor="start" x="1194" y="-159" font-family="Ubuntu" font-size="10.00">product</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1259,-154 1259,-169 1291,-169 1291,-154 1259,-154"/>
+<text text-anchor="start" x="1261" y="-160" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<polygon fill="none" stroke="black" points="1176,-153.5 1176,-230.5 1292,-230.5 1292,-153.5 1176,-153.5"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_102&#45;&gt;Node_Ja_101 -->
+<g id="edge6" class="edge">
+<title>Node_Ja_102:e&#45;&gt;Node_Ja_101:header</title>
+<g id="a_edge6"><a xlink:title="Ja_102 &#45;&#45;&gt; Ja_101">
+<path fill="none" stroke="#000000" d="M1124.5,-222C1143.63,-222 1150.77,-222 1165.97,-222"/>
+<polygon fill="#000000" stroke="#000000" points="1166,-225.5 1176,-222 1166,-218.5 1166,-225.5"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_108 -->
+<g id="node6" class="node">
+<title>Node_Ja_108</title>
+<g id="a_node6"><a xlink:title="proto.ServerResponse">
+<polygon fill="#fffaf0" stroke="transparent" points="340.5,-101.5 340.5,-178.5 504.5,-178.5 504.5,-101.5 340.5,-101.5"/>
+<polygon fill="#e31a1c" stroke="transparent" points="341.5,-162 341.5,-177 503.5,-177 503.5,-162 341.5,-162"/>
+<text text-anchor="start" x="408.5" y="-168" font-family="Ubuntu" font-weight="bold" font-size="10.00">ServerResponse</text>
+<text text-anchor="start" x="347.5" y="-152" font-family="Ubuntu" font-size="10.00">1</text>
+<text text-anchor="start" x="358.5" y="-152" font-family="Ubuntu" font-size="10.00">success</text>
+<polygon fill="#a6cee3" stroke="transparent" points="399.5,-147 399.5,-162 503.5,-162 503.5,-147 399.5,-147"/>
+<text text-anchor="start" x="479.5" y="-153" font-family="Ubuntu" font-style="italic" font-size="10.00">bool</text>
+<text text-anchor="start" x="347.5" y="-137" font-family="Ubuntu" font-size="10.00">2</text>
+<text text-anchor="start" x="358.5" y="-137" font-family="Ubuntu" font-size="10.00">key</text>
+<polygon fill="#a6cee3" stroke="transparent" points="399.5,-132 399.5,-147 503.5,-147 503.5,-132 399.5,-132"/>
+<text text-anchor="start" x="473.5" y="-138" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<text text-anchor="start" x="347.5" y="-122" font-family="Ubuntu" font-size="10.00">3</text>
+<text text-anchor="start" x="358.5" y="-122" font-family="Ubuntu" font-size="10.00">value</text>
+<polygon fill="#fb9a99" stroke="transparent" points="399.5,-117 399.5,-132 503.5,-132 503.5,-117 399.5,-117"/>
+<text text-anchor="start" x="401.5" y="-123" font-family="Ubuntu" font-weight="bold" font-size="10.00">ScannerResponse</text>
+<text text-anchor="start" x="347.5" y="-107" font-family="Ubuntu" font-size="10.00">4</text>
+<text text-anchor="start" x="358.5" y="-107" font-family="Ubuntu" font-size="10.00">error</text>
+<polygon fill="#a6cee3" stroke="transparent" points="399.5,-102 399.5,-117 503.5,-117 503.5,-102 399.5,-102"/>
+<text text-anchor="start" x="473.5" y="-108" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<polygon fill="none" stroke="black" points="340.5,-101.5 340.5,-178.5 504.5,-178.5 504.5,-101.5 340.5,-101.5"/>
 </a>
 </g>
 </g>
 <!-- Node_Ja_104 -->
-<g id="node13" class="node">
+<g id="node11" class="node">
 <title>Node_Ja_104</title>
-<g id="a_node13"><a xlink:title="proto.ScannerResponse">
+<g id="a_node11"><a xlink:title="proto.ScannerResponse">
 <polygon fill="#fffaf0" stroke="transparent" points="568,-289.5 568,-396.5 749,-396.5 749,-289.5 568,-289.5"/>
 <polygon fill="#e31a1c" stroke="transparent" points="569.5,-380 569.5,-395 748.5,-395 748.5,-380 569.5,-380"/>
 <text text-anchor="start" x="646.5" y="-386" font-family="Ubuntu" font-weight="bold" font-size="10.00">ScannerResponse</text>
@@ -602,36 +372,248 @@
 </g>
 </g>
 <!-- Node_Ja_108&#45;&gt;Node_Ja_104 -->
-<g id="edge11" class="edge">
+<g id="edge13" class="edge">
 <title>Node_Ja_108:e&#45;&gt;Node_Ja_104:header</title>
-<g id="a_edge11"><a xlink:title="Ja_108 &#45;&#45;&gt; Ja_104">
+<g id="a_edge13"><a xlink:title="Ja_108 &#45;&#45;&gt; Ja_104">
 <path fill="none" stroke="#000000" d="M504.5,-124C621.58,-124 458.24,-372.26 558.34,-387.29"/>
 <polygon fill="#000000" stroke="#000000" points="558.28,-390.79 568.5,-388 558.77,-383.81 558.28,-390.79"/>
 </a>
 </g>
 </g>
-<!-- Node_Ja_102&#45;&gt;Node_Ja_101 -->
-<g id="edge5" class="edge">
-<title>Node_Ja_102:e&#45;&gt;Node_Ja_101:header</title>
-<g id="a_edge5"><a xlink:title="Ja_102 &#45;&#45;&gt; Ja_101">
-<path fill="none" stroke="#000000" d="M1124.5,-222C1143.63,-222 1150.77,-222 1165.97,-222"/>
-<polygon fill="#000000" stroke="#000000" points="1166,-225.5 1176,-222 1166,-218.5 1166,-225.5"/>
+<!-- Node_Ja_110 -->
+<g id="node14" class="node">
+<title>Node_Ja_110</title>
+<g id="a_node14"><a xlink:title="ServiceState">
+<polygon fill="#b2df8a" stroke="transparent" points="801,-723 801,-785 911,-785 911,-723 801,-723"/>
+<polygon fill="#33a02c" stroke="transparent" points="802,-769 802,-784 910,-784 910,-769 802,-769"/>
+<text text-anchor="start" x="804" y="-775" font-family="Ubuntu" font-size="10.00">enum </text>
+<text text-anchor="start" x="835" y="-775" font-family="Ubuntu" font-weight="bold" font-size="10.00">ServiceState</text>
+<polygon fill="#b2df8a" stroke="transparent" points="802,-754 802,-769 880,-769 880,-754 802,-754"/>
+<text text-anchor="start" x="804" y="-759" font-family="Ubuntu" font-size="10.00">UNKNOWN</text>
+<polygon fill="#b2df8a" stroke="transparent" points="880,-754 880,-769 910,-769 910,-754 880,-754"/>
+<text text-anchor="start" x="882" y="-759" font-family="Ubuntu" font-size="10.00">0</text>
+<polygon fill="#b2df8a" stroke="transparent" points="802,-739 802,-754 880,-754 880,-739 802,-739"/>
+<text text-anchor="start" x="804" y="-744" font-family="Ubuntu" font-size="10.00">START</text>
+<polygon fill="#b2df8a" stroke="transparent" points="880,-739 880,-754 910,-754 910,-739 880,-739"/>
+<text text-anchor="start" x="882" y="-744" font-family="Ubuntu" font-size="10.00">1</text>
+<polygon fill="#b2df8a" stroke="transparent" points="802,-724 802,-739 880,-739 880,-724 802,-724"/>
+<text text-anchor="start" x="804" y="-729" font-family="Ubuntu" font-size="10.00">STOP</text>
+<polygon fill="#b2df8a" stroke="transparent" points="880,-724 880,-739 910,-739 910,-724 880,-724"/>
+<text text-anchor="start" x="882" y="-729" font-family="Ubuntu" font-size="10.00">2</text>
+<polygon fill="none" stroke="black" points="801,-723 801,-785 911,-785 911,-723 801,-723"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_109&#45;&gt;Node_Ja_110 -->
+<g id="edge8" class="edge">
+<title>Node_Ja_109:e&#45;&gt;Node_Ja_110</title>
+<g id="a_edge8"><a xlink:title="Ja_109 &#45;&#45;&gt; Ja_110">
+<path fill="none" stroke="#008000" d="M481.5,-496C606.63,-496 669.85,-464.21 757,-554 806.06,-604.55 745.6,-651.61 785,-710 785.44,-710.65 785.89,-711.29 786.35,-711.92"/>
+<polygon fill="#008000" stroke="#008000" points="783.83,-714.36 792.98,-719.71 789.16,-709.82 783.83,-714.36"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_100 -->
+<g id="node8" class="node">
+<title>Node_Ja_100</title>
+<g id="a_node8"><a xlink:title="proto.Host">
+<polygon fill="#fffaf0" stroke="transparent" points="990.5,-332.5 990.5,-409.5 1096.5,-409.5 1096.5,-332.5 990.5,-332.5"/>
+<polygon fill="#e31a1c" stroke="transparent" points="991.5,-393 991.5,-408 1095.5,-408 1095.5,-393 991.5,-393"/>
+<text text-anchor="start" x="1067.5" y="-399" font-family="Ubuntu" font-weight="bold" font-size="10.00">Host</text>
+<text text-anchor="start" x="997.5" y="-383" font-family="Ubuntu" font-size="10.00">1</text>
+<text text-anchor="start" x="1008.5" y="-383" font-family="Ubuntu" font-size="10.00">address</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-378 1063.5,-393 1095.5,-393 1095.5,-378 1063.5,-378"/>
+<text text-anchor="start" x="1065.5" y="-384" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<text text-anchor="start" x="997.5" y="-368" font-family="Ubuntu" font-size="10.00">2</text>
+<text text-anchor="start" x="1008.5" y="-368" font-family="Ubuntu" font-size="10.00">os_version</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-363 1063.5,-378 1095.5,-378 1095.5,-363 1063.5,-363"/>
+<text text-anchor="start" x="1065.5" y="-369" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<text text-anchor="start" x="997.5" y="-353" font-family="Ubuntu" font-size="10.00">3</text>
+<text text-anchor="start" x="1008.5" y="-353" font-family="Ubuntu" font-size="10.00">state</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-348 1063.5,-363 1095.5,-363 1095.5,-348 1063.5,-348"/>
+<text text-anchor="start" x="1065.5" y="-354" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<text text-anchor="start" x="997.5" y="-338" font-family="Ubuntu" font-size="10.00">4</text>
+<text text-anchor="start" x="1008.5" y="-338" font-family="Ubuntu" font-size="10.00">fqdn</text>
+<polygon fill="#a6cee3" stroke="transparent" points="1063.5,-333 1063.5,-348 1095.5,-348 1095.5,-333 1063.5,-333"/>
+<text text-anchor="start" x="1065.5" y="-339" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<polygon fill="none" stroke="black" points="990.5,-332.5 990.5,-409.5 1096.5,-409.5 1096.5,-332.5 990.5,-332.5"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111 -->
+<g id="node10" class="node">
+<title>Node_Ja_111</title>
+<g id="a_node10"><a xlink:title="ScannerService">
+<polygon fill="#ffd700" stroke="transparent" points="33.5,-117.5 33.5,-284.5 251.5,-284.5 251.5,-117.5 33.5,-117.5"/>
+<polygon fill="#ff7f50" stroke="transparent" points="34.5,-268 34.5,-283 250.5,-283 250.5,-268 34.5,-268"/>
+<text text-anchor="start" x="159.5" y="-274" font-family="Ubuntu" font-weight="bold" font-size="10.00">ScannerService</text>
+<text text-anchor="start" x="36.5" y="-259" font-family="Ubuntu" font-weight="bold" font-size="10.00">StartAsyncScan</text>
+<text text-anchor="start" x="133.5" y="-258" font-family="Ubuntu" font-size="10.00">ParamsScannerRequest</text>
+<polygon fill="#ff7f50" stroke="transparent" points="127.5,-238 127.5,-253 131.5,-253 131.5,-238 127.5,-238"/>
+<polygon fill="#ff7f50" stroke="transparent" points="131.5,-238 131.5,-253 250.5,-253 250.5,-238 131.5,-238"/>
+<text text-anchor="start" x="169.5" y="-243" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
+<text text-anchor="start" x="36.5" y="-229" font-family="Ubuntu" font-weight="bold" font-size="10.00">StartScan</text>
+<text text-anchor="start" x="133.5" y="-228" font-family="Ubuntu" font-size="10.00">ParamsScannerRequest</text>
+<polygon fill="#ff7f50" stroke="transparent" points="127.5,-208 127.5,-223 131.5,-223 131.5,-208 127.5,-208"/>
+<polygon fill="#ff7f50" stroke="transparent" points="131.5,-208 131.5,-223 250.5,-223 250.5,-208 131.5,-208"/>
+<text text-anchor="start" x="169.5" y="-213" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
+<text text-anchor="start" x="36.5" y="-199" font-family="Ubuntu" font-weight="bold" font-size="10.00">GetScan</text>
+<text text-anchor="start" x="151.5" y="-198" font-family="Ubuntu" font-size="10.00">GetScannerRequest</text>
+<polygon fill="#ff7f50" stroke="transparent" points="127.5,-178 127.5,-193 131.5,-193 131.5,-178 127.5,-178"/>
+<polygon fill="#ff7f50" stroke="transparent" points="131.5,-178 131.5,-193 250.5,-193 250.5,-178 131.5,-178"/>
+<text text-anchor="start" x="169.5" y="-183" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
+<text text-anchor="start" x="36.5" y="-169" font-family="Ubuntu" font-weight="bold" font-size="10.00">DeleteScan</text>
+<text text-anchor="start" x="151.5" y="-168" font-family="Ubuntu" font-size="10.00">GetScannerRequest</text>
+<polygon fill="#ff7f50" stroke="transparent" points="127.5,-148 127.5,-163 131.5,-163 131.5,-148 127.5,-148"/>
+<polygon fill="#ff7f50" stroke="transparent" points="131.5,-148 131.5,-163 250.5,-163 250.5,-148 131.5,-148"/>
+<text text-anchor="start" x="169.5" y="-153" font-family="Ubuntu" font-size="10.00">ServerResponse</text>
+<text text-anchor="start" x="36.5" y="-139" font-family="Ubuntu" font-weight="bold" font-size="10.00">ServiceControl</text>
+<text text-anchor="start" x="154.5" y="-138" font-family="Ubuntu" font-size="10.00">ServiceStateValues</text>
+<polygon fill="#ff7f50" stroke="transparent" points="127.5,-118 127.5,-133 131.5,-133 131.5,-118 127.5,-118"/>
+<polygon fill="#ff7f50" stroke="transparent" points="131.5,-118 131.5,-133 250.5,-133 250.5,-118 131.5,-118"/>
+<text text-anchor="start" x="154.5" y="-123" font-family="Ubuntu" font-size="10.00">ServiceStateValues</text>
+<polygon fill="none" stroke="black" points="33.5,-117.5 33.5,-284.5 251.5,-284.5 251.5,-117.5 33.5,-117.5"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_106 -->
+<g id="edge14" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_106:header</title>
+<g id="a_edge14"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_106">
+<path fill="none" stroke="#000000" d="M251.5,-231C352.4,-231 233.85,-437.67 319.32,-452.2"/>
+<polygon fill="#000000" stroke="#000000" points="319.26,-455.7 329.5,-453 319.81,-448.72 319.26,-455.7"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_106 -->
+<g id="edge20" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_106:header</title>
+<g id="a_edge20"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_106">
+<path fill="none" stroke="#000000" d="M251.5,-261C339.83,-261 245.77,-437.57 319.14,-452.06"/>
+<polygon fill="#000000" stroke="#000000" points="319.22,-455.58 329.5,-453 319.86,-448.61 319.22,-455.58"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
+<g id="edge9" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
+<g id="a_edge9"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
+<path fill="none" stroke="#000000" d="M251.5,-246C299.86,-246 290.27,-180.31 330.48,-171.07"/>
+<polygon fill="#000000" stroke="#000000" points="330.93,-174.55 340.5,-170 330.18,-167.59 330.93,-174.55"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
+<g id="edge10" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
+<g id="a_edge10"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
+<path fill="none" stroke="#000000" d="M251.5,-185C288.01,-185 298.56,-172.57 330.4,-170.34"/>
+<polygon fill="#000000" stroke="#000000" points="330.62,-173.84 340.5,-170 330.39,-166.84 330.62,-173.84"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
+<g id="edge11" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
+<g id="a_edge11"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
+<path fill="none" stroke="#000000" d="M251.5,-155C288.01,-155 298.56,-167.43 330.4,-169.66"/>
+<polygon fill="#000000" stroke="#000000" points="330.39,-173.16 340.5,-170 330.62,-166.16 330.39,-173.16"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_108 -->
+<g id="edge15" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_108:header</title>
+<g id="a_edge15"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_108">
+<path fill="none" stroke="#000000" d="M251.5,-216C292.37,-216 295.68,-177.24 330.39,-170.88"/>
+<polygon fill="#000000" stroke="#000000" points="330.84,-174.35 340.5,-170 330.23,-167.38 330.84,-174.35"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_109 -->
+<g id="edge12" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_109:header</title>
+<g id="a_edge12"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_109">
+<path fill="none" stroke="#000000" d="M251.5,-140C420.75,-140 201.08,-496.9 354.37,-511.54"/>
+<polygon fill="#000000" stroke="#000000" points="354.35,-515.04 364.5,-512 354.67,-508.05 354.35,-515.04"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_109 -->
+<g id="edge16" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_109:header</title>
+<g id="a_edge16"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_109">
+<path fill="none" stroke="#000000" d="M251.5,-125C330.8,-125 280.84,-406.62 321,-475 331.94,-493.64 337.39,-507.36 354.44,-511.03"/>
+<polygon fill="#000000" stroke="#000000" points="354.21,-514.52 364.5,-512 354.88,-507.55 354.21,-514.52"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_107 -->
+<g id="node12" class="node">
+<title>Node_Ja_107</title>
+<g id="a_node12"><a xlink:title="proto.GetScannerRequest">
+<polygon fill="#fffaf0" stroke="transparent" points="363.5,-43 363.5,-75 481.5,-75 481.5,-43 363.5,-43"/>
+<polygon fill="#e31a1c" stroke="transparent" points="364.5,-59 364.5,-74 480.5,-74 480.5,-59 364.5,-59"/>
+<text text-anchor="start" x="366.5" y="-65" font-family="Ubuntu" font-weight="bold" font-size="10.00">GetScannerRequest</text>
+<text text-anchor="start" x="405.5" y="-49" font-family="Ubuntu" font-size="10.00">1</text>
+<text text-anchor="start" x="416.5" y="-49" font-family="Ubuntu" font-size="10.00">key</text>
+<polygon fill="#a6cee3" stroke="transparent" points="442.5,-44 442.5,-59 480.5,-59 480.5,-44 442.5,-44"/>
+<text text-anchor="start" x="450.5" y="-50" font-family="Ubuntu" font-style="italic" font-size="10.00">string</text>
+<polygon fill="none" stroke="black" points="363.5,-43 363.5,-75 481.5,-75 481.5,-43 363.5,-43"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_107 -->
+<g id="edge3" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_107:header</title>
+<g id="a_edge3"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_107">
+<path fill="none" stroke="#000000" d="M251.5,-170C299.27,-170 283.36,-117.42 321,-88 334.49,-77.46 340.21,-70.18 353.18,-67.83"/>
+<polygon fill="#000000" stroke="#000000" points="353.81,-71.29 363.5,-67 353.25,-64.31 353.81,-71.29"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_111&#45;&gt;Node_Ja_107 -->
+<g id="edge21" class="edge">
+<title>Node_Ja_111:e&#45;&gt;Node_Ja_107:header</title>
+<g id="a_edge21"><a xlink:title="Ja_111 &#45;&#45;&gt; Ja_107">
+<path fill="none" stroke="#000000" d="M251.5,-200C310.08,-200 277.63,-127.38 321,-88 333.8,-76.38 340.02,-69.69 353.47,-67.67"/>
+<polygon fill="#000000" stroke="#000000" points="353.75,-71.15 363.5,-67 353.29,-64.17 353.75,-71.15"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_103 -->
+<g id="node13" class="node">
+<title>Node_Ja_103</title>
+<g id="a_node13"><a xlink:title="proto.HostResult">
+<polygon fill="#fffaf0" stroke="transparent" points="809.5,-334.5 809.5,-381.5 902.5,-381.5 902.5,-334.5 809.5,-334.5"/>
+<polygon fill="#e31a1c" stroke="transparent" points="811,-365 811,-380 902,-380 902,-365 811,-365"/>
+<text text-anchor="start" x="839" y="-371" font-family="Ubuntu" font-weight="bold" font-size="10.00">HostResult</text>
+<text text-anchor="start" x="834" y="-355" font-family="Ubuntu" font-size="10.00">1</text>
+<text text-anchor="start" x="845" y="-355" font-family="Ubuntu" font-size="10.00">host</text>
+<polygon fill="#fb9a99" stroke="transparent" points="872,-350 872,-365 902,-365 902,-350 872,-350"/>
+<text text-anchor="start" x="874" y="-356" font-family="Ubuntu" font-weight="bold" font-size="10.00">Host</text>
+<text text-anchor="start" x="813" y="-340" font-family="Ubuntu" font-size="10.00">[...]</text>
+<text text-anchor="start" x="834" y="-340" font-family="Ubuntu" font-size="10.00">2</text>
+<text text-anchor="start" x="845" y="-340" font-family="Ubuntu" font-size="10.00">ports</text>
+<polygon fill="#fb9a99" stroke="transparent" points="872,-335 872,-350 902,-350 902,-335 872,-335"/>
+<text text-anchor="start" x="875" y="-341" font-family="Ubuntu" font-weight="bold" font-size="10.00">Port</text>
+<polygon fill="none" stroke="black" points="809.5,-334.5 809.5,-381.5 902.5,-381.5 902.5,-334.5 809.5,-334.5"/>
 </a>
 </g>
 </g>
 <!-- Node_Ja_104&#45;&gt;Node_Ja_103 -->
-<g id="edge15" class="edge">
+<g id="edge1" class="edge">
 <title>Node_Ja_104:e&#45;&gt;Node_Ja_103:header</title>
-<g id="a_edge15"><a xlink:title="Ja_104 &#45;&#45;&gt; Ja_103">
+<g id="a_edge1"><a xlink:title="Ja_104 &#45;&#45;&gt; Ja_103">
 <path fill="none" stroke="#000000" d="M749.5,-373C772.71,-373 780.9,-373 800,-373"/>
 <polygon fill="#000000" stroke="#000000" points="800,-376.5 810,-373 800,-369.5 800,-376.5"/>
 </a>
 </g>
 </g>
 <!-- Node_Ja_105 -->
-<g id="node14" class="node">
+<g id="node15" class="node">
 <title>Node_Ja_105</title>
-<g id="a_node14"><a xlink:title="Status">
+<g id="a_node15"><a xlink:title="Status">
 <polygon fill="#b2df8a" stroke="transparent" points="819,-575 819,-697 893,-697 893,-575 819,-575"/>
 <polygon fill="#33a02c" stroke="transparent" points="820,-681 820,-696 892,-696 892,-681 820,-681"/>
 <text text-anchor="start" x="822" y="-687" font-family="Ubuntu" font-size="10.00">enum </text>
@@ -669,11 +651,29 @@
 </g>
 </g>
 <!-- Node_Ja_104&#45;&gt;Node_Ja_105 -->
-<g id="edge7" class="edge">
+<g id="edge2" class="edge">
 <title>Node_Ja_104:e&#45;&gt;Node_Ja_105</title>
-<g id="a_edge7"><a xlink:title="Ja_104 &#45;&#45;&gt; Ja_105">
+<g id="a_edge2"><a xlink:title="Ja_104 &#45;&#45;&gt; Ja_105">
 <path fill="none" stroke="#008000" d="M749.5,-297C808.25,-297 760.17,-505.75 785,-559 789.9,-569.51 796.75,-579.59 804.25,-588.8"/>
 <polygon fill="#008000" stroke="#008000" points="801.82,-591.34 810.98,-596.65 807.13,-586.78 801.82,-591.34"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_103&#45;&gt;Node_Ja_102 -->
+<g id="edge19" class="edge">
+<title>Node_Ja_103:e&#45;&gt;Node_Ja_102:header</title>
+<g id="a_edge19"><a xlink:title="Ja_103 &#45;&#45;&gt; Ja_102">
+<path fill="none" stroke="#000000" d="M903,-342C932.48,-342 931.11,-307.4 953.6,-299.57"/>
+<polygon fill="#000000" stroke="#000000" points="954.17,-303.02 963.5,-298 953.08,-296.11 954.17,-303.02"/>
+</a>
+</g>
+</g>
+<!-- Node_Ja_103&#45;&gt;Node_Ja_100 -->
+<g id="edge7" class="edge">
+<title>Node_Ja_103:e&#45;&gt;Node_Ja_100:header</title>
+<g id="a_edge7"><a xlink:title="Ja_103 &#45;&#45;&gt; Ja_100">
+<path fill="none" stroke="#000000" d="M903,-357C942.79,-357 946.58,-393.76 980.18,-400.08"/>
+<polygon fill="#000000" stroke="#000000" points="980.23,-403.6 990.5,-401 980.85,-396.63 980.23,-403.6"/>
 </a>
 </g>
 </g>
