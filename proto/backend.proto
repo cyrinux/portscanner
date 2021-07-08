@@ -1,6 +1,13 @@
 syntax = "proto3";
 package proto;
 option go_package = "/proto";
+import "proto/service.proto";
+
+message PrometheusStatus {
+    TasksStatus tasks_status = 1;
+    int64 worker_count = 2;
+    int64 consumer_count = 3;
+}
 
 message TasksStatus {
     int64 success = 1;
@@ -10,23 +17,8 @@ message TasksStatus {
     int64 rejected = 5;
 }
 
-message PrometheusStatus {
-    TasksStatus tasks_status = 1;
-    int64 worker_count = 2;
-    int64 consumer_count = 3;
-}
-
-message TasksServiceControl {
-    enum ServiceState {
-        UNKNOWN = 0;
-        START = 1;
-        STOP = 2;
-    }
-    ServiceState state = 1;
-}
-
-service TasksBackend {
-    rpc StreamTasksServiceControl(TasksServiceControl) returns (stream TasksServiceControl);
+// BackendService, between server and workers
+service BackendService {
+    rpc StreamServiceControl(ServiceStateValues) returns (stream ServiceStateValues);
     rpc StreamTasksStatus(stream PrometheusStatus) returns (stream PrometheusStatus);
 }
-

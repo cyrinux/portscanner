@@ -19,7 +19,7 @@ type Consumer struct {
 	ctx      context.Context
 	db       database.Database
 	engine   *engine.Engine
-	state    pb.ScannerServiceControl
+	state    pb.ServiceStateValues
 	conf     config.Config
 	tasktype string
 	success  chan int64
@@ -86,7 +86,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	go consumer.onCancel(request)
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
-	if consumer.state.State != pb.ScannerServiceControl_START {
+	if consumer.state.State != pb.ServiceStateValues_START {
 		log.Info().Msgf("%s: start consume %s", consumer.name, payload)
 		if err := delivery.Reject(); err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to requeue %s: %s", consumer.name, payload, err)

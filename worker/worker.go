@@ -39,7 +39,7 @@ type Worker struct {
 	conf        config.Config
 	locker      *redislock.Client
 	redisClient *redis.Client
-	state       pb.ScannerServiceControl
+	state       pb.ServiceStateValues
 	consumers   []*Consumer
 	db          database.Database
 	grpcServer  *grpc.ClientConn
@@ -98,13 +98,13 @@ func (worker *Worker) StartWorker() {
 	worker.startConsuming()
 
 	// watch the control server and stop/start service
-	worker.StreamControlService()
+	worker.StreamServiceControl()
 }
 
 // StreamControlService return the workers status and control them
-func (worker *Worker) StreamControlService() {
-	client := pb.NewScannerServiceClient(worker.grpcServer)
-	getState := &pb.ScannerServiceControl{State: 0}
+func (worker *Worker) StreamServiceControl() {
+	client := pb.NewBackendServiceClient(worker.grpcServer)
+	getState := &pb.ServiceStateValues{State: 0}
 	for {
 		stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
@@ -120,11 +120,11 @@ func (worker *Worker) StreamControlService() {
 			if err != nil {
 				break
 			}
-			if serviceControl.State == 1 && worker.state.State != 1 { //pb.ScannerServiceControl_START
-				worker.state.State = pb.ScannerServiceControl_START
+			if serviceControl.State == 1 && worker.state.State != 1 { //pb.ServiceStateValues_START
+				worker.state.State = pb.ServiceStateValues_START
 				worker.startConsuming()
-			} else if serviceControl.State == 2 && worker.state.State != 2 { //pb.ScannerServiceControl_STOP
-				worker.state.State = pb.ScannerServiceControl_STOP
+			} else if serviceControl.State == 2 && worker.state.State != 2 { //pb.ServiceStateValues_STOP
+				worker.state.State = pb.ServiceStateValues_STOP
 				worker.StopConsuming()
 			}
 		}
@@ -189,7 +189,7 @@ func (worker *Worker) startConsuming() *Worker {
 		if _, err := worker.broker.Incoming.AddConsumer(tag, incConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
-		incConsumer.state.State = pb.ScannerServiceControl_START
+		incConsumer.state.State = pb.ServiceStateValues_START
 
 		// store consumer pointer to the worker struct
 		worker.consumers = append(worker.consumers, incConsumer)
@@ -227,7 +227,7 @@ func (worker *Worker) StopConsuming() *Worker {
 
 // collectConsumerStats manage the tasks prometheus counters
 func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64, returned chan int64) {
-	client := pb.NewScannerServiceClient(worker.grpcServer)
+	client := pb.NewBackendServiceClient(worker.grpcServer)
 	for {
 		stream, err := client.StreamTasksStatus(worker.ctx)
 		if err != nil {

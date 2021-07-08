@@ -66,29 +66,6 @@ message ParamsScannerRequest {
     int32 scan_speed = 16;
 }
 
-message TasksStatus {
-    int64 success = 1;
-    int64 failed = 2;
-    int64 returned = 3;
-    int64 ready = 4;
-    int64 rejected = 5;
-}
-
-message PrometheusStatus {
-    TasksStatus tasks_status = 1;
-    int64 worker_count = 2;
-    int64 consumer_count = 3;
-}
-
-message ScannerServiceControl {
-    enum ServiceState {
-        UNKNOWN = 0;
-        START = 1;
-        STOP = 2;
-    }
-    ServiceState state = 1;
-}
-
 message GetScannerRequest {
     string key = 1;
 }
@@ -100,14 +77,21 @@ message ServerResponse{
     string error = 4;
 }
 
+message ServiceStateValues {
+    enum ServiceState {
+        UNKNOWN = 0;
+        START = 1;
+        STOP = 2;
+    }
+    ServiceState state = 1;
+}
+
 // Server ScannerService
 service ScannerService {
     rpc StartAsyncScan(ParamsScannerRequest) returns (ServerResponse);
     rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
     rpc GetScan(GetScannerRequest) returns (ServerResponse);
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
-    rpc ServiceControl(ScannerServiceControl) returns (ScannerServiceControl);
-    rpc StreamServiceControl(ScannerServiceControl) returns (stream ScannerServiceControl);
-    rpc StreamTasksStatus(stream PrometheusStatus) returns (stream PrometheusStatus);
+    rpc ServiceControl(ServiceStateValues) returns (ServiceStateValues);
 }
 

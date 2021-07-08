@@ -42,7 +42,7 @@ testscan: up
 	docker-compose logs -f --tail=50
 
 graphviz:
-	protodot -src proto/service.proto -output graphviz
+	protodot -src proto/backend.proto -output graphviz
 	dot -Tpng ~/protodot/generated/graphviz.dot -o graphviz.png
 	dot -Tsvg ~/protodot/generated/graphviz.dot -o graphviz.svg
 	xdg-open graphviz.png

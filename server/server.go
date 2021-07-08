@@ -14,14 +14,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 	"io"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -88,13 +86,13 @@ type Server struct {
 	db          database.Database
 	err         error
 	broker      broker.Broker
-	state       pb.ScannerServiceControl
+	State       pb.ServiceStateValues
 	tasktype    string
 	tasksStatus TasksStatus
 }
 
 // Listen start the grpc server
-func GRPCListen(ctx context.Context, conf config.Config, wantPrometheus bool) (*grpc.Server, error) {
+func GRPCListen(ctx context.Context, conf config.Config) (*grpc.Server, error) {
 	log.Info().Msg("prepare to serve the gRPC api")
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
@@ -109,21 +107,15 @@ func GRPCListen(ctx context.Context, conf config.Config, wantPrometheus bool) (*
 	)
 
 	reflection.Register(srv)
-	pb.RegisterScannerServiceServer(srv, NewServer(ctx, conf, "nmap", wantPrometheus))
+	server := NewServer(ctx, conf, "nmap")
+	pb.RegisterScannerServiceServer(srv, server)
+	pb.RegisterBackendServiceServer(srv, server)
 	if err = srv.Serve(listener); err != nil {
 		log.Error().Msg("can't serve the gRPC service")
 		return nil, err
 	}
 
 	return srv, nil
-}
-
-func PrometheusListen() {
-	//prometheus endpoint
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(":2112", nil)
-	}()
 }
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus
@@ -146,7 +138,7 @@ func brokerStatsToProm(brk *broker.Broker, name string) {
 }
 
 // NewServer create a new server and init the database connection
-func NewServer(ctx context.Context, conf config.Config, tasktype string, wantPrometheus bool) *Server {
+func NewServer(ctx context.Context, conf config.Config, tasktype string) *Server {
 	errChan := make(chan error)
 	go broker.RmqLogErrors(errChan)
 
@@ -168,9 +160,7 @@ func NewServer(ctx context.Context, conf config.Config, tasktype string, wantPro
 	}
 
 	// start the rmq stats to prometheus
-	if wantPrometheus {
-		go brokerStatsToProm(&brker, tasktype)
-	}
+	go brokerStatsToProm(&brker, tasktype)
 
 	return &Server{
 		ctx:      ctx,
@@ -189,9 +179,9 @@ func (server *Server) DeleteScan(ctx context.Context, in *pb.GetScannerRequest) 
 }
 
 // StreamServiceControl control the service
-func (server *Server) StreamServiceControl(in *pb.ScannerServiceControl, stream pb.ScannerService_StreamServiceControlServer) error {
+func (server *Server) StreamServiceControl(in *pb.ServiceStateValues, stream pb.BackendService_StreamServiceControlServer) error {
 	for {
-		if err := stream.Send(&server.state); err != nil {
+		if err := stream.Send(&server.State); err != nil {
 			log.Error().Stack().Err(err).Msgf("streamer service control send error")
 			return errors.Wrap(err, "streamer service control send error")
 		}
@@ -200,7 +190,7 @@ func (server *Server) StreamServiceControl(in *pb.ScannerServiceControl, stream 
 }
 
 // StreamTasksStatus manage the tasks counter
-func (server *Server) StreamTasksStatus(stream pb.ScannerService_StreamTasksStatusServer) error {
+func (server *Server) StreamTasksStatus(stream pb.BackendService_StreamTasksStatusServer) error {
 	for {
 		promStatus, err := stream.Recv()
 		if err == io.EOF {
@@ -224,16 +214,16 @@ func (server *Server) StreamTasksStatus(stream pb.ScannerService_StreamTasksStat
 }
 
 // ServiceControl control the service
-func (server *Server) ServiceControl(ctx context.Context, in *pb.ScannerServiceControl) (*pb.ScannerServiceControl, error) {
-	if in.GetState() == pb.ScannerServiceControl_UNKNOWN {
-		return &pb.ScannerServiceControl{State: server.state.State}, nil
+func (server *Server) ServiceControl(ctx context.Context, in *pb.ServiceStateValues) (*pb.ServiceStateValues, error) {
+	if in.GetState() == pb.ServiceStateValues_UNKNOWN {
+		return &pb.ServiceStateValues{State: server.State.State}, nil
 	}
 
-	if server.state.State != in.GetState() {
-		server.state.State = in.GetState()
+	if server.State.State != in.GetState() {
+		server.State.State = in.GetState()
 	}
 
-	return &pb.ScannerServiceControl{State: server.state.State}, nil
+	return &pb.ServiceStateValues{State: server.State.State}, nil
 }
 
 // GetScan return the engine scan result

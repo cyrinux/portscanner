@@ -6,6 +6,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/server"
 	"github.com/cyrinux/grpcnmapscanner/worker"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -34,16 +35,17 @@ func handleSignalServer() {
 	os.Exit(1)
 }
 
-func startServer(ctx context.Context, conf config.Config, wantPrometheus bool) {
-	if _, err := server.GRPCListen(ctx, conf, wantPrometheus); err != nil {
+func startServer(ctx context.Context, conf config.Config) {
+	if _, err := server.GRPCListen(ctx, conf); err != nil {
 		os.Exit(1)
-	}
-	if wantPrometheus {
-		log.Print("starting prometheus")
-		server.PrometheusListen()
 	}
 
 	go handleSignalServer()
+}
+
+func prometheusListen() {
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(":2112", nil)
 }
 
 func startWorker(ctx context.Context, conf config.Config, tasktype string) {
@@ -66,15 +68,19 @@ func main() {
 			log.Println(http.ListenAndServe(":6060", nil))
 		}()
 	}
+	if *wantPrometheus {
+		log.Print("starting prometheus")
+		go prometheusListen()
+	}
 
 	ctx := context.Background()
 
 	if *isServer {
-		startServer(ctx, allConfig, *wantPrometheus)
+		startServer(ctx, allConfig)
 	} else if *isWorker {
 		startWorker(ctx, allConfig, "nmap")
 	} else {
-		startServer(ctx, allConfig, *wantPrometheus)
+		startServer(ctx, allConfig)
 		startWorker(ctx, allConfig, "nmap")
 	}
 }
