@@ -47,3 +47,16 @@ graphviz:
 	dot -Tsvg ~/protodot/generated/graphviz.dot -o graphviz.svg
 	xdg-open graphviz.png
 
+cobra:
+	protoc \
+		-I. \
+		--gofast_out=plugins=grpc:. \
+		--cobra_out=plugins=client:. \
+		proto/*.proto
+
+clean:
+	rm -f proto/*.pb.go grpcnmapscanner
+
+deps:
+	go get github.com/gogo/protobuf/protoc-gen-gofast
+	go get github.com/Zenithar/go-protoc-gen-cobra
