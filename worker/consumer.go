@@ -116,7 +116,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		// scan failed
 		consumer.failed <- 1
 		// if scan fail or cancelled, mark task as cancel
-		log.Error().Stack().Err(err).Msgf("%s: scan %v: %v", consumer.name, key, result)
+		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.name, key, result)
 		scannerResponse := &pb.ScannerResponse{
 			Status: pb.ScannerResponse_ERROR,
 		}
