@@ -50,7 +50,7 @@ func NewConsumer(
 	}
 }
 
-// Cancel is a function trigger on consumer context cancel
+// onCancel is a function trigger on consumer context cancel
 func (consumer *Consumer) onCancel(request *pb.ParamsScannerRequest) {
 	<-consumer.ctx.Done()
 
@@ -66,7 +66,7 @@ func (consumer *Consumer) onCancel(request *pb.ParamsScannerRequest) {
 		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
 	}
 	_, err = consumer.db.Set(
-		context.Background(), //
+		context.Background(),
 		request.Key,
 		string(scanResultJSON),
 		time.Duration(request.GetRetentionTime())*time.Second,

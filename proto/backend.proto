@@ -1,5 +1,6 @@
 syntax = "proto3";
 package proto;
+// option go_package = "github.com/cyrinux/grpcnmapscanner/proto;proto";
 option go_package = "/proto";
 import "proto/service.proto";
 

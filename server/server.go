@@ -126,8 +126,8 @@ func Listen(ctx context.Context, conf config.Config) {
 		)
 	}
 	srvBackend := grpc.NewServer(
-		grpc.KeepaliveEnforcementPolicy(kaep),
-		grpc.KeepaliveParams(kasp),
+	// grpc.KeepaliveEnforcementPolicy(kaep),
+	// grpc.KeepaliveParams(kasp),
 	)
 	reflection.Register(srvBackend)
 	pb.RegisterBackendServiceServer(srvBackend, server)
