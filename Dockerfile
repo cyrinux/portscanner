@@ -3,7 +3,7 @@
 FROM golang:alpine as builder
 WORKDIR /app
 COPY . .
-RUN apk --no-cache add make protoc git gcc musl-dev
+RUN apk --no-cache add make git protobuf-dev musl-dev openssl
 RUN make build
 
 FROM alpine:latest as scanner

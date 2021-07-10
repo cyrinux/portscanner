@@ -10,7 +10,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto"
-	// _ "github.com/golang/protobuf/ptypes/empty"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -260,6 +260,24 @@ func (server *Server) GetScan(ctx context.Context, in *pb.GetScannerRequest) (*p
 	}
 
 	return generateResponse(in.Key, &scannerResponse, nil)
+}
+
+// GetAllScans return the engine scan result
+func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.ServerResponse, error) {
+	var scannerResponse pb.ScannerResponse
+
+	scanResult, err := server.db.Get(ctx, "*")
+	if err != nil {
+		return generateResponse("*", nil, err)
+	}
+
+	err = json.Unmarshal([]byte(scanResult), &scannerResponse)
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("can't read scan result")
+		return generateResponse("*", nil, err)
+	}
+
+	return generateResponse("*", &scannerResponse, nil)
 }
 
 // StartScan function prepare a nmap scan

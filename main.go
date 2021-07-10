@@ -1,5 +1,5 @@
 //go:generate go run -mod=vendor git.rootprojects.org/root/go-gitver/v2 --package version --outfile ./version/xversion.go
-//go:generate protoc --go_out=plugins=grpc:. ./proto/service.proto ./proto/backend.proto
+//go:generate protoc -I/usr/include -I. --go_out=plugins=grpc:. ./proto/service.proto ./proto/backend.proto
 
 package main
 
@@ -17,7 +17,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 )
 
@@ -30,9 +29,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		if len(os.Args) > 1 && "version" == strings.TrimLeft(os.Args[1], "-") {
-			fmt.Printf("GRPCNMAPScanner v%s (%s) %s\n", version.Version(), version.Commit(), version.Date())
-		}
+		version.Show()
 		os.Exit(0)
 	}
 
@@ -46,6 +43,8 @@ func main() {
 	}
 
 	allConfig := config.GetConfig()
+
+	version.Show()
 
 	if *isServer {
 		startServer(ctx, allConfig)

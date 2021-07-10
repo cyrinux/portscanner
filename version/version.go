@@ -1,5 +1,11 @@
 package version
 
+import (
+	"fmt"
+	"os"
+	"strings"
+)
+
 var (
 	commit  = "0000000"
 	version = "0.0.0-pre0+0000000"
@@ -19,4 +25,11 @@ func Version() string {
 // Date returns the ISO-formatted date string
 func Date() string {
 	return date
+}
+
+// Show show the versions infos
+func Show() {
+	if len(os.Args) > 1 && "version" == strings.TrimLeft(os.Args[1], "-") {
+		fmt.Printf("GRPCNMAPScanner v%s (%s) %s\n", Version(), Commit(), Date())
+	}
 }

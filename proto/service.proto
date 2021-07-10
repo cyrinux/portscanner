@@ -1,8 +1,7 @@
 syntax = "proto3";
 package proto;
-// option go_package = "github.com/cyrinux/grpcnmapscanner/proto;proto";
 option go_package = "/proto";
-// import "google/protobuf/empty.proto";
+import "google/protobuf/empty.proto";
 
 message Host {
     string address = 1;
@@ -93,7 +92,7 @@ service ScannerService {
     rpc StartAsyncScan(ParamsScannerRequest) returns (ServerResponse);
     rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
     rpc GetScan(GetScannerRequest) returns (ServerResponse);
-    // rpc GetAllScans(google.protobuf.empty) returns (ServerResponse);
+    rpc GetAllScans(google.protobuf.Empty) returns (ServerResponse);
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
     rpc ServiceControl(ServiceStateValues) returns (ServiceStateValues);
 }
