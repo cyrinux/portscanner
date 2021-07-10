@@ -1,4 +1,5 @@
 //go:generate go run -mod=vendor git.rootprojects.org/root/go-gitver/v2 --package version --outfile ./version/xversion.go
+//go:generate protoc --gofast_out=plugins=grpc:. proto/backend.proto proto/service.proto
 package main
 
 import (
@@ -29,7 +30,7 @@ func main() {
 
 	if *showVersion {
 		if len(os.Args) > 1 && "version" == strings.TrimLeft(os.Args[1], "-") {
-			fmt.Printf("GRPCScanner v%s (%s) %s\n", version.Version(), version.Commit(), version.Date())
+			fmt.Printf("GRPCNMAPScanner v%s (%s) %s\n", version.Version(), version.Commit(), version.Date())
 		}
 		os.Exit(0)
 	}
