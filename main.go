@@ -1,10 +1,13 @@
+//go:generate go run -mod=vendor git.rootprojects.org/root/go-gitver/v2 --package version --outfile ./version/xversion.go
 package main
 
 import (
 	"context"
 	"flag"
+	"fmt"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/server"
+	"github.com/cyrinux/grpcnmapscanner/version"
 	"github.com/cyrinux/grpcnmapscanner/worker"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
@@ -12,8 +15,45 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
+
+func main() {
+	showVersion := flag.Bool("version", false, "Print version and exit")
+	isServer := flag.Bool("server", false, "Start the gRPC server")
+	isWorker := flag.Bool("worker", false, "Start the worker")
+	wantProfiler := flag.Bool("pprof", false, "Start pprof profiler")
+	wantPrometheus := flag.Bool("prometheus", false, "Expose prometheus stats")
+	flag.Parse()
+
+	if *showVersion {
+		if len(os.Args) > 1 && "version" == strings.TrimLeft(os.Args[1], "-") {
+			fmt.Printf("GRPCScanner v%s (%s) %s\n", version.Version(), version.Commit(), version.Date())
+		}
+		os.Exit(0)
+	}
+
+	ctx := context.Background()
+
+	if *wantProfiler {
+		go profilerListen()
+	}
+	if *wantPrometheus {
+		go prometheusListen()
+	}
+
+	allConfig := config.GetConfig()
+
+	if *isServer {
+		startServer(ctx, allConfig)
+	} else if *isWorker {
+		startWorker(ctx, allConfig, "nmap")
+	} else {
+		startServer(ctx, allConfig)
+		startWorker(ctx, allConfig, "nmap")
+	}
+}
 
 func handleSignalWorker(worker *worker.Worker) {
 	signals := make(chan os.Signal, 1)
@@ -43,8 +83,9 @@ func startServer(ctx context.Context, conf config.Config) {
 }
 
 func prometheusListen() {
+	log.Print("starting prometheus listener")
 	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(":2112", nil)
+	fmt.Println(http.ListenAndServe(":2112", nil))
 }
 
 func startWorker(ctx context.Context, conf config.Config, tasktype string) {
@@ -54,32 +95,7 @@ func startWorker(ctx context.Context, conf config.Config, tasktype string) {
 	go handleSignalWorker(w)
 }
 
-func main() {
-	isServer := flag.Bool("server", false, "start the gRPC server")
-	isWorker := flag.Bool("worker", false, "start the worker")
-	wantProfiler := flag.Bool("pprof", false, "start pprof profiler")
-	wantPrometheus := flag.Bool("prometheus", false, "expose prometheus stats")
-	allConfig := config.GetConfig()
-	flag.Parse()
-
-	if *wantProfiler {
-		go func() {
-			log.Println(http.ListenAndServe(":6060", nil))
-		}()
-	}
-	if *wantPrometheus {
-		log.Print("starting prometheus")
-		go prometheusListen()
-	}
-
-	ctx := context.Background()
-
-	if *isServer {
-		startServer(ctx, allConfig)
-	} else if *isWorker {
-		startWorker(ctx, allConfig, "nmap")
-	} else {
-		startServer(ctx, allConfig)
-		startWorker(ctx, allConfig, "nmap")
-	}
+func profilerListen() {
+	log.Print("starting pprof listener")
+	log.Println(http.ListenAndServe(":6060", nil))
 }

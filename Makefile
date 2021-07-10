@@ -7,23 +7,35 @@ up: build-docker
 	docker-compose up -d --scale worker=2
 	docker-compose logs -f --tail=50
 
-build:
+build: generate
 	 CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -mod vendor -installsuffix cgo -o grpcnmapscanner .
+
+generate:
+	go generate -mod=vendor ./...
 
 .PHONY: vendor
 vendor:
+	@echo Make vendor
+	go mod tidy
 	go mod vendor
 
 .PHONY: proto
-proto:
+proto: vendor cobra
 	@echo Generating protobuf code from docker
-	@docker run --rm -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -l go -f proto/service.proto
-	@docker run --rm -e UID=$(shell id -u) -e GID=$(shell id -g) -v `pwd`:/defs namely/protoc-all -l go -f proto/backend.proto
-	@sudo chown -R $(shell id -u):$(shell id -g) ./gen
-	@mv gen/pb-go/proto/*.pb.go ./proto
-	@rm ./gen -rf
+	@protoc \
+		-I. \
+		--go_out=. \
+		proto/*.proto
 
-build-docker: proto
+cobra:
+	@echo Generating protobuf code for cobra
+	@protoc \
+		-I. \
+		--gofast_out=plugins=grpc:. \
+		--cobra_out=plugins=client:. \
+		proto/*.proto
+
+build-docker: vendor proto
 	docker-compose build
 
 .PHONY: server
@@ -47,16 +59,9 @@ graphviz:
 	dot -Tsvg ~/protodot/generated/graphviz.dot -o graphviz.svg
 	xdg-open graphviz.png
 
-cobra:
-	protoc \
-		-I. \
-		--gofast_out=plugins=grpc:. \
-		--cobra_out=plugins=client:. \
-		proto/*.proto
-
 clean:
 	rm -f proto/*.pb.go grpcnmapscanner
 
-deps:
+deps: vendor
 	go get github.com/gogo/protobuf/protoc-gen-gofast
 	go get github.com/Zenithar/go-protoc-gen-cobra
