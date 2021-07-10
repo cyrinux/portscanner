@@ -67,7 +67,6 @@ type Config struct {
 // GetConfig get the configuration
 func GetConfig() Config {
 
-	log.Debug().Msg("reading config")
 	// Init config
 	var conf Config
 
