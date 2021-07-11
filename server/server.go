@@ -296,7 +296,6 @@ func (server *Server) GetScan(ctx context.Context, in *pb.GetScannerRequest) (*p
 
 // GetAllScans return the engine scan result
 func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.AllServerResponses, error) {
-	var scannerResponse pb.ScannerResponse
 	var allScannerResponses []*pb.ScannerResponse
 
 	allKeys, err := server.db.GetAll(ctx, "*")
@@ -305,6 +304,7 @@ func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.All
 	}
 
 	for _, key := range allKeys {
+		var scannerResponse pb.ScannerResponse
 		scanResult, err := server.db.Get(ctx, key)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't get scan result")
@@ -312,6 +312,8 @@ func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.All
 		}
 
 		err = json.Unmarshal([]byte(scanResult), &scannerResponse)
+		scannerResponse.Key = key
+
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't list scan result")
 			return generateArrayResponses("list", nil, err)
@@ -416,7 +418,7 @@ func generateResponse(key string, value *pb.ScannerResponse, err error) (*pb.Ser
 	}, nil
 }
 
-// generateArrayResponses generate the response for the grpc return
+// generateArrayResponses generate the response from array of ScannerResponse for the grpc return
 func generateArrayResponses(key string, responses []*pb.ScannerResponse, err error) (*pb.AllServerResponses, error) {
 	if key == "list" {
 		arr := make([]*pb.ServerResponse, 0)
