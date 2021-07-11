@@ -86,6 +86,13 @@ func parseParamsScannerRequestNmapOptions(
 
 	if s.GetServiceDefaultScripts() {
 		options = append(options, nmap.WithDefaultScript())
+		options = append(options, nmap.WithScriptUpdateDB())
+	}
+
+	if s.GetVulners() {
+		options = append(options, nmap.WithScriptUpdateDB())
+		options = append(options, nmap.WithServiceInfo())
+		options = append(options, nmap.WithScripts("vulners"))
 	}
 
 	if s.GetWithAggressiveScan() {
@@ -166,7 +173,7 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 					retention,
 				)
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}()
 
@@ -207,8 +214,8 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 			fp := host.OS.Matches[0]
 			osversion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
 		}
-		for _, adr := range host.Addresses {
-			address := adr.Addr
+		for _, ip := range host.Addresses {
+			address := ip.Addr
 			hostResult := &proto.Host{
 				Address:   address,
 				OsVersion: osversion,
