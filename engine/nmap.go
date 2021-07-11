@@ -208,7 +208,12 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 		log.Error().Err(err).Msg("")
 		return nil, err
 	}
+	// fmt.Printf("%+v", result)
 	for _, host := range result.Hosts {
+
+		// fmt.Printf("Post: %+v\n", result.PostScripts)
+		// fmt.Printf("Pre: %+v\n", result.PreScripts)
+
 		var osversion string
 		if len(host.Addresses) == 0 {
 			continue
@@ -217,6 +222,7 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 			fp := host.OS.Matches[0]
 			osversion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
 		}
+
 		for _, ip := range host.Addresses {
 			address := ip.Addr
 			hostResult := &proto.Host{
@@ -224,12 +230,24 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 				OsVersion: osversion,
 				State:     host.Status.Reason,
 			}
+
 			for _, port := range host.Ports {
+				scripts := make([]*proto.Script, 0)
+				for _, v := range port.Scripts {
+					scripts = append(
+						scripts,
+						&proto.Script{
+							Id:     v.ID,
+							Output: v.Output,
+						},
+					)
+				}
 				version := &proto.PortVersion{
 					ExtraInfos:  port.Service.ExtraInfo,
 					LowVersion:  port.Service.LowVersion,
 					HighVersion: port.Service.HighVersion,
 					Product:     port.Service.Product,
+					Scripts:     scripts,
 				}
 				newPort := &proto.Port{
 					PortId:      fmt.Sprintf("%v", port.ID),

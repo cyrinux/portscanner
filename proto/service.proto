@@ -10,11 +10,19 @@ message Host {
     string fqdn = 4;
 }
 
+message Script {
+    string id = 1;
+    string output = 2;
+    string elements = 3;
+    string tables = 4;
+}
+
 message PortVersion {
    string low_version = 1;
    string high_version = 2;
    string extra_infos = 3;
    string product = 4;
+   repeated Script scripts = 5;
 }
 
 message Port {
