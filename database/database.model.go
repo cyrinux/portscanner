@@ -10,6 +10,7 @@ import (
 type Database interface {
 	Set(ctx context.Context, key string, value string, retention time.Duration) (string, error)
 	Get(ctx context.Context, key string) (string, error)
+	GetAll(ctx context.Context, key string) ([]string, error)
 	Delete(ctx context.Context, key string) (string, error)
 }
 

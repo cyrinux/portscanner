@@ -21,6 +21,8 @@ import (
 	"google.golang.org/grpc/reflection"
 	"io"
 	"net"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 )
@@ -111,6 +113,21 @@ func Listen(ctx context.Context, conf config.Config) {
 			grpc.KeepaliveEnforcementPolicy(kaep),
 			grpc.KeepaliveParams(kasp),
 		)
+
+		// graceful shutdown
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				// sig is a ^C, handle it
+				log.Info().Msg("shutting down gRPC server...")
+
+				srvFrontend.GracefulStop()
+
+				<-ctx.Done()
+			}
+		}()
+
 		reflection.Register(srvFrontend)
 		pb.RegisterScannerServiceServer(srvFrontend, server)
 		if err = srvFrontend.Serve(frontListener); err != nil {
@@ -126,9 +143,24 @@ func Listen(ctx context.Context, conf config.Config) {
 		)
 	}
 	srvBackend := grpc.NewServer(
-	// grpc.KeepaliveEnforcementPolicy(kaep),
-	// grpc.KeepaliveParams(kasp),
+		grpc.KeepaliveEnforcementPolicy(kaep),
+		grpc.KeepaliveParams(kasp),
 	)
+	// graceful shutdown
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	go func() {
+		for range c {
+			// sig is a ^C, handle it
+			log.Info().Msg("shutting down gRPC server...")
+
+			srvBackend.GracefulStop()
+
+			<-ctx.Done()
+		}
+	}()
+
 	reflection.Register(srvBackend)
 	pb.RegisterBackendServiceServer(srvBackend, server)
 	if err = srvBackend.Serve(backendListener); err != nil {
@@ -263,21 +295,32 @@ func (server *Server) GetScan(ctx context.Context, in *pb.GetScannerRequest) (*p
 }
 
 // GetAllScans return the engine scan result
-func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.ServerResponse, error) {
+func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.AllServerResponses, error) {
 	var scannerResponse pb.ScannerResponse
+	var allScannerResponses []*pb.ScannerResponse
 
-	scanResult, err := server.db.Get(ctx, "*")
+	allKeys, err := server.db.GetAll(ctx, "*")
 	if err != nil {
-		return generateResponse("*", nil, err)
+		return generateArrayResponses("list", nil, err)
 	}
 
-	err = json.Unmarshal([]byte(scanResult), &scannerResponse)
-	if err != nil {
-		log.Error().Stack().Err(err).Msg("can't read scan result")
-		return generateResponse("*", nil, err)
+	for _, key := range allKeys {
+		scanResult, err := server.db.Get(ctx, key)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't get scan result")
+			continue
+		}
+
+		err = json.Unmarshal([]byte(scanResult), &scannerResponse)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't list scan result")
+			return generateArrayResponses("list", nil, err)
+		}
+
+		allScannerResponses = append(allScannerResponses, &scannerResponse)
 	}
 
-	return generateResponse("*", &scannerResponse, nil)
+	return generateArrayResponses("list", allScannerResponses, nil)
 }
 
 // StartScan function prepare a nmap scan
@@ -371,6 +414,24 @@ func generateResponse(key string, value *pb.ScannerResponse, err error) (*pb.Ser
 		Value:   value,
 		Error:   "",
 	}, nil
+}
+
+// generateArrayResponses generate the response for the grpc return
+func generateArrayResponses(key string, responses []*pb.ScannerResponse, err error) (*pb.AllServerResponses, error) {
+	if key == "list" {
+		arr := make([]*pb.ServerResponse, 0)
+		for _, scanResp := range responses {
+			serverResponse := &pb.ServerResponse{
+				Success: true,
+				Key:     scanResp.Key,
+				Value:   scanResp,
+				Error:   "",
+			}
+			arr = append(arr, serverResponse)
+		}
+		return &pb.AllServerResponses{Response: arr}, nil
+	}
+	return &pb.AllServerResponses{Response: nil}, errors.Wrap(nil, "can't get all responses")
 }
 
 func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {

@@ -45,6 +45,18 @@ func (r redisSentinelDatabase) Get(ctx context.Context, key string) (string, err
 	return value, nil
 }
 
+func (r redisSentinelDatabase) GetAll(ctx context.Context, key string) ([]string, error) {
+	arr := make([]string, 0)
+	iter := r.client.Scan(ctx, 0, key, 0).Iterator()
+	for iter.Next(ctx) {
+		arr = append(arr, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+	return arr, nil
+}
+
 func (r redisSentinelDatabase) Delete(ctx context.Context, key string) (string, error) {
 	_, err := r.client.Del(ctx, key).Result()
 	if err != nil {

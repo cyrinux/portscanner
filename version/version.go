@@ -2,8 +2,6 @@ package version
 
 import (
 	"fmt"
-	"os"
-	"strings"
 )
 
 var (
@@ -28,8 +26,6 @@ func Date() string {
 }
 
 // Show show the versions infos
-func Show() {
-	if len(os.Args) > 1 && "version" == strings.TrimLeft(os.Args[1], "-") {
-		fmt.Printf("GRPCNMAPScanner v%s (%s) %s\n", Version(), Commit(), Date())
-	}
+func Show() string {
+	return fmt.Sprintf("GRPCNMAPScanner v%s (%s) %s\n", Version(), Commit(), Date())
 }

@@ -17,7 +17,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"syscall"
 )
 
 func main() {
@@ -29,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		version.Show()
+		fmt.Print(version.Show())
 		os.Exit(0)
 	}
 
@@ -44,7 +43,7 @@ func main() {
 
 	allConfig := config.GetConfig()
 
-	version.Show()
+	log.Print(version.Show())
 
 	if *isServer {
 		startServer(ctx, allConfig)
@@ -58,7 +57,7 @@ func main() {
 
 func handleSignalWorker(worker *worker.Worker) {
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT)
+	signal.Notify(signals, os.Interrupt)
 	defer signal.Stop(signals)
 	go func() {
 		<-signals // hard exit on second signal (in case shutdown gets stuck)
@@ -70,14 +69,13 @@ func handleSignalWorker(worker *worker.Worker) {
 
 func handleSignalServer() {
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT)
+	signal.Notify(signals, os.Interrupt)
 	defer signal.Stop(signals)
 	<-signals // hard exit on second signal (in case shutdown gets stuck)
 	os.Exit(1)
 }
 
 func startServer(ctx context.Context, conf config.Config) {
-
 	server.Listen(ctx, conf)
 
 	go handleSignalServer()

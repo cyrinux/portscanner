@@ -53,10 +53,6 @@ services:
     deploy:
       mode: replicated
       replicas: 3
-      update_config:
-        parallelism: 2
-        delay: 10s
-        order: start-first
 
   redis-primary:
     image: docker.io/bitnami/redis:6.2
@@ -92,10 +88,6 @@ services:
     deploy:
       mode: replicated
       replicas: 5
-      update_config:
-        parallelism: 2
-        delay: 10s
-        order: start-first
 
   redis-sentinel:
     image: "bitnami/redis-sentinel:6.2"
@@ -114,10 +106,6 @@ services:
     deploy:
       mode: replicated
       replicas: 3
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: stop-first
 
   prometheus:
     image: prom/prometheus:v2.26.0
