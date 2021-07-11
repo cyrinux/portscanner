@@ -419,24 +419,7 @@ func generateResponse(key string, value *pb.ScannerResponse, err error) (*pb.Ser
 	}, nil
 }
 
-// generateArrayResponses generate the response from array of ScannerResponse for the grpc return
-func generateArrayResponses(key string, responses []*pb.ScannerResponse, err error) (*pb.AllServerResponses, error) {
-	if key == "list" {
-		arr := make([]*pb.ServerResponse, 0)
-		for _, scanResp := range responses {
-			serverResponse := &pb.ServerResponse{
-				Success: true,
-				Key:     scanResp.Key,
-				Value:   scanResp,
-				Error:   "",
-			}
-			arr = append(arr, serverResponse)
-		}
-		return &pb.AllServerResponses{Response: arr}, nil
-	}
-	return &pb.AllServerResponses{Response: nil}, errors.Wrap(nil, "can't get all responses")
-}
-
+// parseParamsScannerRequest parse, sanitize the request
 func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
 
 	// if the Key is not forced, we generate one unique
