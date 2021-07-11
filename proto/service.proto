@@ -65,7 +65,7 @@ message ParamsScannerRequest {
     int64 defer_duration = 14;
     string crontab = 15;
     int32 scan_speed = 16;
-    bool vulners = 17;
+    string service_scripts = 17;
 }
 
 message GetScannerRequest {

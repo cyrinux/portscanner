@@ -89,10 +89,13 @@ func parseParamsScannerRequestNmapOptions(
 		options = append(options, nmap.WithScriptUpdateDB())
 	}
 
-	if s.GetVulners() {
+	if s.ServiceScripts != "" {
 		options = append(options, nmap.WithScriptUpdateDB())
 		options = append(options, nmap.WithServiceInfo())
-		options = append(options, nmap.WithScripts("vulners"))
+		for _, script := range strings.Split(s.ServiceScripts, ",") {
+			options = append(options, nmap.WithScripts(script))
+
+		}
 	}
 
 	if s.GetWithAggressiveScan() {
