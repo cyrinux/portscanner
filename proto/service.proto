@@ -5,7 +5,7 @@ import "google/protobuf/empty.proto";
 
 message Host {
     string address = 1;
-    string os_version = 2;
+    optional string os_version = 2;
     string state = 3;
     string fqdn = 4;
 }
@@ -27,8 +27,8 @@ message Port {
     string port_id = 1;
     string protocol = 2;
     string state = 3;
-    string service_name = 4;
-    PortVersion version = 5;
+    optional string service_name = 4;
+    optional PortVersion version = 5;
 }
 
 message HostResult {
@@ -96,11 +96,17 @@ message ServiceStateValues {
 
 // Server ScannerService
 service ScannerService {
+    // start an async scan task
     rpc StartAsyncScan(ParamsScannerRequest) returns (ServerResponse);
+    // start a scan task
     rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
+    // fetch a task result from database filter by key
     rpc GetScan(GetScannerRequest) returns (ServerResponse);
+    // fetch all results from database
     rpc GetAllScans(google.protobuf.Empty) returns (stream ServerResponse);
+    // delete a task entry from the database
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
+    // control the worker state
     rpc ServiceControl(ServiceStateValues) returns (ServiceStateValues);
 }
 
