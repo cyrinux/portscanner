@@ -78,10 +78,6 @@ message ServerResponse{
     string error = 4;
 }
 
-message AllServerResponses{
-    repeated ServerResponse response = 1;
-}
-
 message ServiceStateValues {
     enum ServiceState {
         UNKNOWN = 0;
@@ -96,7 +92,7 @@ service ScannerService {
     rpc StartAsyncScan(ParamsScannerRequest) returns (ServerResponse);
     rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
     rpc GetScan(GetScannerRequest) returns (ServerResponse);
-    rpc GetAllScans(google.protobuf.Empty) returns (AllServerResponses);
+    rpc GetAllScans(google.protobuf.Empty) returns (stream ServerResponse);
     rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
     rpc ServiceControl(ServiceStateValues) returns (ServiceStateValues);
 }

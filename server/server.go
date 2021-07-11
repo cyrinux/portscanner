@@ -295,17 +295,15 @@ func (server *Server) GetScan(ctx context.Context, in *pb.GetScannerRequest) (*p
 }
 
 // GetAllScans return the engine scan result
-func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.AllServerResponses, error) {
-	var allScannerResponses []*pb.ScannerResponse
-
-	allKeys, err := server.db.GetAll(ctx, "*")
+func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetAllScansServer) error {
+	allKeys, err := server.db.GetAll(server.ctx, "*")
 	if err != nil {
-		return generateArrayResponses("list", nil, err)
+		return err
 	}
 
 	for _, key := range allKeys {
 		var scannerResponse pb.ScannerResponse
-		scanResult, err := server.db.Get(ctx, key)
+		scanResult, err := server.db.Get(server.ctx, key)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't get scan result")
 			continue
@@ -313,16 +311,19 @@ func (server *Server) GetAllScans(ctx context.Context, in *empty.Empty) (*pb.All
 
 		err = json.Unmarshal([]byte(scanResult), &scannerResponse)
 		scannerResponse.Key = key
-
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't list scan result")
-			return generateArrayResponses("list", nil, err)
+			return err
 		}
 
-		allScannerResponses = append(allScannerResponses, &scannerResponse)
+		resp, err := generateResponse(key, &scannerResponse, err)
+		if err != nil {
+			return err
+		}
+		stream.Send(resp)
 	}
 
-	return generateArrayResponses("list", allScannerResponses, nil)
+	return nil
 }
 
 // StartScan function prepare a nmap scan
