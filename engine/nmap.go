@@ -234,14 +234,25 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 			for _, port := range host.Ports {
 				scripts := make([]*proto.Script, 0)
 				for _, v := range port.Scripts {
+					// split some scripts result (vulners)
+					scriptOutputArray := strings.Split(v.Output, "\n    \t")
+
+					output := make([]string, 0)
+					for _, line := range scriptOutputArray {
+						line = strings.ReplaceAll(line, "\t", "  ")
+						line = strings.TrimSpace(line)
+						output = append(output, line)
+					}
+
 					scripts = append(
 						scripts,
 						&proto.Script{
 							Id:     v.ID,
-							Output: v.Output,
+							Output: output,
 						},
 					)
 				}
+
 				version := &proto.PortVersion{
 					ExtraInfos:  port.Service.ExtraInfo,
 					LowVersion:  port.Service.LowVersion,
@@ -249,6 +260,7 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 					Product:     port.Service.Product,
 					Scripts:     scripts,
 				}
+
 				newPort := &proto.Port{
 					PortId:      fmt.Sprintf("%v", port.ID),
 					ServiceName: port.Service.Name,

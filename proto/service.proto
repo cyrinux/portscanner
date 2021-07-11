@@ -12,9 +12,7 @@ message Host {
 
 message Script {
     string id = 1;
-    string output = 2;
-    string elements = 3;
-    string tables = 4;
+    repeated string output = 2;
 }
 
 message PortVersion {
