@@ -22,6 +22,7 @@ All scan results are stored in the database (redis only for the moment)
 # Build
 
 ```bash
+$ make cert
 $ make
 ```
 
@@ -30,6 +31,7 @@ $ make
 Start the server as root with
 
 ```bash
+$ make cert
 $ make
 ```
 
@@ -44,5 +46,7 @@ $ make testscan
 Or
 
 ```bash
-$ grpc_cli call 127.0.0.1:9000 scanner.ScannerService.Scan "hosts:'google.com',ports:'80,443'"
+$ grpcurl -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -d '{"hosts":"scanme.nmap.org,levis.name","os_detection":true,"fast_mode":true,"service_default_scripts":false,"service_version_detection":true,"scan_speed":5,"ports":"443","service_scripts":"vulners","use_tor":true,"timeout":3600}' -H "Username: admin" -H "Password: admin123" 127.0.0.1:9000 proto.ScannerService.StartScan
+
+$./bin/scanner StartScan '{"hosts":"scanme.nmap.org,levis.name","os_detection":true,"fast_mode":true,"service_default_scripts":false,"service_version_detection":true,"scan_speed":5,"ports":"443","service_scripts":"vulners","use_tor":true,"timeout":3600}'
 ```

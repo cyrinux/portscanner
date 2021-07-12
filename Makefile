@@ -61,10 +61,12 @@ proto-docker:
 	@rm ./gen -rf
 
 testscan:
-	grpc_cli ls 127.0.0.1:9000
-	grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'scanme.nmap.org',fast_mode:true"
-	grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
-	grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
+	./bin/scanner
+	./bin/scanner -d '{"hosts":"scanme.nmap.org","fast_mode":true}' StartAsyncScan
+	# grpc_cli ls 127.0.0.1:9000
+	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'scanme.nmap.org',fast_mode:true"
+	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
+	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
 
 
 

@@ -123,8 +123,8 @@ func Listen(ctx context.Context, conf config.Config) {
 			grpc.KeepaliveEnforcementPolicy(kaep),
 			grpc.KeepaliveParams(kasp),
 			grpc.Creds(tlsCredentials),
-			// grpc.StreamInterceptor(streamInterceptor),
-			// grpc.UnaryInterceptor(unaryInterceptor),
+			grpc.StreamInterceptor(streamInterceptor),
+			grpc.UnaryInterceptor(unaryInterceptor),
 		)
 
 		// graceful shutdown
