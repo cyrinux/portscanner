@@ -16,10 +16,10 @@ message Script {
 }
 
 message PortVersion {
-   string low_version = 1;
-   string high_version = 2;
-   string extra_infos = 3;
-   string product = 4;
+   optional string low_version = 1;
+   optional string high_version = 2;
+   optional string extra_infos = 3;
+   optional string product = 4;
    repeated Script scripts = 5;
 }
 

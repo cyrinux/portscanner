@@ -259,10 +259,10 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 				}
 
 				version := &pb.PortVersion{
-					ExtraInfos:  port.Service.ExtraInfo,
-					LowVersion:  port.Service.LowVersion,
-					HighVersion: port.Service.HighVersion,
-					Product:     port.Service.Product,
+					ExtraInfos:  &port.Service.ExtraInfo,
+					LowVersion:  &port.Service.LowVersion,
+					HighVersion: &port.Service.HighVersion,
+					Product:     &port.Service.Product,
 					Scripts:     scripts,
 				}
 
