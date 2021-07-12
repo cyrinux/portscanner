@@ -45,6 +45,11 @@ func parseParamsScannerRequestNmapOptions(
 		nmap.WithTimingTemplate(nmap.Timing(s.ScanSpeed)),
 	}
 
+	if s.GetUseTor() {
+		options = append(options, nmap.WithProxies("socks4://127.0.0.1:9050"))
+		options = append(options, nmap.WithSkipHostDiscovery())
+	}
+
 	portsList := strings.Split(ports, ",")
 	if len(ports) == 0 && !s.GetPingOnly() {
 		if s.GetFastMode() {
