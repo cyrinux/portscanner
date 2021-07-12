@@ -1,11 +1,12 @@
 #!/bin/sh
-grpc_cli ls 127.0.0.1:9000 proto.ScannerService
-grpc_cli ls 127.0.0.1:9000 proto.ScannerService -l
-grpc_cli type 127.0.0.1:9000 proto.ParamsScannerRequest
+server=127.0.0.1:9000
+grpc_cli ls $server proto.ScannerService
+grpc_cli ls $server proto.ScannerService -l
+grpc_cli type $server proto.ParamsScannerRequest
 
 if [ $# -eq 0 ]; then
     exit 1
 fi
 action=$1
 shift
-grpc_cli call 127.0.0.1:9000 proto.ScannerService.$action $@
+grpc_cli call $server proto.ScannerService.$action $@

@@ -68,11 +68,22 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	// distributed lock - with redis
 	locker := redislock.New(redisClient)
 
+	// tls client config
+	tlsCredentials, err := loadTLSCredentials(conf.Backend.CAFile, conf.Backend.ClientCertFile, conf.Backend.ClientKeyFile)
+	if err != nil {
+		log.Fatal().Msgf("cannot load TLS credentials: %v", err)
+	}
+
 	grpcServer, err := grpc.Dial(
 		conf.BackendServer,
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(tlsCredentials),
 		grpc.WithKeepaliveParams(kacp),
+		grpc.WithPerRPCCredentials(&loginCreds{
+			Username: "admin",
+			Password: "admin123",
+		}),
 	)
+
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
 	}

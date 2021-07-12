@@ -1,0 +1,10 @@
+# Extensions to add to a certificate request
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = ip6-localhost
+DNS.3 = server
+IP.1 = 127.0.0.1
+IP.2 = ::1
+IP.3 = 0.0.0.0

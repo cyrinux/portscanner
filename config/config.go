@@ -62,6 +62,24 @@ type Config struct {
 	Logger     LoggerConfig
 	Prometheus PrometheusConfig
 	Global
+	Backend  GRPCBackend
+	Frontend GRPCFrontend
+}
+
+// GRPCBackendServer is the GRPC backend endpoint config
+type GRPCBackend struct {
+	CAFile         string `default:"/etc/scanner/cert/ca-cert.pem" split_words:"true"`
+	ServerCertFile string `default:"/etc/scanner/cert/server-cert.pem" split_words:"true"`
+	ServerKeyFile  string `default:"/etc/scanner/cert/server-key.pem" split_words:"true"`
+	ClientCertFile string `default:"/etc/scanner/cert/client-worker-cert.pem" split_words:"true"`
+	ClientKeyFile  string `default:"/etc/scanner/cert/client-worker-key.pem" split_words:"true"`
+}
+
+// GRPCBackendServer is the GRPC backend endpoint config
+type GRPCFrontend struct {
+	CAFile         string `default:"/etc/scanner/cert/ca-cert.pem" split_words:"true"`
+	ServerCertFile string `default:"/etc/scanner/cert/server-cert.pem" split_words:"true"`
+	ServerKeyFile  string `default:"/etc/scanner/cert/server-key.pem" split_words:"true"`
 }
 
 // GetConfig get the configuration

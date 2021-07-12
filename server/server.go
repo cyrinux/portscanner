@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/cyrinux/grpcnmapscanner/broker"
@@ -15,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
@@ -94,7 +94,7 @@ type Server struct {
 	tasksStatus TasksStatus
 }
 
-// ScannerListen start the frontend grpc server
+// Listen start the frontend grpc server
 func Listen(ctx context.Context, conf config.Config) {
 	log.Info().Msg("prepare to serve the gRPC api")
 
@@ -109,9 +109,22 @@ func Listen(ctx context.Context, conf config.Config) {
 				"can't start frontend server, can't listen on tcp/%d", conf.FrontendListenPort,
 			)
 		}
+
+		tlsCredentials, err := loadTLSCredentials(
+			s.config.Frontend.CAFile,
+			s.config.Frontend.ServerCertFile,
+			s.config.Frontend.ServerKeyFile,
+		)
+		if err != nil {
+			log.Fatal().Msgf("cannot load TLS credentials: %v", err)
+		}
+
 		srvFrontend := grpc.NewServer(
 			grpc.KeepaliveEnforcementPolicy(kaep),
 			grpc.KeepaliveParams(kasp),
+			grpc.Creds(tlsCredentials),
+			// grpc.StreamInterceptor(streamInterceptor),
+			// grpc.UnaryInterceptor(unaryInterceptor),
 		)
 
 		// graceful shutdown
@@ -142,10 +155,24 @@ func Listen(ctx context.Context, conf config.Config) {
 			"can't start backend server, can't listen on tcp/%d", conf.BackendListenPort,
 		)
 	}
+
+	tlsCredentials, err := loadTLSCredentials(
+		conf.Backend.CAFile,
+		conf.Backend.ServerCertFile,
+		conf.Backend.ServerKeyFile,
+	)
+	if err != nil {
+		log.Fatal().Msgf("cannot load TLS credentials: %v", err)
+	}
+
 	srvBackend := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
+		grpc.Creds(tlsCredentials),
+		grpc.StreamInterceptor(streamInterceptor),
+		grpc.UnaryInterceptor(unaryInterceptor),
 	)
+
 	// graceful shutdown
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)

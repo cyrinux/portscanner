@@ -10,7 +10,8 @@ FROM alpine:latest as scanner
 MAINTAINER  Cyril Levis <grpcnmapscanner@levis.name>
 LABEL Name=grpcnmapscanner
 RUN apk --no-cache add ca-certificates nmap nmap-scripts iputils tcptraceroute fping openssl tor torsocks proxychains-ng && rm -f /var/cache/apk/*
-ADD entrypoint.sh /
+ADD docker/entrypoint.sh /
 COPY --from=builder /app/grpcnmapscanner /usr/local/bin/grpcnmapscanner
 EXPOSE 9000 9001 6060 2112
 ENTRYPOINT ["/entrypoint.sh"]
+# ENTRYPOINT ["grpcnmapscanner"]

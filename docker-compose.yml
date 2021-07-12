@@ -31,6 +31,8 @@ services:
       - "127.0.0.1:9001:9001"
       - "127.0.0.1:6060:6060"
       - "127.0.0.1:2112:2112"
+    volumes:
+      - "./cert:/etc/scanner/cert:ro"
     networks:
       - backend
 
@@ -51,6 +53,8 @@ services:
       - backend
     ports:
       - "127.0.0.1:16060-16062:6060"
+    volumes:
+      - "./cert:/etc/scanner/cert:ro"
     deploy:
       mode: replicated
       replicas: 3
