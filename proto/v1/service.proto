@@ -1,6 +1,6 @@
 syntax = "proto3";
 package proto;
-option go_package = "/proto";
+option go_package = "/proto/v1";
 import "google/protobuf/empty.proto";
 
 message Host {

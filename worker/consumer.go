@@ -8,7 +8,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
-	pb "github.com/cyrinux/grpcnmapscanner/proto"
+	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"time"
 )
 

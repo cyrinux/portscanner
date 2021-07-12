@@ -9,7 +9,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
-	pb "github.com/cyrinux/grpcnmapscanner/proto"
+	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"

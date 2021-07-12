@@ -11,7 +11,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/logger"
-	"github.com/cyrinux/grpcnmapscanner/proto"
+	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/pkg/errors"
 )
 
@@ -24,7 +24,7 @@ var (
 type Engine struct {
 	ctx   context.Context
 	db    database.Database
-	State proto.ScannerResponse_Status
+	State pb.ScannerResponse_Status
 }
 
 // NewEngine create a new nmap engine
@@ -34,7 +34,7 @@ func NewEngine(ctx context.Context, db database.Database) *Engine {
 
 func parseParamsScannerRequestNmapOptions(
 	ctx context.Context,
-	s *proto.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
+	s *pb.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
 
 	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports
@@ -118,9 +118,9 @@ func parseParamsScannerRequestNmapOptions(
 }
 
 // StartNmapScan start a nmap scan
-func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nmap.Run, error) {
-	scannerResponse := &proto.ScannerResponse{
-		Status: proto.ScannerResponse_RUNNING,
+func (engine *Engine) StartNmapScan(s *pb.ParamsScannerRequest) (string, *nmap.Run, error) {
+	scannerResponse := &pb.ScannerResponse{
+		Status: pb.ScannerResponse_RUNNING,
 	}
 
 	scanResultJSON, err := json.Marshal(scannerResponse)
@@ -204,9 +204,9 @@ func (engine *Engine) StartNmapScan(s *proto.ParamsScannerRequest) (string, *nma
 }
 
 // ParseScanResult parse the nmap result and create the expected output
-func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
-	portList := []*proto.Port{}
-	scanResult := []*proto.HostResult{}
+func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
+	portList := []*pb.Port{}
+	scanResult := []*pb.HostResult{}
 	totalPorts := 0
 	if result == nil || len(result.Hosts) == 0 {
 		err := errors.New("scan timeout or not result")
@@ -230,14 +230,14 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 
 		for _, ip := range host.Addresses {
 			address := ip.Addr
-			hostResult := &proto.Host{
+			hostResult := &pb.Host{
 				Address:   address,
 				OsVersion: &osversion,
 				State:     host.Status.Reason,
 			}
 
 			for _, port := range host.Ports {
-				scripts := make([]*proto.Script, 0)
+				scripts := make([]*pb.Script, 0)
 				for _, v := range port.Scripts {
 					// split some scripts result (vulners)
 					scriptOutputArray := strings.Split(v.Output, "\n    \t")
@@ -251,14 +251,14 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 
 					scripts = append(
 						scripts,
-						&proto.Script{
+						&pb.Script{
 							Id:     v.ID,
 							Output: output,
 						},
 					)
 				}
 
-				version := &proto.PortVersion{
+				version := &pb.PortVersion{
 					ExtraInfos:  port.Service.ExtraInfo,
 					LowVersion:  port.Service.LowVersion,
 					HighVersion: port.Service.HighVersion,
@@ -266,7 +266,7 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 					Scripts:     scripts,
 				}
 
-				newPort := &proto.Port{
+				newPort := &pb.Port{
 					PortId:      fmt.Sprintf("%v", port.ID),
 					ServiceName: &port.Service.Name,
 					Protocol:    port.Protocol,
@@ -277,7 +277,7 @@ func ParseScanResult(result *nmap.Run) ([]*proto.HostResult, error) {
 			}
 			totalPorts += len(portList)
 
-			scan := &proto.HostResult{
+			scan := &pb.HostResult{
 				Host:  hostResult,
 				Ports: portList,
 			}

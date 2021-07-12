@@ -35,13 +35,13 @@ worker:
 	./grpcnmapscanner -worker
 
 graphviz:
-	@protodot -src proto/backend.proto -output graphviz
+	@protodot -src proto/v1/backend.proto -output graphviz
 	@dot -Tpng ~/protodot/generated/graphviz.dot -o graphviz.png
 	@dot -Tsvg ~/protodot/generated/graphviz.dot -o graphviz.svg
 	@xdg-open graphviz.png
 
 clean:
-	rm -f proto/*.pb.go grpcnmapscanner
+	rm -f proto/*/*.pb.go grpcnmapscanner
 
 .PHONY: proto
 proto: generate

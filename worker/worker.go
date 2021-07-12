@@ -13,7 +13,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
-	pb "github.com/cyrinux/grpcnmapscanner/proto"
+	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	redis "github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"

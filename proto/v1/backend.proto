@@ -1,7 +1,7 @@
 syntax = "proto3";
 package proto;
-option go_package = "/proto";
-import "proto/service.proto";
+option go_package = "/proto/v1";
+import "proto/v1/service.proto";
 
 // number of tasks messages by type
 message TasksStatus {

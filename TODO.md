@@ -1,5 +1,9 @@
 # TODO
 
+- use default grpc code and status?
+  "google.golang.org/grpc/codes"
+  "google.golang.org/grpc/status"
+- try some basic auth https://github.com/grpc/grpc-go/issues/106
 - include nmap vulners https://github.com/vulnersCom/nmap-vulners
 - get worker/consumer state on server start or register the last server state in redis
 - add rpc service to StartConsume and StopConsume the queue
