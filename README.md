@@ -50,3 +50,11 @@ $ grpcurl -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./
 
 $./bin/scanner StartScan '{"hosts":"scanme.nmap.org,levis.name","os_detection":true,"fast_mode":true,"service_default_scripts":false,"service_version_detection":true,"scan_speed":5,"ports":"443","service_scripts":"vulners","use_tor":true,"timeout":3600}'
 ```
+
+# Testing
+
+Choas monkey
+
+```bash
+$ docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock gaiaadm/pumba  -l info --random  --interval 30s kill
+```

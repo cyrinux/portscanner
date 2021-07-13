@@ -2,14 +2,14 @@
 server=127.0.0.1:9000
 
 client() {
-    grpcurl -d @ -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -H "Username: admin" -H "Password: admin123" $server "$@"
+    grpcurl -protoset ./proto/grpcnmapscanner.protoset -d @ -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -H "Username: admin" -H "Password: admin123" $server "$@"
 }
 
 if [ $# -eq 0 ]; then
-    grpcurl -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -H "Username: admin" -H "Password: admin123" $server list
+    grpcurl -protoset ./proto/grpcnmapscanner.protoset -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -H "Username: admin" -H "Password: admin123" $server list
     exit 1
 fi
 
 action=$1
 shift
-echo -n "$@" | client proto.ScannerService.$action
+echo -n "$@" | client proto.ScannerService.$action | jq .

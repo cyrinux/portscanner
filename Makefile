@@ -13,7 +13,7 @@ build: generate
 	 @echo Build grpcnmapscanner
 	 @GOARCH=amd64 GOOS=linux go build -mod=vendor -ldflags="-w -s" -o grpcnmapscanner .
 
-generate: deps
+generate: deps vendor
 	@echo Generate go:generate protobuf and stuff
 	@go generate -mod=vendor ./...
 
@@ -62,15 +62,21 @@ proto-docker:
 
 testscan:
 	./bin/scanner
-	./bin/scanner -d '{"hosts":"scanme.nmap.org","fast_mode":true}' StartAsyncScan
-	# grpc_cli ls 127.0.0.1:9000
+	./bin/scanner StartAsyncScan '{"hosts":"scanme.nmap.org","fast_mode":true}'
 	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'scanme.nmap.org',fast_mode:true"
 	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
 	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
 
-
-
 .PHONY: cert
 cert:
 	cd cert; ./gen.sh; cd ..
+
+chaos-kill:
+	docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock gaiaadm/pumba --label com.docker.compose.project=grpcnmapscanner -l info --random --interval 30s kill
+
+chaos-loss:
+	docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock gaiaadm/pumba --label com.docker.compose.project=grpcnmapscanner -l info --random --interval 30s netem --tc-image gaiadocker/iproute2 --duration 15s loss --percent 30
+
+chaos-delay:
+	docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock gaiaadm/pumba --label com.docker.compose.project=grpcnmapscanner -l info --random --interval 30s netem --tc-image gaiadocker/iproute2 --duration 15s delay --time 5000
 

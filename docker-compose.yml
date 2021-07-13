@@ -127,3 +127,12 @@ services:
       - "127.0.0.1:9090:9090"
     networks:
       - backend
+
+  envoy:
+    image: envoyproxy/envoy-alpine:v1.18-latest
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml
+    networks:
+      - backend

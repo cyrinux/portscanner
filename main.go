@@ -1,5 +1,6 @@
 //go:generate go run -mod=vendor git.rootprojects.org/root/go-gitver/v2 --package version --outfile ./version/xversion.go
-//go:generate protoc -I/usr/include -I. --go_out=plugins=grpc:. ./proto/v1/service.proto ./proto/v1/backend.proto
+//go:generate protoc --proto_path=. -I/usr/include -I. --go_out=plugins=grpc:. ./proto/v1/service.proto ./proto/v1/backend.proto
+//go:generate protoc --proto_path=. --descriptor_set_out=./proto/grpcnmapscanner.protoset --include_imports ./proto/v1/service.proto
 
 package main
 

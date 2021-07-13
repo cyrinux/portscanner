@@ -5,7 +5,7 @@ import "google/protobuf/empty.proto";
 
 message Host {
     string address = 1;
-    optional string os_version = 2;
+    string os_version = 2;
     string state = 3;
     string fqdn = 4;
 }
@@ -16,10 +16,10 @@ message Script {
 }
 
 message PortVersion {
-   optional string low_version = 1;
-   optional string high_version = 2;
-   optional string extra_infos = 3;
-   optional string product = 4;
+   string low_version = 1;
+   string high_version = 2;
+   string extra_infos = 3;
+   string product = 4;
    repeated Script scripts = 5;
 }
 
@@ -27,8 +27,18 @@ message Port {
     string port_id = 1;
     string protocol = 2;
     string state = 3;
-    optional string service_name = 4;
-    optional PortVersion version = 5;
+    string service_name = 4;
+    PortVersion version = 5;
+}
+
+message Task {
+    string key = 1;
+    ScannerResponse scanner_response = 2;
+}
+
+message Tasks {
+    string key = 1;
+    repeated Task tasks = 2;
 }
 
 message HostResult {
@@ -98,15 +108,15 @@ message ServiceStateValues {
 // Server ScannerService
 service ScannerService {
     // start an async scan task
-    rpc StartAsyncScan(ParamsScannerRequest) returns (ServerResponse);
+    rpc StartAsyncScan(ParamsScannerRequest) returns (ServerResponse) {};
     // start a scan task
-    rpc StartScan(ParamsScannerRequest) returns (ServerResponse);
+    rpc StartScan(ParamsScannerRequest) returns (ServerResponse) {};
     // fetch a task result from database filter by key
-    rpc GetScan(GetScannerRequest) returns (ServerResponse);
+    rpc GetScan(GetScannerRequest) returns (ServerResponse) {};
     // fetch all results from database
-    rpc GetAllScans(google.protobuf.Empty) returns (stream ServerResponse);
+    rpc GetAllScans(google.protobuf.Empty) returns (stream ServerResponse) {};
     // delete a task entry from the database
-    rpc DeleteScan(GetScannerRequest) returns (ServerResponse);
+    rpc DeleteScan(GetScannerRequest) returns (ServerResponse) {};
     // control the worker state
-    rpc ServiceControl(ServiceStateValues) returns (ServiceStateValues);
+    rpc ServiceControl(ServiceStateValues) returns (ServiceStateValues) {};
 }

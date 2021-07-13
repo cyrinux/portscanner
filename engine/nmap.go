@@ -232,7 +232,7 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 			address := ip.Addr
 			hostResult := &pb.Host{
 				Address:   address,
-				OsVersion: &osversion,
+				OsVersion: osversion,
 				State:     host.Status.Reason,
 			}
 
@@ -259,16 +259,16 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 				}
 
 				version := &pb.PortVersion{
-					ExtraInfos:  &port.Service.ExtraInfo,
-					LowVersion:  &port.Service.LowVersion,
-					HighVersion: &port.Service.HighVersion,
-					Product:     &port.Service.Product,
+					ExtraInfos:  port.Service.ExtraInfo,
+					LowVersion:  port.Service.LowVersion,
+					HighVersion: port.Service.HighVersion,
+					Product:     port.Service.Product,
 					Scripts:     scripts,
 				}
 
 				newPort := &pb.Port{
 					PortId:      fmt.Sprintf("%v", port.ID),
-					ServiceName: &port.Service.Name,
+					ServiceName: port.Service.Name,
 					Protocol:    port.Protocol,
 					State:       port.State.Reason,
 					Version:     version,

@@ -22,7 +22,7 @@ message PrometheusStatus {
 // BackendService, between server and workers
 service BackendService {
     // get the worker wanted state from the server
-    rpc StreamServiceControl(ServiceStateValues) returns (stream ServiceStateValues);
+    rpc StreamServiceControl(ServiceStateValues) returns (stream ServiceStateValues) {};
     // stream tasks status to prometheus
-    rpc StreamTasksStatus(stream PrometheusStatus) returns (stream PrometheusStatus);
+    rpc StreamTasksStatus(stream PrometheusStatus) returns (stream PrometheusStatus) {};
 }

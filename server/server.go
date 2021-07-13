@@ -181,14 +181,12 @@ func Listen(ctx context.Context, conf config.Config) {
 		for range c {
 			// sig is a ^C, handle it
 			log.Info().Msg("shutting down gRPC server...")
-
 			srvBackend.GracefulStop()
-
 			<-ctx.Done()
 		}
 	}()
 
-	reflection.Register(srvBackend)
+	// reflection.Register(srvBackend)
 	pb.RegisterBackendServiceServer(srvBackend, server)
 	if err = srvBackend.Serve(backendListener); err != nil {
 		log.Fatal().Msg("can't serve the gRPC backend service")

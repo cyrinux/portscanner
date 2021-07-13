@@ -4,3 +4,4 @@ gen
 vendor
 proto/*.pb.go
 version/xversion.go
+*.protoset
