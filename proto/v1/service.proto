@@ -31,25 +31,21 @@ message Port {
     PortVersion version = 5;
 }
 
-message Task {
-    string key = 1;
-    ScannerResponse scanner_response = 2;
-}
-
-message Tasks {
-    string key = 1;
-    repeated Task tasks = 2;
-}
-
 message HostResult {
     Host host = 1;
     repeated Port ports = 2;
 }
 
+message ScannerMainResponse {
+    string key = 1;
+    ParamsScannerRequest request = 2;
+    repeated ScannerResponse response = 3;
+}
+
 message ScannerResponse {
     repeated HostResult host_result = 1;
-    string start_time = 2;
-    string end_time = 3;
+    int64 start_time = 2;
+    int64 end_time = 3;
     string expiration_time = 4;
     string key = 5;
     enum Status {
@@ -83,6 +79,7 @@ message ParamsScannerRequest {
     int32 scan_speed = 16;
     string service_scripts = 17;
     bool use_tor = 18;
+    string nmap_params = 19;
 }
 
 message GetScannerRequest {
@@ -92,7 +89,7 @@ message GetScannerRequest {
 message ServerResponse{
     bool success = 1;
     string key = 2;
-    ScannerResponse value = 3;
+    ScannerMainResponse value = 3;
     string error = 4;
 }
 

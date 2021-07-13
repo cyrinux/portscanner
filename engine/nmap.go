@@ -118,33 +118,40 @@ func parseParamsScannerRequestNmapOptions(
 }
 
 // StartNmapScan start a nmap scan
-func (engine *Engine) StartNmapScan(s *pb.ParamsScannerRequest) (string, *nmap.Run, error) {
-	scannerResponse := &pb.ScannerResponse{
-		Status: pb.ScannerResponse_RUNNING,
-	}
+func (engine *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+	scannerResponse := []*pb.ScannerResponse{{Status: pb.ScannerResponse_RUNNING}}
+	scannerMainResponse := pb.ScannerMainResponse{Key: params.Key, Response: scannerResponse}
 
-	scanResultJSON, err := json.Marshal(scannerResponse)
+	resultJSONJSON, err := json.Marshal(&scannerMainResponse)
 	if err != nil {
-		return s.Key, nil, err
+		return params, nil, err
 	}
-	_, err = engine.db.Set(engine.ctx, s.Key, string(scanResultJSON), time.Duration(s.GetRetentionTime())*time.Second)
+	_, err = engine.db.Set(engine.ctx, params.Key, string(resultJSONJSON), time.Duration(params.GetRetentionTime())*time.Second)
 	if err != nil {
-		return s.Key, nil, err
+		return params, nil, err
 	}
 
 	// int32s in seconds
-	timeout := time.Duration(s.Timeout) * time.Second
-	retention := time.Duration(s.RetentionTime) * time.Second
+	timeout := time.Duration(params.Timeout) * time.Second
+	retention := time.Duration(params.RetentionTime) * time.Second
 
 	// define scan context
 	ctx, cancel := context.WithTimeout(engine.ctx, timeout)
 	defer cancel()
 
 	// parse all input options
-	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(ctx, s)
+	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(ctx, params)
 	if err != nil {
-		return s.Key, nil, err
+		return params, nil, err
 	}
+
+	// add nmap args to response
+	var opts []string
+	for _, opt := range opts {
+		opts = append(opts, opt)
+	}
+	nmapParams := strings.Join(opts, " ")
+	params.NmapParams = nmapParams
 
 	// add context to nmap options
 	options = append(options, nmap.WithContext(ctx))
@@ -152,15 +159,16 @@ func (engine *Engine) StartNmapScan(s *pb.ParamsScannerRequest) (string, *nmap.R
 	// create a nmap scanner
 	scanner, err := nmap.NewScanner(options...)
 	if err != nil {
-		return s.Key, nil, err
+		return params, nil, err
 	}
 
-	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v",
-		s.Key,
+	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v, params: %v",
+		params.Key,
 		hosts,
 		ports,
 		timeout,
 		retention,
+		nmapParams,
 	)
 
 	// Function to listen and print the progress
@@ -168,18 +176,18 @@ func (engine *Engine) StartNmapScan(s *pb.ParamsScannerRequest) (string, *nmap.R
 	go func() {
 		var previous float32
 		for p := range progress {
-			if p < previous {
-				continue
-			} else {
-				previous = p
+			if p > previous {
 				log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s, timeout: %v, retention: %v",
-					s.Key,
+					params.Key,
 					p,
 					hosts,
 					ports,
 					timeout,
 					retention,
 				)
+				previous = p
+			} else {
+				continue
 			}
 			time.Sleep(1000 * time.Millisecond)
 		}
@@ -187,7 +195,7 @@ func (engine *Engine) StartNmapScan(s *pb.ParamsScannerRequest) (string, *nmap.R
 
 	result, warnings, err := scanner.RunWithProgress(progress)
 	if err != nil {
-		return s.Key, nil, err
+		return params, nil, err
 	}
 
 	if warnings != nil {
@@ -200,13 +208,13 @@ func (engine *Engine) StartNmapScan(s *pb.ParamsScannerRequest) (string, *nmap.R
 		result.Stats.Finished.Elapsed,
 	)
 
-	return s.Key, result, nil
+	return params, result, nil
 }
 
 // ParseScanResult parse the nmap result and create the expected output
 func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 	portList := []*pb.Port{}
-	scanResult := []*pb.HostResult{}
+	resultJSON := []*pb.HostResult{}
 	totalPorts := 0
 	if result == nil || len(result.Hosts) == 0 {
 		err := errors.New("scan timeout or not result")
@@ -239,8 +247,8 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 			for _, port := range host.Ports {
 				scripts := make([]*pb.Script, 0)
 				for _, v := range port.Scripts {
-					// split some scripts result (vulners)
-					scriptOutputArray := strings.Split(v.Output, "\n    \t")
+					// split some scripts results
+					scriptOutputArray := strings.Split(v.Output, "\n")
 
 					output := make([]string, 0)
 					for _, line := range scriptOutputArray {
@@ -282,8 +290,8 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 				Ports: portList,
 			}
 
-			scanResult = append(scanResult, scan)
+			resultJSON = append(resultJSON, scan)
 		}
 	}
-	return scanResult, nil
+	return resultJSON, nil
 }

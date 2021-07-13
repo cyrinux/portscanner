@@ -111,22 +111,21 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 // consumeNow really consume the message
 func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
-	key, result, err := consumer.engine.StartNmapScan(request)
+	params, result, err := consumer.engine.StartNmapScan(request)
 	if err != nil && consumer.engine.State != pb.ScannerResponse_CANCEL {
 		// scan failed
 		consumer.failed <- 1
 		// if scan fail or cancelled, mark task as cancel
-		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.name, key, result)
-		scannerResponse := &pb.ScannerResponse{
-			Status: pb.ScannerResponse_ERROR,
-		}
-		scanResultJSON, err := json.Marshal(scannerResponse)
+		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.name, params.Key, result)
+		scannerResponse := []*pb.ScannerResponse{{Status: pb.ScannerResponse_ERROR}}
+		scannerMainResponse := pb.ScannerMainResponse{Key: params.Key, Response: scannerResponse}
+		scanResultJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
 		}
 		_, err = consumer.db.Set(
 			consumer.ctx,
-			key,
+			params.Key,
 			string(scanResultJSON),
 			time.Duration(request.GetRetentionTime())*time.Second,
 		)
@@ -142,15 +141,14 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 	// parse the result
 	if result != nil {
 		scanResult, _ := engine.ParseScanResult(result)
-		scannerResponse := &pb.ScannerResponse{
-			HostResult: scanResult,
-		}
-		scanResultJSON, err := json.Marshal(scannerResponse)
+		scannerResponse := []*pb.ScannerResponse{{HostResult: scanResult}}
+		scannerMainResponse := pb.ScannerMainResponse{Key: params.Key, Response: scannerResponse}
+		scanResultJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
 		}
 		_, err = consumer.db.Set(
-			consumer.ctx, key, string(scanResultJSON),
+			consumer.ctx, params.Key, string(scanResultJSON),
 			time.Duration(request.GetRetentionTime())*time.Second,
 		)
 		if err != nil {

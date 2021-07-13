@@ -128,11 +128,11 @@ services:
     networks:
       - backend
 
-  envoy:
-    image: envoyproxy/envoy-alpine:v1.18-latest
-    ports:
-      - "10000:10000"
-    volumes:
-      - ./envoy.yaml:/etc/envoy/envoy.yaml
-    networks:
-      - backend
+  # envoy:
+  #   image: envoyproxy/envoy-alpine:v1.18-latest
+  #   ports:
+  #     - "10000:10000"
+  #   volumes:
+  #     - ./envoy.yaml:/etc/envoy/envoy.yaml
+  #   networks:
+  #     - backend

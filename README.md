@@ -58,3 +58,7 @@ Choas monkey
 ```bash
 $ docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock gaiaadm/pumba  -l info --random  --interval 30s kill
 ```
+
+# Resources
+
+- [GRPC TLS](https://dev.to/techschoolguru/how-to-create-sign-ssl-tls-certificates-2aai)

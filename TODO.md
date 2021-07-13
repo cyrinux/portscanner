@@ -1,5 +1,6 @@
 # TODO
 
+- use s6-overlay as init to start TOR https://github.com/just-containers/s6-overlay
 - a new scan should create a main scan which contains sub tasks
 - envoy config https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/examples
 - split large network range in several smaller and publish them as new tasks
@@ -11,6 +12,7 @@
 - get worker/consumer state on server start or register the last server state in redis
 - Use go-cron for reccuring scan tasks (crontal in ParamsScannerRequest)
 - scan nmap export to defectdojo
+- generate k8s deploy files with kompose
 
 # Done
 

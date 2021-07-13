@@ -303,7 +303,7 @@ func (server *Server) ServiceControl(ctx context.Context, in *pb.ServiceStateVal
 
 // GetScan return the engine scan result
 func (server *Server) GetScan(ctx context.Context, in *pb.GetScannerRequest) (*pb.ServerResponse, error) {
-	var scannerResponse pb.ScannerResponse
+	var scannerResponse pb.ScannerMainResponse
 
 	scanResult, err := server.db.Get(ctx, in.Key)
 	if err != nil {
@@ -327,7 +327,7 @@ func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetA
 	}
 
 	for _, key := range allKeys {
-		var scannerResponse pb.ScannerResponse
+		var scannerResponse pb.ScannerMainResponse
 		scanResult, err := server.db.Get(server.ctx, key)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't get scan result")
@@ -352,41 +352,22 @@ func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetA
 }
 
 // StartScan function prepare a nmap scan
-func (server *Server) StartScan(ctx context.Context, in *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
-	// sanitize
-	request := parseParamsScannerRequest(in)
+func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
+	params = parseParamsScannerRequest(params)
 
 	// we start the scan
 	newEngine := engine.NewEngine(ctx, server.db)
 
 	scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_ERROR}
 
-	key, result, err := newEngine.StartNmapScan(request)
+	params, result, err := newEngine.StartNmapScan(params)
 	if err != nil {
-		return generateResponse(key, nil, err)
+		return generateResponse(params.Key, nil, err)
 	}
 
 	scanParsedResult, err := engine.ParseScanResult(result)
 	if err != nil {
-		return generateResponse(key, nil, err)
-	}
-	scannerResponse = pb.ScannerResponse{
-		HostResult: scanParsedResult,
-	}
-
-	scanResultJSON, err := json.Marshal(&scannerResponse)
-	if err != nil {
-		log.Error().Err(err).Msg("")
-	}
-
-	// and write the response to the database
-	_, err = server.db.Set(
-		ctx, key,
-		string(scanResultJSON),
-		time.Duration(request.GetRetentionTime())*time.Second,
-	)
-	if err != nil {
-		return generateResponse(key, &scannerResponse, err)
+		return generateResponse(params.Key, nil, err)
 	}
 
 	scannerResponse = pb.ScannerResponse{
@@ -394,40 +375,77 @@ func (server *Server) StartScan(ctx context.Context, in *pb.ParamsScannerRequest
 		Status:     pb.ScannerResponse_OK,
 	}
 
-	return generateResponse(key, &scannerResponse, nil)
+	scannerMainResponse := pb.ScannerMainResponse{
+		Key:      params.Key,
+		Response: []*pb.ScannerResponse{&scannerResponse},
+	}
+
+	scanResultJSON, err := json.Marshal(&scannerMainResponse)
+	if err != nil {
+		log.Error().Err(err).Msg("")
+	}
+
+	// and write the response to the database
+	_, err = server.db.Set(
+		ctx, params.Key,
+		string(scanResultJSON),
+		time.Duration(params.GetRetentionTime())*time.Second,
+	)
+	if err != nil {
+		return generateResponse(params.Key, &scannerMainResponse, err)
+	}
+
+	scannerResponse = pb.ScannerResponse{
+		HostResult: scanParsedResult,
+		Status:     pb.ScannerResponse_OK,
+	}
+	scannerMainResponse = pb.ScannerMainResponse{
+		Key:      params.Key,
+		Request:  params,
+		Response: []*pb.ScannerResponse{&scannerResponse},
+	}
+
+	return generateResponse(params.Key, &scannerMainResponse, nil)
+}
+
+func getDuration(start time.Time) time.Duration {
+	now := time.Now()
+	return now.Sub(start)
 }
 
 // StartAsyncScan function prepare a nmap scan
-func (server *Server) StartAsyncScan(ctx context.Context, in *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
-	request := parseParamsScannerRequest(in)
+func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
+	params = parseParamsScannerRequest(params)
 
 	// and write the response to the database
-	scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_QUEUED}
-	scanResponseJSON, _ := json.Marshal(&scannerResponse)
-	log.Info().Msgf("receive async task order: %v", request)
-	_, err := server.db.Set(ctx, request.Key, string(scanResponseJSON), 0)
+	responses := []*pb.ScannerResponse{{Status: pb.ScannerResponse_QUEUED, Key: params.Key}}
+	scanResponseJSON, _ := json.Marshal(&responses)
+	log.Info().Msgf("receive async task order: %v", params)
+	_, err := server.db.Set(ctx, params.Key, string(scanResponseJSON), 0)
 	if err != nil {
 		log.Error().Err(err).Msg("")
 	}
 
 	// create scan task
-	taskScanBytes, err := json.Marshal(request)
+	taskScanBytes, err := json.Marshal(params)
+	responses = []*pb.ScannerResponse{{Status: pb.ScannerResponse_ERROR}}
 	if err != nil {
-		scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_ERROR}
-		return generateResponse(request.Key, &scannerResponse, err)
-	}
-	err = server.broker.Incoming.PublishBytes(taskScanBytes)
-	if err != nil {
-		scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_ERROR}
-		return generateResponse(request.Key, &scannerResponse, err)
+		scannerResponse := pb.ScannerMainResponse{Response: responses}
+		return generateResponse(params.Key, &scannerResponse, err)
 	}
 
-	scannerResponse = pb.ScannerResponse{Status: pb.ScannerResponse_QUEUED}
-	return generateResponse(request.Key, &scannerResponse, nil)
+	err = server.broker.Incoming.PublishBytes(taskScanBytes)
+	if err != nil {
+		scannerResponse := pb.ScannerMainResponse{Response: responses}
+		return generateResponse(params.Key, &scannerResponse, err)
+	}
+
+	responses = []*pb.ScannerResponse{{Status: pb.ScannerResponse_QUEUED}}
+	return generateResponse(params.Key, &pb.ScannerMainResponse{Request: params, Response: responses}, nil)
 }
 
 // generateResponse generate the response for the grpc return
-func generateResponse(key string, value *pb.ScannerResponse, err error) (*pb.ServerResponse, error) {
+func generateResponse(key string, value *pb.ScannerMainResponse, err error) (*pb.ServerResponse, error) {
 	if err != nil {
 		return &pb.ServerResponse{
 			Success: false,
