@@ -2,6 +2,8 @@ syntax = "proto3";
 package proto;
 option go_package = "/proto/v1";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
 
 message Host {
     string address = 1;
@@ -21,6 +23,7 @@ message PortVersion {
    string extra_infos = 3;
    string product = 4;
    repeated Script scripts = 5;
+   int32 confidence = 6;
 }
 
 message Port {
@@ -40,13 +43,14 @@ message ScannerMainResponse {
     string key = 1;
     ParamsScannerRequest request = 2;
     repeated ScannerResponse response = 3;
+    google.protobuf.Timestamp added_time = 4;
 }
 
 message ScannerResponse {
     repeated HostResult host_result = 1;
-    int64 start_time = 2;
-    int64 end_time = 3;
-    string expiration_time = 4;
+    google.protobuf.Timestamp start_time = 2;
+    google.protobuf.Timestamp end_time = 3;
+    int64 expiration_time = 4;
     string key = 5;
     enum Status {
         UNKNOWN = 0;

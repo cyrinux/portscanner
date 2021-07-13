@@ -9,6 +9,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
 
@@ -111,13 +112,16 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 // consumeNow really consume the message
 func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
+	startTime := timestamppb.Now()
 	params, result, err := consumer.engine.StartNmapScan(request)
+	endTime := timestamppb.Now()
+	scannerResponse := []*pb.ScannerResponse{}
 	if err != nil && consumer.engine.State != pb.ScannerResponse_CANCEL {
 		// scan failed
 		consumer.failed <- 1
 		// if scan fail or cancelled, mark task as cancel
 		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.name, params.Key, result)
-		scannerResponse := []*pb.ScannerResponse{{Status: pb.ScannerResponse_ERROR}}
+		scannerResponse = []*pb.ScannerResponse{{StartTime: startTime, Status: pb.ScannerResponse_ERROR, EndTime: endTime}}
 		scannerMainResponse := pb.ScannerMainResponse{Key: params.Key, Response: scannerResponse}
 		scanResultJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
@@ -140,9 +144,18 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 	// if scan is cancel, result will be nil and we can't
 	// parse the result
 	if result != nil {
+		var scannerMainResponse pb.ScannerMainResponse
 		scanResult, _ := engine.ParseScanResult(result)
-		scannerResponse := []*pb.ScannerResponse{{HostResult: scanResult}}
-		scannerMainResponse := pb.ScannerMainResponse{Key: params.Key, Response: scannerResponse}
+		scannerResponse = []*pb.ScannerResponse{{StartTime: startTime, HostResult: scanResult, EndTime: endTime}}
+		scannerMainResponseJson, err := consumer.db.Get(consumer.ctx, request.Key)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.name, request.Key)
+		}
+		err = json.Unmarshal([]byte(scannerMainResponseJson), &scannerMainResponse)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.name)
+		}
+		scannerMainResponse.Response = scannerResponse
 		scanResultJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)

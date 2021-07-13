@@ -258,6 +258,7 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 					HighVersion: port.Service.HighVersion,
 					Product:     port.Service.Product,
 					Scripts:     scripts,
+					Confidence:  int32(port.Service.Configuration),
 				}
 
 				newPort := &pb.Port{

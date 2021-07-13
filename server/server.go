@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"net"
 	"os"
@@ -357,29 +358,31 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 
 	// we start the scan
 	newEngine := engine.NewEngine(ctx, server.db)
-
-	scannerResponse := pb.ScannerResponse{Status: pb.ScannerResponse_ERROR}
-
+	scannerResponse := pb.ScannerResponse{
+		StartTime: timestamppb.Now(),
+		Status:    pb.ScannerResponse_UNKNOWN,
+	}
 	params, result, err := newEngine.StartNmapScan(params)
 	if err != nil {
 		return generateResponse(params.Key, nil, err)
 	}
+	// end of scan
+	scannerResponse.EndTime = timestamppb.Now()
 
+	// parse result
 	scanParsedResult, err := engine.ParseScanResult(result)
 	if err != nil {
 		return generateResponse(params.Key, nil, err)
 	}
+	scannerResponse.HostResult = scanParsedResult
+	scannerResponse.Status = pb.ScannerResponse_OK
 
-	scannerResponse = pb.ScannerResponse{
-		HostResult: scanParsedResult,
-		Status:     pb.ScannerResponse_OK,
-	}
-
+	// forge main response
 	scannerMainResponse := pb.ScannerMainResponse{
-		Key:      params.Key,
-		Response: []*pb.ScannerResponse{&scannerResponse},
+		AddedTime: timestamppb.Now(),
+		Key:       params.Key,
+		Response:  []*pb.ScannerResponse{&scannerResponse},
 	}
-
 	scanResultJSON, err := json.Marshal(&scannerMainResponse)
 	if err != nil {
 		log.Error().Err(err).Msg("")
@@ -395,22 +398,14 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 		return generateResponse(params.Key, &scannerMainResponse, err)
 	}
 
-	scannerResponse = pb.ScannerResponse{
-		HostResult: scanParsedResult,
-		Status:     pb.ScannerResponse_OK,
-	}
-	scannerMainResponse = pb.ScannerMainResponse{
-		Key:      params.Key,
-		Request:  params,
-		Response: []*pb.ScannerResponse{&scannerResponse},
-	}
+	// scannerMainResponse = pb.ScannerMainResponse{
+	// 	AddedTime: timestamppb.Now(),
+	// 	Key:      params.Key,
+	// 	Request:  params,
+	// 	Response: []*pb.ScannerResponse{&scannerResponse},
+	// }
 
 	return generateResponse(params.Key, &scannerMainResponse, nil)
-}
-
-func getDuration(start time.Time) time.Duration {
-	now := time.Now()
-	return now.Sub(start)
 }
 
 // StartAsyncScan function prepare a nmap scan
@@ -419,9 +414,13 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 
 	// and write the response to the database
 	responses := []*pb.ScannerResponse{{Status: pb.ScannerResponse_QUEUED, Key: params.Key}}
-	scanResponseJSON, _ := json.Marshal(&responses)
+	scanResponseJSON, err := json.Marshal(&responses)
+	if err != nil {
+		log.Error().Err(err).Msg("")
+	}
+
 	log.Info().Msgf("receive async task order: %v", params)
-	_, err := server.db.Set(ctx, params.Key, string(scanResponseJSON), 0)
+	_, err = server.db.Set(ctx, params.Key, string(scanResponseJSON), 0)
 	if err != nil {
 		log.Error().Err(err).Msg("")
 	}
@@ -440,8 +439,18 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 		return generateResponse(params.Key, &scannerResponse, err)
 	}
 
-	responses = []*pb.ScannerResponse{{Status: pb.ScannerResponse_QUEUED}}
-	return generateResponse(params.Key, &pb.ScannerMainResponse{Request: params, Response: responses}, nil)
+	responses = []*pb.ScannerResponse{
+		{Status: pb.ScannerResponse_QUEUED},
+	}
+	return generateResponse(
+		params.Key,
+		&pb.ScannerMainResponse{
+			AddedTime: timestamppb.Now(),
+			Request:   params,
+			Response:  responses,
+		},
+		nil,
+	)
 }
 
 // generateResponse generate the response for the grpc return
@@ -464,7 +473,6 @@ func generateResponse(key string, value *pb.ScannerMainResponse, err error) (*pb
 
 // parseParamsScannerRequest parse, sanitize the request
 func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
-
 	// if the Key is not forced, we generate one unique
 	guid := uuid.New()
 	if request.Key == "" {
@@ -487,4 +495,10 @@ func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScann
 	request.DeferDuration = time.Now().Add(time.Duration(request.DeferDuration) * time.Second).Unix()
 
 	return request
+}
+
+// getDuration based on start time
+func getDuration(start time.Time) time.Duration {
+	now := time.Now()
+	return now.Sub(start)
 }

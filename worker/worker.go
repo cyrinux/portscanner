@@ -162,10 +162,14 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 				log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 			} else if ttl > 0 {
 				// Yay, I still have my lock!
-				rtr, _ := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
-				if rtr > 0 {
-					log.Info().Msgf("returner success requeue %d tasks messages to incoming", rtr)
-					returned <- rtr
+				ret, err := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
+				if err != nil {
+					log.Error().Stack().Err(err).Msg("error while returning message")
+				}
+				if ret > 0 {
+					log.Info().Msgf("returner success requeue %d tasks messages to incoming", ret)
+					// prometheus returned stats
+					returned <- ret
 				}
 				lock.Refresh(worker.ctx, 5*time.Second, nil)
 			}
