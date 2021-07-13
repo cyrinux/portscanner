@@ -145,14 +145,6 @@ func (engine *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.Params
 		return params, nil, err
 	}
 
-	// add nmap args to response
-	var opts []string
-	for _, opt := range opts {
-		opts = append(opts, opt)
-	}
-	nmapParams := strings.Join(opts, " ")
-	params.NmapParams = nmapParams
-
 	// add context to nmap options
 	options = append(options, nmap.WithContext(ctx))
 
@@ -162,13 +154,12 @@ func (engine *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.Params
 		return params, nil, err
 	}
 
-	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v, params: %v",
+	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v",
 		params.Key,
 		hosts,
 		ports,
 		timeout,
 		retention,
-		nmapParams,
 	)
 
 	// Function to listen and print the progress
@@ -221,12 +212,7 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 		log.Error().Err(err).Msg("")
 		return nil, err
 	}
-	// fmt.Printf("%+v", result)
 	for _, host := range result.Hosts {
-
-		// fmt.Printf("Post: %+v\n", result.PostScripts)
-		// fmt.Printf("Pre: %+v\n", result.PreScripts)
-
 		var osversion string
 		if len(host.Addresses) == 0 {
 			continue
