@@ -89,8 +89,8 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	}
 
 	return &Worker{
-		conf:        conf,
 		name:        name,
+		conf:        conf,
 		ctx:         ctx,
 		broker:      broker,
 		locker:      locker,
@@ -200,7 +200,7 @@ func (worker *Worker) startConsuming() *Worker {
 	numConsumers++ // we got one consumer for the returned, lets add 2 more
 
 	for i := 0; i < int(numConsumers); i++ {
-		tag, incConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "incoming")
+		tag, incConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "incoming")
 		if _, err := worker.broker.Incoming.AddConsumer(tag, incConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
@@ -212,7 +212,7 @@ func (worker *Worker) startConsuming() *Worker {
 		// start prometheus collector
 		go worker.collectConsumerStats(incConsumer.success, incConsumer.failed, worker.returned)
 
-		tag, rConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, "rejected")
+		tag, rConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "rejected")
 		if _, err := worker.broker.Pushed.AddConsumer(tag, rConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}

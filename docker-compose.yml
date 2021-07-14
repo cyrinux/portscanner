@@ -49,6 +49,7 @@ services:
       - NET_ADMIN
     depends_on:
       - redis-sentinel
+      - tor
     networks:
       - backend
     ports:
@@ -58,6 +59,12 @@ services:
     deploy:
       mode: replicated
       replicas: 3
+
+  tor:
+    image: dperson/torproxy
+    restart: always
+    networks:
+      - backend
 
   redis-primary:
     image: docker.io/bitnami/redis:6.2

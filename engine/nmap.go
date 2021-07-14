@@ -22,20 +22,18 @@ var (
 
 // Engine define a scanner engine
 type Engine struct {
-	ctx   context.Context
-	db    database.Database
-	State pb.ScannerResponse_Status
+	ctx    context.Context
+	db     database.Database
+	State  pb.ScannerResponse_Status
+	config config.NMAPConfig
 }
 
 // NewEngine create a new nmap engine
-func NewEngine(ctx context.Context, db database.Database) *Engine {
-	return &Engine{ctx: ctx, db: db}
+func NewEngine(ctx context.Context, db database.Database, conf config.NMAPConfig) *Engine {
+	return &Engine{ctx: ctx, db: db, config: conf}
 }
 
-func parseParamsScannerRequestNmapOptions(
-	ctx context.Context,
-	s *pb.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
-
+func (e *Engine) parseParams(s *pb.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
 	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports
 
@@ -46,7 +44,7 @@ func parseParamsScannerRequestNmapOptions(
 	}
 
 	if s.GetUseTor() {
-		options = append(options, nmap.WithProxies("socks4://127.0.0.1:9050"))
+		options = append(options, nmap.WithProxies(e.config.TorServer))
 		options = append(options, nmap.WithSkipHostDiscovery())
 	}
 
@@ -118,15 +116,15 @@ func parseParamsScannerRequestNmapOptions(
 }
 
 // StartNmapScan start a nmap scan
-func (engine *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
 	scannerResponse := []*pb.ScannerResponse{{Status: pb.ScannerResponse_RUNNING}}
-	scannerMainResponse := pb.ScannerMainResponse{Key: params.Key, Response: scannerResponse}
+	scannerMainResponse := pb.ScannerMainResponse{Request: params, Key: params.Key, Response: scannerResponse}
 
 	resultJSONJSON, err := json.Marshal(&scannerMainResponse)
 	if err != nil {
 		return params, nil, err
 	}
-	_, err = engine.db.Set(engine.ctx, params.Key, string(resultJSONJSON), time.Duration(params.GetRetentionTime())*time.Second)
+	_, err = e.db.Set(e.ctx, params.Key, string(resultJSONJSON), time.Duration(params.GetRetentionTime())*time.Second)
 	if err != nil {
 		return params, nil, err
 	}
@@ -136,11 +134,11 @@ func (engine *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.Params
 	retention := time.Duration(params.RetentionTime) * time.Second
 
 	// define scan context
-	ctx, cancel := context.WithTimeout(engine.ctx, timeout)
+	ctx, cancel := context.WithTimeout(e.ctx, timeout)
 	defer cancel()
 
 	// parse all input options
-	hosts, ports, options, err := parseParamsScannerRequestNmapOptions(ctx, params)
+	hosts, ports, options, err := e.parseParams(params)
 	if err != nil {
 		return params, nil, err
 	}
@@ -154,12 +152,17 @@ func (engine *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.Params
 		return params, nil, err
 	}
 
-	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v",
+	// nmap args
+	nmapArgs := fmt.Sprintf("%s", scanner.Args())
+	params.NmapParams = nmapArgs
+
+	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v, args: %v",
 		params.Key,
 		hosts,
 		ports,
 		timeout,
 		retention,
+		nmapArgs,
 	)
 
 	// Function to listen and print the progress
@@ -258,7 +261,7 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 					HighVersion: port.Service.HighVersion,
 					Product:     port.Service.Product,
 					Scripts:     scripts,
-					Confidence:  int32(port.Service.Configuration),
+					Confidence:  int32(port.Service.Confidence),
 				}
 
 				newPort := &pb.Port{

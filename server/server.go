@@ -357,7 +357,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	params = parseParamsScannerRequest(params)
 
 	// we start the scan
-	newEngine := engine.NewEngine(ctx, server.db)
+	newEngine := engine.NewEngine(ctx, server.db, server.config.NMAP)
 	scannerResponse := pb.ScannerResponse{
 		StartTime: timestamppb.Now(),
 		Status:    pb.ScannerResponse_UNKNOWN,
@@ -379,8 +379,9 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 
 	// forge main response
 	scannerMainResponse := pb.ScannerMainResponse{
-		AddedTime: timestamppb.Now(),
 		Key:       params.Key,
+		AddedTime: timestamppb.Now(),
+		Request:   params,
 		Response:  []*pb.ScannerResponse{&scannerResponse},
 	}
 	scanResultJSON, err := json.Marshal(&scannerMainResponse)
@@ -397,13 +398,6 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	if err != nil {
 		return generateResponse(params.Key, &scannerMainResponse, err)
 	}
-
-	// scannerMainResponse = pb.ScannerMainResponse{
-	// 	AddedTime: timestamppb.Now(),
-	// 	Key:      params.Key,
-	// 	Request:  params,
-	// 	Response: []*pb.ScannerResponse{&scannerResponse},
-	// }
 
 	return generateResponse(params.Key, &scannerMainResponse, nil)
 }
@@ -427,7 +421,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 
 	// create scan task
 	taskScanBytes, err := json.Marshal(params)
-	responses = []*pb.ScannerResponse{{Status: pb.ScannerResponse_ERROR}}
+	responses[0].Status = pb.ScannerResponse_ERROR
 	if err != nil {
 		scannerResponse := pb.ScannerMainResponse{Response: responses}
 		return generateResponse(params.Key, &scannerResponse, err)
@@ -442,6 +436,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 	responses = []*pb.ScannerResponse{
 		{Status: pb.ScannerResponse_QUEUED},
 	}
+
 	return generateResponse(
 		params.Key,
 		&pb.ScannerMainResponse{

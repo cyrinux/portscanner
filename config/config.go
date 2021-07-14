@@ -25,6 +25,10 @@ type DBConfig struct {
 	Redis  Redis
 }
 
+type NMAPConfig struct {
+	TorServer string `default:"socks4://tor:9050" split_words:"true"`
+}
+
 // RMQConfig  contains the redis broker config
 type RMQConfig struct {
 	Name               string        `default:"broker"`
@@ -59,6 +63,7 @@ type Global struct {
 type Config struct {
 	DB         DBConfig
 	RMQ        RMQConfig
+	NMAP       NMAPConfig
 	Logger     LoggerConfig
 	Prometheus PrometheusConfig
 	Global
