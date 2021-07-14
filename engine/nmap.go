@@ -124,14 +124,15 @@ func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScann
 	if err != nil {
 		return params, nil, err
 	}
-	_, err = e.db.Set(e.ctx, params.Key, string(resultJSONJSON), time.Duration(params.GetRetentionTime())*time.Second)
+
+	retention := params.RetentionDuration.AsDuration()
+	_, err = e.db.Set(e.ctx, params.Key, string(resultJSONJSON), retention)
 	if err != nil {
 		return params, nil, err
 	}
 
 	// int32s in seconds
 	timeout := time.Duration(params.Timeout) * time.Second
-	retention := time.Duration(params.RetentionTime) * time.Second
 
 	// define scan context
 	ctx, cancel := context.WithTimeout(e.ctx, timeout)

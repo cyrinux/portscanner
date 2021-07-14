@@ -73,7 +73,7 @@ func (consumer *Consumer) onCancel(request *pb.ParamsScannerRequest) {
 		context.Background(),
 		request.Key,
 		string(scanResultJSON),
-		time.Duration(request.GetRetentionTime())*time.Second,
+		request.DeferDuration.AsDuration(),
 	)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
@@ -100,8 +100,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		return
 	}
 
-	deferTime := time.Unix(int64(request.DeferDuration), 0).Unix()
-	if deferTime <= time.Now().Unix() {
+	if request.DeferTime.AsTime().Unix() <= time.Now().Unix() {
 		consumer.consumeNow(delivery, request, payload)
 	} else {
 		if err := delivery.Reject(); err != nil {
@@ -124,7 +123,9 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		consumer.failed <- 1
 		// if scan fail or cancelled, mark task as cancel
 		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.name, params.Key, result)
-		scannerResponse = []*pb.ScannerResponse{{StartTime: startTime, Status: pb.ScannerResponse_ERROR, EndTime: endTime}}
+		scannerResponse = []*pb.ScannerResponse{
+			{StartTime: startTime, Status: pb.ScannerResponse_ERROR, EndTime: endTime, RetentionDuration: params.RetentionDuration},
+		}
 		scannerMainResponse := pb.ScannerMainResponse{Request: params, Key: params.Key, Response: scannerResponse}
 		scanResultJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
@@ -134,7 +135,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 			consumer.ctx,
 			params.Key,
 			string(scanResultJSON),
-			time.Duration(request.GetRetentionTime())*time.Second,
+			params.RetentionDuration.AsDuration(),
 		)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
@@ -152,7 +153,9 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.name, request.Key)
 		}
-		scannerResponse = []*pb.ScannerResponse{{StartTime: startTime, HostResult: scanResult, EndTime: endTime}}
+		scannerResponse = []*pb.ScannerResponse{
+			{StartTime: startTime, HostResult: scanResult, EndTime: endTime, RetentionDuration: params.RetentionDuration},
+		}
 		scannerMainResponseJson, err := consumer.db.Get(consumer.ctx, request.Key)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.name, request.Key)
@@ -168,7 +171,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 			log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
 		}
 		_, err = consumer.db.Set(
-			consumer.ctx, params.Key, string(scanResultJSON), time.Duration(request.GetRetentionTime())*time.Second,
+			consumer.ctx, params.Key, string(scanResultJSON), request.RetentionDuration.AsDuration(),
 		)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)

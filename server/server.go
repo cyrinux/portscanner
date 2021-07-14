@@ -196,6 +196,7 @@ func Listen(ctx context.Context, conf config.Config) {
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus
 func brokerStatsToProm(brk *broker.Broker, name string) {
+	var prevReady, prevReject int64
 	for range time.Tick(1000 * time.Millisecond) {
 		stats, err := broker.GetStats(brk)
 		if err != nil {
@@ -207,9 +208,11 @@ func brokerStatsToProm(brk *broker.Broker, name string) {
 		opsReady.Set(float64(s.ReadyCount))
 		opsRejected.Set(float64(s.RejectedCount))
 		consumersCount.Set(float64(s.ConsumerCount()))
-		if s.ReadyCount > 0 || s.RejectedCount > 0 {
+		if (s.ReadyCount > 0 || s.RejectedCount > 0) && (prevReady != s.ReadyCount || prevReject != s.RejectedCount) {
 			log.Debug().Msgf("broker %s incoming queue ready: %v, rejected: %v", name, s.ReadyCount, s.RejectedCount)
 		}
+		prevReady = s.ReadyCount
+		prevReject = s.RejectedCount
 	}
 }
 
@@ -354,35 +357,37 @@ func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetA
 
 // StartScan function prepare a nmap scan
 func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
-	params = parseParamsScannerRequest(params)
+	params = parseRequest(params)
+
+	addedTime := timestamppb.Now()
 
 	// we start the scan
 	newEngine := engine.NewEngine(ctx, server.db, server.config.NMAP)
-	scannerResponse := pb.ScannerResponse{
+	scannerResponses := []*pb.ScannerResponse{{
 		StartTime: timestamppb.Now(),
 		Status:    pb.ScannerResponse_UNKNOWN,
-	}
+	}}
 	params, result, err := newEngine.StartNmapScan(params)
 	if err != nil {
 		return generateResponse(params.Key, nil, err)
 	}
 	// end of scan
-	scannerResponse.EndTime = timestamppb.Now()
+	scannerResponses[0].EndTime = timestamppb.Now()
 
 	// parse result
 	scanParsedResult, err := engine.ParseScanResult(result)
 	if err != nil {
 		return generateResponse(params.Key, nil, err)
 	}
-	scannerResponse.HostResult = scanParsedResult
-	scannerResponse.Status = pb.ScannerResponse_OK
+	scannerResponses[0].HostResult = scanParsedResult
+	scannerResponses[0].Status = pb.ScannerResponse_OK
 
 	// forge main response
 	scannerMainResponse := pb.ScannerMainResponse{
 		Key:       params.Key,
-		AddedTime: timestamppb.Now(),
+		AddedTime: addedTime,
 		Request:   params,
-		Response:  []*pb.ScannerResponse{&scannerResponse},
+		Response:  scannerResponses,
 	}
 	scanResultJSON, err := json.Marshal(&scannerMainResponse)
 	if err != nil {
@@ -393,7 +398,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	_, err = server.db.Set(
 		ctx, params.Key,
 		string(scanResultJSON),
-		time.Duration(params.GetRetentionTime())*time.Second,
+		params.RetentionDuration.AsDuration(),
 	)
 	if err != nil {
 		return generateResponse(params.Key, &scannerMainResponse, err)
@@ -404,10 +409,15 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 
 // StartAsyncScan function prepare a nmap scan
 func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
-	params = parseParamsScannerRequest(params)
+	params = parseRequest(params)
+
+	addedTime := timestamppb.Now()
 
 	// and write the response to the database
-	responses := []*pb.ScannerResponse{{Status: pb.ScannerResponse_QUEUED, Key: params.Key}}
+	responses := []*pb.ScannerResponse{
+		{Key: params.Key, Status: pb.ScannerResponse_QUEUED},
+	}
+
 	scanResponseJSON, err := json.Marshal(&responses)
 	if err != nil {
 		log.Error().Err(err).Msg("")
@@ -433,15 +443,12 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 		return generateResponse(params.Key, &scannerResponse, err)
 	}
 
-	responses = []*pb.ScannerResponse{
-		{Status: pb.ScannerResponse_QUEUED},
-	}
-
+	responses[0].Status = pb.ScannerResponse_QUEUED
 	return generateResponse(
 		params.Key,
 		&pb.ScannerMainResponse{
-			AddedTime: timestamppb.Now(),
 			Request:   params,
+			AddedTime: addedTime,
 			Response:  responses,
 		},
 		nil,
@@ -466,8 +473,8 @@ func generateResponse(key string, value *pb.ScannerMainResponse, err error) (*pb
 	}, nil
 }
 
-// parseParamsScannerRequest parse, sanitize the request
-func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
+// parseRequest parse, sanitize the request
+func parseRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
 	// if the Key is not forced, we generate one unique
 	guid := uuid.New()
 	if request.Key == "" {
@@ -475,10 +482,7 @@ func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScann
 	}
 
 	// If timeout < 10s, fallback to 1h
-	if request.Timeout < 30 && request.Timeout > 0 {
-		request.Timeout = 60 * 60
-		// if timeout not set
-	} else if request.Timeout == 0 {
+	if (request.Timeout < 30 && request.Timeout > 0) || request.Timeout == 0 {
 		request.Timeout = 60 * 60
 	}
 
@@ -486,8 +490,8 @@ func parseParamsScannerRequest(request *pb.ParamsScannerRequest) *pb.ParamsScann
 	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
 	request.Ports = strings.ReplaceAll(request.Ports, " ", "")
 
-	// add the defer duration to the current unix timestamp
-	request.DeferDuration = time.Now().Add(time.Duration(request.DeferDuration) * time.Second).Unix()
+	// defer Duration to defer Time
+	request.DeferTime = timestamppb.New(time.Now().Add(request.DeferDuration.AsDuration()))
 
 	return request
 }
