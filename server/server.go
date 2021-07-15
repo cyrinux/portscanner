@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -365,7 +366,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 		StartTime: timestamppb.Now(),
 		Status:    pb.ScannerResponse_UNKNOWN,
 	}}
-	params, result, err := newEngine.StartNmapScan(params)
+	params, result, err := newEngine.Start(params, false)
 	if err != nil {
 		return generateResponse(params.Key, nil, err)
 	}
@@ -384,7 +385,6 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	smr := pb.ScannerMainResponse{
 		Key:       params.Key,
 		AddedTime: addedTime,
-		Request:   params,
 		Response:  sr,
 	}
 	smrJSON, err := json.Marshal(&smr)
@@ -411,40 +411,45 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 
 	addedTime := timestamppb.Now()
 
-	// and write the response to the database
-	srs := []*pb.ScannerResponse{
-		{Key: params.Key, Status: pb.ScannerResponse_QUEUED},
-	}
-	smr := pb.ScannerMainResponse{
-		Request:   params,
-		AddedTime: addedTime,
-		Response:  srs,
-	}
-	smrJSON, err := json.Marshal(&smr)
-	if err != nil {
-		log.Error().Stack().Err(err).Msg("")
+	srs := []*pb.ScannerResponse{}
+	smr := pb.ScannerMainResponse{}
+	for i, host := range strings.Split(params.Hosts, ",") {
+		sr := &pb.ScannerResponse{Key: fmt.Sprintf("%s-%s", params.Key, host), Status: pb.ScannerResponse_QUEUED}
+		srs = append(srs, sr)
+		params.Hosts = host
+		smr = pb.ScannerMainResponse{
+			Key:       params.Key,
+			Request:   params,
+			AddedTime: addedTime,
+			Response:  srs,
+		}
+		smrJSON, err := json.Marshal(&smr)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("")
+		}
+
+		log.Info().Msgf("receive async task order: %v", params)
+		_, err = server.db.Set(ctx, params.Key, string(smrJSON), 0)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("")
+		}
+		// create scan task
+		paramsJSON, err := json.Marshal(params)
+		if err != nil {
+			srs[i].Status = pb.ScannerResponse_ERROR
+			return generateResponse(params.Key, &smr, err)
+		}
+
+		srs[i].Status = pb.ScannerResponse_QUEUED
+
+		err = server.broker.Incoming.PublishBytes(paramsJSON)
+		if err != nil {
+			scannerResponse := pb.ScannerMainResponse{Response: srs}
+			return generateResponse(params.Key, &scannerResponse, err)
+		}
+
 	}
 
-	log.Info().Msgf("receive async task order: %v", params)
-	_, err = server.db.Set(ctx, params.Key, string(smrJSON), 0)
-	if err != nil {
-		log.Error().Stack().Err(err).Msg("")
-	}
-
-	// create scan task
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		srs[0].Status = pb.ScannerResponse_ERROR
-		return generateResponse(params.Key, &smr, err)
-	}
-
-	err = server.broker.Incoming.PublishBytes(paramsJSON)
-	if err != nil {
-		scannerResponse := pb.ScannerMainResponse{Response: srs}
-		return generateResponse(params.Key, &scannerResponse, err)
-	}
-
-	srs[0].Status = pb.ScannerResponse_QUEUED
 	return generateResponse(params.Key, &smr, nil)
 }
 
@@ -477,6 +482,10 @@ func parseRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
 	// If timeout < 10s, fallback to 1h
 	if (request.Timeout < 30 && request.Timeout > 0) || request.Timeout == 0 {
 		request.Timeout = 60 * 60
+	}
+
+	if request.RetentionDuration == nil {
+		request.RetentionDuration = durationpb.New(0)
 	}
 
 	// replace all whitespaces
