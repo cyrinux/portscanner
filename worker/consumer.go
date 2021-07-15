@@ -22,7 +22,7 @@ type Consumer struct {
 	engine   *engine.Engine
 	state    pb.ServiceStateValues
 	conf     config.Config
-	tasktype string
+	taskType string
 	success  chan int64
 	failed   chan int64
 }
@@ -32,14 +32,14 @@ func NewConsumer(
 	ctx context.Context,
 	db database.Database,
 	tag int,
-	tasktype string,
+	taskType string,
 	conf config.NMAPConfig,
 	queue string) (string, *Consumer) {
 
-	name := fmt.Sprintf("%s-consumer-%s-%s-%d", tasktype, queue, hostname, tag)
+	name := fmt.Sprintf("%s-consumer-%s-%s-%d", taskType, queue, hostname, tag)
 	log.Info().Msgf("new: %s", name)
 	ctx, cancel := context.WithCancel(ctx)
-	engine := engine.NewEngine(ctx, db, conf)
+	engine := engine.New(ctx, db, conf)
 
 	return name, &Consumer{
 		ctx:      ctx,
@@ -48,7 +48,7 @@ func NewConsumer(
 		db:       db,
 		engine:   engine,
 		conf:     config.GetConfig(),
-		tasktype: tasktype,
+		taskType: taskType,
 		success:  make(chan int64),
 		failed:   make(chan int64),
 	}
@@ -179,8 +179,8 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 	}
 	if err := delivery.Ack(); err != nil {
-		log.Error().Stack().Err(err).Msgf("%s: failed to ack %s: %s", consumer.name, payload)
+		log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.name, payload)
 	} else {
-		log.Info().Msgf("%s: acked %s", consumer.name, payload)
+		log.Info().Msgf("%s: acked %v", consumer.name, payload)
 	}
 }

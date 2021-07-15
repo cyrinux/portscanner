@@ -6,15 +6,15 @@ import (
 	"os"
 	"time"
 
-	rmq "github.com/adjust/rmq/v4"
+	"github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
-	brk "github.com/cyrinux/grpcnmapscanner/broker"
+	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
-	redis "github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
@@ -35,7 +35,7 @@ var kacp = keepalive.ClientParameters{
 type Worker struct {
 	ctx         context.Context
 	name        string
-	broker      brk.Broker
+	broker      *broker.Broker
 	conf        config.Config
 	locker      *redislock.Client
 	redisClient *redis.Client
@@ -51,19 +51,25 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	log.Info().Msgf("%s worker is starting", name)
 
 	// Storage database connection init, dedicated context to keep access to the database
-	db, err := database.Factory(context.Background(), conf)
-	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("")
+	var db database.Database
+	var err error
+	timeRetry := 5000 * time.Millisecond
+	for {
+		db, err = database.Factory(context.Background(), conf)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("can't connected to main database, retrying in %v...", timeRetry)
+			time.Sleep(timeRetry)
+		} else {
+			log.Info().Msg("connected to main database")
+			break
+		}
 	}
 
-	//redis
-	redisClient, err := helpers.NewRedisClient(ctx, conf)
-	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("")
-	}
+	// redis, redisLock
+	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
 	// broker - with redis
-	broker := brk.NewBroker(ctx, name, conf.RMQ, redisClient)
+	brker := broker.New(ctx, name, conf.RMQ, redisClient)
 
 	// distributed lock - with redis
 	locker := redislock.New(redisClient)
@@ -71,7 +77,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	// tls client config
 	tlsCredentials, err := loadTLSCredentials(conf.Backend.CAFile, conf.Backend.ClientCertFile, conf.Backend.ClientKeyFile)
 	if err != nil {
-		log.Fatal().Msgf("cannot load TLS credentials: %v", err)
+		log.Fatal().Msgf("can't load TLS credentials: %v", err)
 	}
 
 	grpcServer, err := grpc.Dial(
@@ -92,7 +98,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		name:        name,
 		conf:        conf,
 		ctx:         ctx,
-		broker:      broker,
+		broker:      brker,
 		locker:      locker,
 		consumers:   make([]*Consumer, 0),
 		db:          db,
@@ -185,7 +191,7 @@ func (worker *Worker) startConsuming() *Worker {
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 	log.Info().Msgf("start consuming %s with %d consumers...", worker.name, numConsumers)
 
-	worker.broker = brk.NewBroker(worker.ctx, worker.name, conf.RMQ, worker.redisClient)
+	worker.broker = broker.New(worker.ctx, worker.name, conf.RMQ, worker.redisClient)
 
 	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration)
 	if err != nil {

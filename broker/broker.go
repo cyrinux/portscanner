@@ -17,14 +17,12 @@ type Broker struct {
 	Pushed     rmq.Queue
 	Connection rmq.Connection
 	Stats      rmq.Stats
-	tasktype   string
+	taskType   string
 }
 
 // NewBroker open the broker queues
-func NewBroker(ctx context.Context, tasktype string, conf config.RMQConfig, redisClient *redis.Client) Broker {
+func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClient *redis.Client) *Broker {
 	errChan := make(chan error, 10)
-	var connection rmq.Connection
-	var err error
 
 	go RmqLogErrors(errChan)
 
@@ -39,26 +37,29 @@ func NewBroker(ctx context.Context, tasktype string, conf config.RMQConfig, redi
 		})
 	}
 
+	var connection rmq.Connection
+	var err error
 	for {
 		retryTime := 5000 * time.Millisecond
 		connection, err = rmq.OpenConnectionWithRedisClient(
 			conf.Name, redisClient, errChan,
 		)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("can't open RMQ connection, retrying in %v", retryTime)
+			log.Error().Stack().Err(err).Msgf("can't open RMQ connection, retrying in %v...", retryTime)
 			time.Sleep(retryTime)
 		} else {
+			log.Info().Msg("connected to RMQ database")
 			break
 		}
 	}
 
-	queueIncomingName := fmt.Sprintf("%s-incoming", tasktype)
+	queueIncomingName := fmt.Sprintf("%s-incoming", taskType)
 	queueIncoming, err := connection.OpenQueue(queueIncomingName)
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		log.Fatal().Stack().Err(err).Msgf("can't open %s queue", queueIncomingName)
 	}
 
-	queuePushName := fmt.Sprintf("%s-rejected", tasktype)
+	queuePushName := fmt.Sprintf("%s-rejected", taskType)
 	queuePushed, err := connection.OpenQueue(queuePushName)
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		log.Fatal().Stack().Err(err).Msgf("can't open %s queue", queuePushName)
@@ -66,12 +67,12 @@ func NewBroker(ctx context.Context, tasktype string, conf config.RMQConfig, redi
 
 	queueIncoming.SetPushQueue(queuePushed)
 
-	return Broker{
+	return &Broker{
 		ctx:        context.Background(),
 		Incoming:   queueIncoming,
 		Pushed:     queuePushed,
 		Connection: connection,
-		tasktype:   tasktype,
+		taskType:   taskType,
 	}
 }
 
@@ -96,7 +97,7 @@ func RmqLogErrors(errChan <-chan error) {
 }
 
 // GetStats return RMQ broker connection stats
-func GetStats(broker *Broker) (rmq.Stats, error) {
+func (broker *Broker) GetStats() (rmq.Stats, error) {
 	queues, err := broker.Connection.GetOpenQueues()
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("")

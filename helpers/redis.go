@@ -4,11 +4,24 @@ import (
 	"context"
 
 	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/logger"
 	redis "github.com/go-redis/redis/v8"
+	"time"
 )
 
+var (
+	conf = config.GetConfig().Logger
+	log  = logger.New(conf.Debug, conf.Pretty)
+)
+
+type RedisClient struct {
+	ctx    context.Context
+	conf   config.Config
+	client *redis.Client
+}
+
 // NewRedisClient return a sentinel redis client from RMQ config params
-func NewRedisClient(ctx context.Context, conf config.Config) (*redis.Client, error) {
+func NewRedisClient(ctx context.Context, conf config.Config) *RedisClient {
 	redisClient := redis.NewFailoverClient(&redis.FailoverOptions{
 		SentinelAddrs:    conf.RMQ.Redis.SentinelServers,
 		MasterName:       conf.RMQ.Redis.MasterName,
@@ -17,5 +30,22 @@ func NewRedisClient(ctx context.Context, conf config.Config) (*redis.Client, err
 		DB:               conf.RMQ.Database,
 		MaxRetries:       10,
 	})
-	return redisClient, nil
+	return &RedisClient{ctx: ctx, client: redisClient, conf: conf}
+}
+
+func (rc *RedisClient) Connect() *redis.Client {
+	timeRetry := 5000 * time.Millisecond
+	var err error
+	var redisClient RedisClient
+	for {
+		redisClient = *NewRedisClient(rc.ctx, rc.conf)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("cannot connected to redis, retrying in %v...", timeRetry)
+			time.Sleep(timeRetry)
+		} else {
+			log.Info().Msg("connected to redis database")
+			break
+		}
+	}
+	return redisClient.client
 }

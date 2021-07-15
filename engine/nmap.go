@@ -28,12 +28,22 @@ type Engine struct {
 	config config.NMAPConfig
 }
 
-// NewEngine create a new nmap engine
-func NewEngine(ctx context.Context, db database.Database, conf config.NMAPConfig) *Engine {
+// ParamsParsed are the engine params parsed
+type ParamsParsed struct {
+	hosts    []string
+	ports    []string
+	options  []nmap.Option
+	timeout  time.Duration
+	nmapArgs []string
+	params   pb.ParamsScannerRequest
+}
+
+// New create a new nmap engine
+func New(ctx context.Context, db database.Database, conf config.NMAPConfig) *Engine {
 	return &Engine{ctx: ctx, db: db, config: conf}
 }
 
-func (e *Engine) parseParams(s *pb.ParamsScannerRequest) ([]string, []string, []nmap.Option, error) {
+func (e *Engine) parseParams(s *pb.ParamsScannerRequest) (*ParamsParsed, error) {
 	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports
 
@@ -112,82 +122,63 @@ func (e *Engine) parseParams(s *pb.ParamsScannerRequest) ([]string, []string, []
 		options = append(options, nmap.WithSYNScan())
 	}
 
-	return hostsList, portsList, options, nil
+	return &ParamsParsed{hosts: hostsList, ports: portsList, options: options}, nil
 }
 
 // StartNmapScan start a nmap scan
 func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
-	scannerResponse := []*pb.ScannerResponse{
+	sr := []*pb.ScannerResponse{
 		{Status: pb.ScannerResponse_RUNNING},
 	}
-	scannerMainResponse := pb.ScannerMainResponse{Request: params, Key: params.Key, Response: scannerResponse}
+	smr := pb.ScannerMainResponse{Request: params, Key: params.Key, Response: sr}
 
-	resultJSONJSON, err := json.Marshal(&scannerMainResponse)
+	smrJSON, err := json.Marshal(&smr)
 	if err != nil {
 		return params, nil, err
 	}
 
-	_, err = e.db.Set(e.ctx, params.Key, string(resultJSONJSON), params.RetentionDuration.AsDuration())
+	_, err = e.db.Set(e.ctx, params.Key, string(smrJSON), params.RetentionDuration.AsDuration())
+	if err != nil {
+		return params, nil, err
+	}
+
+	// parse all input options
+	paramsParsed, err := e.parseParams(params)
 	if err != nil {
 		return params, nil, err
 	}
 
 	// int32s in seconds
-	timeout := time.Duration(params.Timeout) * time.Second
+	paramsParsed.timeout = time.Duration(params.Timeout) * time.Second
 
 	// define scan context
-	ctx, cancel := context.WithTimeout(e.ctx, timeout)
+	ctx, cancel := context.WithTimeout(e.ctx, paramsParsed.timeout)
 	defer cancel()
 
-	// parse all input options
-	hosts, ports, options, err := e.parseParams(params)
-	if err != nil {
-		return params, nil, err
-	}
-
 	// add context to nmap options
-	options = append(options, nmap.WithContext(ctx))
+	paramsParsed.options = append(paramsParsed.options, nmap.WithContext(ctx))
 
 	// create a nmap scanner
-	scanner, err := nmap.NewScanner(options...)
+	scanner, err := nmap.NewScanner(paramsParsed.options...)
 	if err != nil {
 		return params, nil, err
 	}
 
 	// nmap args
-	nmapArgs := fmt.Sprintf("%s", scanner.Args())
-	params.NmapParams = nmapArgs
+	paramsParsed.nmapArgs = scanner.Args()
 
 	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %vs, args: %v",
 		params.Key,
-		hosts,
-		ports,
-		timeout,
-		params.RetentionDuration.Seconds,
-		nmapArgs,
+		paramsParsed.hosts,
+		paramsParsed.ports,
+		paramsParsed.timeout,
+		params.RetentionDuration,
+		fmt.Sprintf("%s", paramsParsed.nmapArgs),
 	)
 
 	// Function to listen and print the progress
 	progress := make(chan float32, 1)
-	go func() {
-		var previous float32
-		for p := range progress {
-			if p > previous {
-				log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s, timeout: %v, retention: %vs",
-					params.Key,
-					p,
-					hosts,
-					ports,
-					timeout,
-					params.RetentionDuration.Seconds,
-				)
-				previous = p
-			} else {
-				continue
-			}
-			time.Sleep(1000 * time.Millisecond)
-		}
-	}()
+	go progressNmap(progress, params, paramsParsed)
 
 	result, warnings, err := scanner.RunWithProgress(progress)
 	if err != nil {
@@ -195,7 +186,7 @@ func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScann
 	}
 
 	if warnings != nil {
-		log.Warn().Msgf("nmap warnings: %v", warnings)
+		log.Warn().Msgf("nmap: %v", warnings)
 	}
 
 	log.Info().Msgf("nmap done: %d/%d hosts up scanned in %3f seconds",
@@ -286,4 +277,24 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 		}
 	}
 	return resultJSON, nil
+}
+
+func progressNmap(progress chan float32, params *pb.ParamsScannerRequest, parsedParams *ParamsParsed) {
+	var previous float32
+	for p := range progress {
+		if p > previous {
+			log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s, timeout: %v, retention: %v",
+				params.Key,
+				p,
+				parsedParams.hosts,
+				parsedParams.ports,
+				parsedParams.timeout,
+				params.RetentionDuration,
+			)
+			previous = p
+		} else {
+			continue
+		}
+		time.Sleep(1000 * time.Millisecond)
+	}
 }
