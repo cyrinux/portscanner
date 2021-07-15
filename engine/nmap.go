@@ -117,7 +117,9 @@ func (e *Engine) parseParams(s *pb.ParamsScannerRequest) ([]string, []string, []
 
 // StartNmapScan start a nmap scan
 func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
-	scannerResponse := []*pb.ScannerResponse{{Status: pb.ScannerResponse_RUNNING}}
+	scannerResponse := []*pb.ScannerResponse{
+		{Status: pb.ScannerResponse_RUNNING},
+	}
 	scannerMainResponse := pb.ScannerMainResponse{Request: params, Key: params.Key, Response: scannerResponse}
 
 	resultJSONJSON, err := json.Marshal(&scannerMainResponse)
@@ -125,8 +127,7 @@ func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScann
 		return params, nil, err
 	}
 
-	retention := params.RetentionDuration.AsDuration()
-	_, err = e.db.Set(e.ctx, params.Key, string(resultJSONJSON), retention)
+	_, err = e.db.Set(e.ctx, params.Key, string(resultJSONJSON), params.RetentionDuration.AsDuration())
 	if err != nil {
 		return params, nil, err
 	}
@@ -157,12 +158,12 @@ func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScann
 	nmapArgs := fmt.Sprintf("%s", scanner.Args())
 	params.NmapParams = nmapArgs
 
-	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v, args: %v",
+	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %vs, args: %v",
 		params.Key,
 		hosts,
 		ports,
 		timeout,
-		retention,
+		params.RetentionDuration.Seconds,
 		nmapArgs,
 	)
 
@@ -172,13 +173,13 @@ func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScann
 		var previous float32
 		for p := range progress {
 			if p > previous {
-				log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s, timeout: %v, retention: %v",
+				log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s, timeout: %v, retention: %vs",
 					params.Key,
 					p,
 					hosts,
 					ports,
 					timeout,
-					retention,
+					params.RetentionDuration.Seconds,
 				)
 				previous = p
 			} else {

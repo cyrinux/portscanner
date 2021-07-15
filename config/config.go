@@ -32,7 +32,7 @@ type NMAPConfig struct {
 // RMQConfig  contains the redis broker config
 type RMQConfig struct {
 	Name               string        `default:"broker"`
-	Database           string        `default:"0"`
+	Database           int           `default:"0"`
 	NumConsumers       int64         `default:"5" split_words:"true"`
 	ReturnerLimit      int64         `default:"200" split_words:"true"`
 	PollDuration       time.Duration `default:"100ms" split_words:"true"`

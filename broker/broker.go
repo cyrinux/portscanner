@@ -7,7 +7,6 @@ import (
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
-	"strconv"
 	"time"
 )
 
@@ -24,25 +23,33 @@ type Broker struct {
 // NewBroker open the broker queues
 func NewBroker(ctx context.Context, tasktype string, conf config.RMQConfig, redisClient *redis.Client) Broker {
 	errChan := make(chan error, 10)
+	var connection rmq.Connection
+	var err error
+
 	go RmqLogErrors(errChan)
 
 	if redisClient == nil {
-		rmqDB, _ := strconv.ParseInt(conf.Database, 10, 0)
 		redisClient = redis.NewFailoverClient(&redis.FailoverOptions{
 			SentinelAddrs:    conf.Redis.SentinelServers,
 			MasterName:       conf.Redis.MasterName,
 			Password:         conf.Redis.Password,
 			SentinelPassword: conf.Redis.SentinelPassword,
-			DB:               int(rmqDB),
+			DB:               conf.Database,
 			MaxRetries:       5,
 		})
 	}
 
-	connection, err := rmq.OpenConnectionWithRedisClient(
-		conf.Name, redisClient, errChan,
-	)
-	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("can't open RMQ connection")
+	for {
+		retryTime := 5000 * time.Millisecond
+		connection, err = rmq.OpenConnectionWithRedisClient(
+			conf.Name, redisClient, errChan,
+		)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("can't open RMQ connection, retrying in %v", retryTime)
+			time.Sleep(retryTime)
+		} else {
+			break
+		}
 	}
 
 	queueIncomingName := fmt.Sprintf("%s-incoming", tasktype)
@@ -60,7 +67,7 @@ func NewBroker(ctx context.Context, tasktype string, conf config.RMQConfig, redi
 	queueIncoming.SetPushQueue(queuePushed)
 
 	return Broker{
-		ctx:        context.TODO(),
+		ctx:        context.Background(),
 		Incoming:   queueIncoming,
 		Pushed:     queuePushed,
 		Connection: connection,
