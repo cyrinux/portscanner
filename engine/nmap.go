@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
-
 	nmap "github.com/Ullaakut/nmap/v2"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/pkg/errors"
+	"math/rand"
+	"strings"
+	"time"
 )
 
 var (
@@ -43,7 +43,16 @@ func New(ctx context.Context, db database.Database, conf config.NMAPConfig) *Eng
 	return &Engine{ctx: ctx, db: db, config: conf}
 }
 
-func (e *Engine) parseParams(s *pb.ParamsScannerRequest) (*ParamsParsed, error) {
+// Start the scan
+func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+	if async {
+		return e.startAsyncScan(params)
+	} else {
+		return e.startScan(params)
+	}
+}
+
+func (e *Engine) parseNMAPParams(s *pb.ParamsScannerRequest) (*ParamsParsed, error) {
 	hostsList := strings.Split(s.Hosts, ",")
 	ports := s.Ports
 
@@ -125,25 +134,69 @@ func (e *Engine) parseParams(s *pb.ParamsScannerRequest) (*ParamsParsed, error) 
 	return &ParamsParsed{hosts: hostsList, ports: portsList, options: options}, nil
 }
 
-// StartNmapScan start a nmap scan
-func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+func (e *Engine) startScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
 	sr := []*pb.ScannerResponse{
 		{Status: pb.ScannerResponse_RUNNING},
 	}
-	smr := pb.ScannerMainResponse{Request: params, Key: params.Key, Response: sr}
+	smr := pb.ScannerMainResponse{Key: params.Key, Response: sr}
 
 	smrJSON, err := json.Marshal(&smr)
 	if err != nil {
 		return params, nil, err
 	}
-
 	_, err = e.db.Set(e.ctx, params.Key, string(smrJSON), params.RetentionDuration.AsDuration())
 	if err != nil {
 		return params, nil, err
 	}
 
+	params, result, err := e.parse(params)
+	return params, result, nil
+
+}
+
+func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+	var srs []*pb.ScannerResponse
+	var smr *pb.ScannerMainResponse
+
+	// delay a little the start of the scan
+	rand.Seed(time.Now().UnixNano())
+	delay := time.Duration(rand.Intn(15)) * time.Second
+	time.Sleep(delay)
+	log.Debug().Msgf("nmap waiting %v before start", delay)
+	smrJSON, err := e.db.Get(e.ctx, params.Key)
+	if err != nil {
+		return params, nil, err
+	}
+	err = json.Unmarshal([]byte(smrJSON), &smr)
+	if err != nil {
+		return params, nil, err
+	}
+	srs = smr.Response
+
+	for i, sr := range srs {
+		if sr.Key == fmt.Sprintf("%s-%s", params.Key, params.Hosts) {
+			srs[i].Status = pb.ScannerResponse_RUNNING
+			break
+		}
+	}
+	smr.Response = srs
+	smr.Request.Hosts += "," + params.Hosts
+	smrNewJSON, err := json.Marshal(smr)
+	if err != nil {
+		return params, nil, err
+	}
+	_, err = e.db.Set(e.ctx, params.Key, string(smrNewJSON), params.RetentionDuration.AsDuration())
+	if err != nil {
+		return params, nil, err
+	}
+
+	params, result, err := e.parse(params)
+	return params, result, nil
+}
+
+func (e *Engine) parse(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
 	// parse all input options
-	paramsParsed, err := e.parseParams(params)
+	paramsParsed, err := e.parseNMAPParams(params)
 	if err != nil {
 		return params, nil, err
 	}
@@ -167,7 +220,7 @@ func (e *Engine) StartNmapScan(params *pb.ParamsScannerRequest) (*pb.ParamsScann
 	// nmap args
 	paramsParsed.nmapArgs = scanner.Args()
 
-	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %vs, args: %v",
+	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v, args: %v",
 		params.Key,
 		paramsParsed.hosts,
 		paramsParsed.ports,

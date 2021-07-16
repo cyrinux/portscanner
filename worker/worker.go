@@ -156,7 +156,6 @@ func (worker *Worker) StreamServiceControl() {
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 	log.Info().Msg("starting the returner routine")
-	conf := worker.conf
 	for {
 		// Try to obtain lock.
 		lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
@@ -168,7 +167,7 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 				log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 			} else if ttl > 0 {
 				// Yay, I still have my lock!
-				ret, err := queue.ReturnRejected(conf.RMQ.ReturnerLimit)
+				ret, err := queue.ReturnRejected(worker.conf.RMQ.ReturnerLimit)
 				if err != nil {
 					log.Error().Stack().Err(err).Msg("error while returning message")
 				}
