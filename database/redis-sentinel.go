@@ -37,6 +37,14 @@ func (r redisSentinelDatabase) Set(ctx context.Context, key string, value string
 	return key, nil
 }
 
+func (r redisSentinelDatabase) WatchAndSet(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
+	_, err := r.client.Set(ctx, key, value, retention).Result()
+	if err != nil {
+		return generateError("set", err)
+	}
+	return key, nil
+}
+
 func (r redisSentinelDatabase) Get(ctx context.Context, key string) (string, error) {
 	value, err := r.client.Get(ctx, key).Result()
 	if err != nil {

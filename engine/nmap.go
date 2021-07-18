@@ -7,6 +7,7 @@ import (
 	nmap "github.com/Ullaakut/nmap/v2"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/pkg/errors"
@@ -180,7 +181,12 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 		}
 	}
 	smr.Response = srs
-	smr.Request.Hosts += "," + params.Hosts
+
+	hosts := strings.Split(smr.Request.Hosts, ",")
+	hosts = append(hosts, params.Hosts)
+	hosts = helpers.MakeUnique(hosts)
+	smr.Request.Hosts = strings.Join(hosts, ",")
+
 	smrNewJSON, err := json.Marshal(smr)
 	if err != nil {
 		return params, nil, err

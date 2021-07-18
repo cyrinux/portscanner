@@ -358,7 +358,7 @@ func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetA
 func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
 	params = parseRequest(params)
 
-	addedTime := timestamppb.Now()
+	createAt := timestamppb.Now()
 
 	// we start the scan
 	newEngine := engine.New(ctx, server.db, server.config.NMAP)
@@ -383,9 +383,9 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 
 	// forge main response
 	smr := pb.ScannerMainResponse{
-		Key:       params.Key,
-		AddedTime: addedTime,
-		Response:  sr,
+		Key:      params.Key,
+		CreateAt: createAt,
+		Response: sr,
 	}
 	smrJSON, err := json.Marshal(&smr)
 	if err != nil {
@@ -409,7 +409,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
 	params = parseRequest(params)
 
-	addedTime := timestamppb.Now()
+	createAt := timestamppb.Now()
 
 	srs := []*pb.ScannerResponse{}
 	smr := pb.ScannerMainResponse{}
@@ -418,10 +418,10 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 		srs = append(srs, sr)
 		params.Hosts = host
 		smr = pb.ScannerMainResponse{
-			Key:       params.Key,
-			Request:   params,
-			AddedTime: addedTime,
-			Response:  srs,
+			Key:      params.Key,
+			Request:  params,
+			CreateAt: createAt,
+			Response: srs,
 		}
 		smrJSON, err := json.Marshal(&smr)
 		if err != nil {

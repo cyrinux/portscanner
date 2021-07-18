@@ -44,15 +44,14 @@ message ScannerMainResponse {
     string key = 1;
     ParamsScannerRequest request = 2;
     repeated ScannerResponse response = 3;
-    google.protobuf.Timestamp added_time = 4;
+    google.protobuf.Timestamp create_at = 4;
 }
 
 message ScannerResponse {
-    repeated HostResult host_result = 1;
+    string key = 1;
     google.protobuf.Timestamp start_time = 2;
     google.protobuf.Timestamp end_time = 3;
     google.protobuf.Duration retention_duration = 4;
-    string key = 5;
     enum Status {
         UNKNOWN = 0;
         QUEUED = 1;
@@ -62,29 +61,30 @@ message ScannerResponse {
         CANCEL = 5;
         TIMEOUT= 6;
       }
-    Status status = 6;
+    Status status = 5;
+    repeated HostResult host_result = 6;
 }
 
 message ParamsScannerRequest {
-    string hosts = 1;
-    string ports = 2;
-    bool with_aggressive_scan = 3;
-    bool with_syn_scan = 4;
-    bool with_null_scan = 5;
-    bool service_version_detection = 6;
-    bool os_detection = 7;
-    bool service_default_scripts = 8;
-    int32 timeout = 9;
-    bool ping_only = 10;
-    google.protobuf.Duration retention_duration = 11;
-    bool fast_mode = 12;
-    string key = 13;
-    google.protobuf.Duration defer_duration = 14;
-    string crontab = 15;
+    string key = 1;
+    string hosts = 2;
+    string ports = 3;
+    google.protobuf.Timestamp defer_time = 4;
+    int32 timeout = 5;
+    bool with_aggressive_scan = 6;
+    bool with_syn_scan = 7;
+    bool with_null_scan = 8;
+    bool service_version_detection = 9;
+    bool os_detection = 10;
+    bool service_default_scripts = 11;
+    bool ping_only = 12;
+    google.protobuf.Duration retention_duration = 13;
+    bool fast_mode = 14;
+    google.protobuf.Duration defer_duration = 15;
     int32 scan_speed = 16;
     string service_scripts = 17;
     bool use_tor = 18;
-    google.protobuf.Timestamp defer_time = 19;
+    string crontab = 19;
 }
 
 message GetScannerRequest {
