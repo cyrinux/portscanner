@@ -63,9 +63,6 @@ proto-docker:
 testscan:
 	./bin/scanner
 	./bin/scanner StartAsyncScan '{"hosts":"scanme.nmap.org","fast_mode":true}'
-	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'scanme.nmap.org',fast_mode:true"
-	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartAsyncScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
-	# grpc_cli call 127.0.0.1:9000 proto.ScannerService.StartScan "hosts:'1.1.1.1,8.8.8.8',ports:'80,U:53,T:443,22,T:8040-8080'"
 
 .PHONY: cert
 cert:

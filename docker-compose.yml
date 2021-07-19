@@ -53,12 +53,12 @@ services:
     networks:
       - backend
     ports:
-      - "127.0.0.1:16060-16062:6060"
+      - "127.0.0.1:16060-16064:6060"
     volumes:
       - "./cert:/etc/scanner/cert:ro"
     deploy:
       mode: replicated
-      replicas: 3
+      replicas: 5
 
   tor:
     image: dperson/torproxy

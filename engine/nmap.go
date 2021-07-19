@@ -54,7 +54,7 @@ func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) (*pb.ParamsS
 }
 
 func (e *Engine) parseNMAPParams(s *pb.ParamsScannerRequest) (*ParamsParsed, error) {
-	hostsList := strings.Split(s.Hosts, ",")
+	hostsList := strings.Split(s.Targets, ",")
 	ports := s.Ports
 
 	var options = []nmap.Option{
@@ -109,16 +109,18 @@ func (e *Engine) parseNMAPParams(s *pb.ParamsScannerRequest) (*ParamsParsed, err
 
 	if s.GetServiceDefaultScripts() {
 		options = append(options, nmap.WithDefaultScript())
-		options = append(options, nmap.WithScriptUpdateDB())
 	}
 
 	if s.ServiceScripts != "" {
-		options = append(options, nmap.WithScriptUpdateDB())
 		options = append(options, nmap.WithServiceInfo())
 		for _, script := range strings.Split(s.ServiceScripts, ",") {
 			options = append(options, nmap.WithScripts(script))
 
 		}
+	}
+
+	if s.OpenOnly {
+		options = append(options, nmap.WithOpenOnly())
 	}
 
 	if s.GetWithAggressiveScan() {
@@ -150,7 +152,10 @@ func (e *Engine) startScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRe
 		return params, nil, err
 	}
 
-	params, result, err := e.parse(params)
+	params, result, err := e.run(params)
+	if err != nil {
+		return params, nil, err
+	}
 	return params, result, nil
 
 }
@@ -161,7 +166,7 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 
 	// delay a little the start of the scan
 	rand.Seed(time.Now().UnixNano())
-	delay := time.Duration(rand.Intn(15)) * time.Second
+	delay := time.Duration(rand.Intn(5)) * time.Second
 	time.Sleep(delay)
 	log.Debug().Msgf("nmap waiting %v before start", delay)
 	smrJSON, err := e.db.Get(e.ctx, params.Key)
@@ -175,17 +180,19 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 	srs = smr.Response
 
 	for i, sr := range srs {
-		if sr.Key == fmt.Sprintf("%s-%s", params.Key, params.Hosts) {
+		if sr.Key == fmt.Sprintf("%s-%s", params.Key, params.Targets) {
 			srs[i].Status = pb.ScannerResponse_RUNNING
 			break
 		}
 	}
 	smr.Response = srs
 
-	hosts := strings.Split(smr.Request.Hosts, ",")
-	hosts = append(hosts, params.Hosts)
-	hosts = helpers.MakeUnique(hosts)
-	smr.Request.Hosts = strings.Join(hosts, ",")
+	if smr.Request != nil && smr.Request.Targets != "" {
+		hosts := strings.Split(smr.Request.Targets, ",")
+		hosts = append(hosts, params.Targets)
+		hosts = helpers.MakeUnique(hosts)
+		smr.Request.Targets = strings.Join(hosts, ",")
+	}
 
 	smrNewJSON, err := json.Marshal(smr)
 	if err != nil {
@@ -196,11 +203,14 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 		return params, nil, err
 	}
 
-	params, result, err := e.parse(params)
+	params, result, err := e.run(params)
+	if err != nil {
+		return params, nil, err
+	}
 	return params, result, nil
 }
 
-func (e *Engine) parse(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+func (e *Engine) run(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
 	// parse all input options
 	paramsParsed, err := e.parseNMAPParams(params)
 	if err != nil {
@@ -226,12 +236,10 @@ func (e *Engine) parse(params *pb.ParamsScannerRequest) (*pb.ParamsScannerReques
 	// nmap args
 	paramsParsed.nmapArgs = scanner.Args()
 
-	log.Info().Msgf("starting scan %s of host: %s, port: %s, timeout: %v, retention: %v, args: %v",
+	log.Info().Msgf("starting scan %s of host: %s, port: %s, args: %v",
 		params.Key,
 		paramsParsed.hosts,
 		paramsParsed.ports,
-		paramsParsed.timeout,
-		params.RetentionDuration,
 		fmt.Sprintf("%s", paramsParsed.nmapArgs),
 	)
 
@@ -342,13 +350,11 @@ func progressNmap(progress chan float32, params *pb.ParamsScannerRequest, parsed
 	var previous float32
 	for p := range progress {
 		if p > previous {
-			log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s, timeout: %v, retention: %v",
+			log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s",
 				params.Key,
 				p,
 				parsedParams.hosts,
 				parsedParams.ports,
-				parsedParams.timeout,
-				params.RetentionDuration,
 			)
 			previous = p
 		} else {

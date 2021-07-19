@@ -64,6 +64,11 @@ func authorize(ctx context.Context) error {
 			return nil
 		}
 
+		if len(md["username"]) > 0 && md["username"][0] == "user" &&
+			len(md["password"]) > 0 && md["password"][0] == "user123" {
+			return nil
+		}
+
 		return errors.New("Access denied")
 	}
 

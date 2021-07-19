@@ -4,13 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"os"
-	"os/signal"
-	"strings"
-	"time"
-
+	"github.com/mikioh/ipaddr"
+	// "github.com/apparentlymart/go-cidr/cidr"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -28,6 +23,12 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"io"
+	"net"
+	"os"
+	"os/signal"
+	"strings"
+	"time"
 )
 
 var (
@@ -389,7 +390,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	}
 	smrJSON, err := json.Marshal(&smr)
 	if err != nil {
-		log.Error().Err(err).Msg("")
+		log.Error().Stack().Err(err).Msg("can't create main JSON response")
 	}
 
 	// and write the response to the database
@@ -405,47 +406,112 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	return generateResponse(params.Key, &smr, nil)
 }
 
+func splitInSubnets(targets string, n int) ([]string, error) {
+	var networks []string
+
+	_, network, err := net.ParseCIDR(targets)
+	if err != nil {
+		return nil, err
+	}
+
+	p := ipaddr.NewPrefix(network)
+	subnetPrefixes := p.Subnets(n)
+
+	for _, subnet := range subnetPrefixes {
+		networks = append(networks, subnet.String())
+	}
+
+	return networks, nil
+}
+
 // StartAsyncScan function prepare a nmap scan
 func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
+
 	params = parseRequest(params)
 
 	createAt := timestamppb.Now()
 
 	srs := []*pb.ScannerResponse{}
 	smr := pb.ScannerMainResponse{}
-	for i, host := range strings.Split(params.Hosts, ",") {
-		sr := &pb.ScannerResponse{Key: fmt.Sprintf("%s-%s", params.Key, host), Status: pb.ScannerResponse_QUEUED}
+
+	// if we want to split a task by host
+	// we split host list by "," and then
+	// spawn a consumer per host
+	//
+	// also, we split a network cidr in smaller one
+	var hosts []string
+	if params.NetworkChuncked || params.ProcessPerTarget {
+		hosts = strings.Split(params.Targets, ",")
+		if params.NetworkChuncked {
+			var splittedNetworks []string
+			for _, network := range hosts {
+				splittedNetwork, err := splitInSubnets(network, 3)
+				if err != nil {
+					splittedNetworks = append(splittedNetworks, network)
+				}
+				splittedNetworks = append(splittedNetworks, splittedNetwork...)
+			}
+			hosts = splittedNetworks
+		}
+	} else {
+		// or we use the default behavior, passing all host
+		// to one nmap process
+		hosts = []string{params.Targets}
+	}
+
+	// we loop of each host
+	for i, host := range hosts {
+		// if we split the scan, let use a key ID containing
+		// the main Key and host
+		subKey := params.Key
+		if (params.NetworkChuncked || params.ProcessPerTarget) && len(hosts) > 1 {
+			subKey = fmt.Sprintf("%s-%s", params.Key, host)
+		}
+
+		// we create the task response with queued status
+		sr := &pb.ScannerResponse{
+			Key:    subKey,
+			Status: pb.ScannerResponse_QUEUED,
+		}
+
+		// then append it to the main task
 		srs = append(srs, sr)
-		params.Hosts = host
+		// we override the Hosts param in case we split it
+		// for the scan request
+		params.Targets = host
 		smr = pb.ScannerMainResponse{
 			Key:      params.Key,
 			Request:  params,
 			CreateAt: createAt,
 			Response: srs,
 		}
-		smrJSON, err := json.Marshal(&smr)
-		if err != nil {
-			log.Error().Stack().Err(err).Msg("")
-		}
 
 		log.Info().Msgf("receive async task order: %v", params)
+
+		smrJSON, err := json.Marshal(&smr)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't create main JSON response")
+			return generateResponse(params.Key, &smr, err)
+		}
+
+		// write main response to database
 		_, err = server.db.Set(ctx, params.Key, string(smrJSON), 0)
 		if err != nil {
-			log.Error().Stack().Err(err).Msg("")
+			log.Error().Stack().Err(err).Msg("can't write main response to database")
+			return generateResponse(params.Key, &smr, err)
 		}
-		// create scan task
+
+		// create scan task and publish it to the RMQ broker
 		paramsJSON, err := json.Marshal(params)
 		if err != nil {
 			srs[i].Status = pb.ScannerResponse_ERROR
 			return generateResponse(params.Key, &smr, err)
 		}
 
-		srs[i].Status = pb.ScannerResponse_QUEUED
-
 		err = server.broker.Incoming.PublishBytes(paramsJSON)
 		if err != nil {
-			scannerResponse := pb.ScannerMainResponse{Response: srs}
-			return generateResponse(params.Key, &scannerResponse, err)
+			srs[i].Status = pb.ScannerResponse_ERROR
+			return generateResponse(params.Key, &smr, err)
 		}
 
 	}
@@ -489,7 +555,7 @@ func parseRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
 	}
 
 	// replace all whitespaces
-	request.Hosts = strings.ReplaceAll(request.Hosts, " ", "")
+	request.Targets = strings.ReplaceAll(request.Targets, " ", "")
 	request.Ports = strings.ReplaceAll(request.Ports, " ", "")
 
 	// defer Duration to defer Time

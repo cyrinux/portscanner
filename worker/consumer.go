@@ -141,7 +141,11 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 			EndTime:           endTime,
 			RetentionDuration: params.RetentionDuration},
 		)
-		smr = pb.ScannerMainResponse{Key: params.Key, Response: srs}
+		smr = pb.ScannerMainResponse{
+			Key:      params.Key,
+			Request:  params,
+			Response: srs,
+		}
 		scanResultJSON, err := json.Marshal(&smr)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
@@ -176,7 +180,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.name)
 		}
 		srs = smr.Response
-		childKey := fmt.Sprintf("%s-%s", params.Key, request.Hosts)
+		childKey := fmt.Sprintf("%s-%s", params.Key, request.Targets)
 		srs = append(srs, &pb.ScannerResponse{
 			Key:               childKey,
 			StartTime:         startTime,
