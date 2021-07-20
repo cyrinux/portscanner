@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikioh/ipaddr"
-	// "github.com/apparentlymart/go-cidr/cidr"
+	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -15,6 +14,7 @@ import (
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/google/uuid"
+	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -94,6 +94,7 @@ type Server struct {
 	err         error
 	broker      broker.Broker
 	State       pb.ServiceStateValues
+	locker      *redislock.Client
 	taskType    string
 	tasksStatus TasksStatus
 }
@@ -227,6 +228,9 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	//redis
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
+	// distributed lock - with redis
+	locker := redislock.New(redisClient)
+
 	// Broker init nmap queue
 	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)
 	// clean the queues
@@ -248,6 +252,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 		broker:   *brker,
 		db:       db,
 		err:      err,
+		locker:   locker,
 	}
 }
 
@@ -362,7 +367,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	createAt := timestamppb.Now()
 
 	// we start the scan
-	newEngine := engine.New(ctx, server.db, server.config.NMAP)
+	newEngine := engine.New(ctx, server.db, server.config.NMAP, server.locker)
 	sr := []*pb.ScannerResponse{{
 		StartTime: timestamppb.Now(),
 		Status:    pb.ScannerResponse_UNKNOWN,
@@ -428,7 +433,7 @@ func splitInSubnets(targets string, n int) ([]string, error) {
 func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
 
 	params = parseRequest(params)
-
+	targets := params.Targets
 	createAt := timestamppb.Now()
 
 	srs := []*pb.ScannerResponse{}
@@ -516,6 +521,13 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 
 	}
 
+	params.Targets = targets
+	smr = pb.ScannerMainResponse{
+		Key:      params.Key,
+		Request:  params,
+		CreateAt: createAt,
+		Response: srs,
+	}
 	return generateResponse(params.Key, &smr, nil)
 }
 

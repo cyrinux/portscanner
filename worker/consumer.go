@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	rmq "github.com/adjust/rmq/v4"
+	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
@@ -20,6 +21,7 @@ type Consumer struct {
 	ctx      context.Context
 	db       database.Database
 	engine   *engine.Engine
+	locker   *redislock.Client
 	state    pb.ServiceStateValues
 	conf     config.Config
 	taskType string
@@ -34,12 +36,13 @@ func NewConsumer(
 	tag int,
 	taskType string,
 	conf config.NMAPConfig,
-	queue string) (string, *Consumer) {
+	queue string,
+	locker *redislock.Client) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", taskType, queue, hostname, tag)
 	log.Info().Msgf("new: %s", name)
 	ctx, cancel := context.WithCancel(ctx)
-	engine := engine.New(ctx, db, conf)
+	engine := engine.New(ctx, db, conf, locker)
 
 	return name, &Consumer{
 		ctx:      ctx,

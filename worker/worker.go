@@ -37,8 +37,8 @@ type Worker struct {
 	name        string
 	broker      *broker.Broker
 	conf        config.Config
-	locker      *redislock.Client
 	redisClient *redis.Client
+	locker      *redislock.Client
 	state       pb.ServiceStateValues
 	consumers   []*Consumer
 	db          database.Database
@@ -68,11 +68,11 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	// redis, redisLock
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
-	// broker - with redis
-	brker := broker.New(ctx, name, conf.RMQ, redisClient)
-
 	// distributed lock - with redis
 	locker := redislock.New(redisClient)
+
+	// broker - with redis
+	brker := broker.New(ctx, name, conf.RMQ, redisClient)
 
 	// tls client config
 	tlsCredentials, err := loadTLSCredentials(conf.Backend.CAFile, conf.Backend.ClientCertFile, conf.Backend.ClientKeyFile)
@@ -205,7 +205,7 @@ func (worker *Worker) startConsuming() *Worker {
 	numConsumers++ // we got one consumer for the returned, lets add 2 more
 
 	for i := 0; i < int(numConsumers); i++ {
-		tag, incConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "incoming")
+		tag, incConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "incoming", worker.locker)
 		if _, err := worker.broker.Incoming.AddConsumer(tag, incConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
@@ -217,7 +217,7 @@ func (worker *Worker) startConsuming() *Worker {
 		// start prometheus collector
 		go worker.collectConsumerStats(incConsumer.success, incConsumer.failed, worker.returned)
 
-		tag, rConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "rejected")
+		tag, rConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "rejected", worker.locker)
 		if _, err := worker.broker.Pushed.AddConsumer(tag, rConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}

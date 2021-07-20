@@ -1,0 +1,41 @@
+apiVersion: v1
+data:
+  ALLOW_EMPTY_PASSWORD: "no"
+  BACKEND_LISTEN_PORT: "9001"
+  BACKEND_SERVER: server:9001
+  DB_DRIVER: redis-sentinel
+  DB_REDIS_DATABASE: "1"
+  DB_REDIS_MASTER_NAME: mymaster
+  DB_REDIS_MASTER_PASSWORD: redispassw0rd
+  DB_REDIS_NAME: scanner
+  DB_REDIS_PASSWORD: redispassw0rd
+  DB_REDIS_SENTINEL_PASSWORD: sentinelPassw0rd
+  DB_REDIS_SENTINEL_SERVERS: redis-sentinel:26379,redis-sentinel:26380,redis-sentinel:26381
+  DEBUG: "true"
+  FRONTEND_LISTEN_PORT: "9000"
+  LOGGER_DEBUG: "true"
+  LOGGER_PRETTY: "true"
+  REDIS_MASTER_PASSWORD: redispassw0rd
+  REDIS_MASTER_SET: mymaster
+  REDIS_PASSWORD: redispassw0rd
+  REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS: "15000"
+  REDIS_SENTINEL_PASSWORD: sentinelPassw0rd
+  REDIS_SENTINEL_QUORUM: "2"
+  RMQ_NAME: scanner
+  RMQ_NUM_CONSUMERS: "30"
+  RMQ_REDIS_DATABASE: "2"
+  RMQ_REDIS_MASTER_NAME: mymaster
+  RMQ_REDIS_MASTER_PASSWORD: redispassw0rd
+  RMQ_REDIS_NAME: broker
+  RMQ_REDIS_PASSWORD: redispassw0rd
+  RMQ_REDIS_SENTINEL_PASSWORD: sentinelPassw0rd
+  RMQ_REDIS_SENTINEL_SERVERS: redis-sentinel:26379,redis-sentinel:26380,redis-sentinel:26381
+  RMQ_REDIS_SERVER: redis-primary:6379
+  RMQ_RETURNER_LIMIT: "1000"
+  TZ: Europe/Paris
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: prometheus-env
+  name: env

@@ -53,7 +53,7 @@ services:
     networks:
       - backend
     ports:
-      - "127.0.0.1:16060-16064:6060"
+      - "127.0.0.1:16060-16064:6060/tcp"
     volumes:
       - "./cert:/etc/scanner/cert:ro"
     deploy:
@@ -84,7 +84,7 @@ services:
   redis-secondary:
     image: docker.io/bitnami/redis:6.2
     ports:
-      - "6379"
+      - "6379/tcp"
     depends_on:
       - redis-primary
     env_file:
@@ -108,7 +108,7 @@ services:
     environment:
       - REDIS_MASTER_HOST=redis-primary
     ports:
-      - "26379-26381:26379"
+      - "26379-26381:26379/tcp"
     depends_on:
       - redis-primary
       - redis-secondary
@@ -131,7 +131,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
     ports:
-      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:9090:9090/tcp"
     networks:
       - backend
 

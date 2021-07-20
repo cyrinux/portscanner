@@ -1,0 +1,215 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -c -o kubernetes/
+    kompose.version: 1.22.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: worker
+  name: worker
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      io.kompose.service: worker
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert -c -o kubernetes/
+        kompose.version: 1.22.0 (HEAD)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/my-network: "true"
+        io.kompose.service: worker
+    spec:
+      containers:
+        - args:
+            - -worker
+            - -pprof
+          env:
+            - name: ALLOW_EMPTY_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: ALLOW_EMPTY_PASSWORD
+                  name: env
+            - name: BACKEND_LISTEN_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: BACKEND_LISTEN_PORT
+                  name: env
+            - name: BACKEND_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  key: BACKEND_SERVER
+                  name: env
+            - name: DB_DRIVER
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_DRIVER
+                  name: env
+            - name: DB_REDIS_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_REDIS_DATABASE
+                  name: env
+            - name: DB_REDIS_MASTER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_REDIS_MASTER_NAME
+                  name: env
+            - name: DB_REDIS_MASTER_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_REDIS_MASTER_PASSWORD
+                  name: env
+            - name: DB_REDIS_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_REDIS_NAME
+                  name: env
+            - name: DB_REDIS_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_REDIS_PASSWORD
+                  name: env
+            - name: DB_REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_REDIS_SENTINEL_PASSWORD
+                  name: env
+            - name: DB_REDIS_SENTINEL_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  key: DB_REDIS_SENTINEL_SERVERS
+                  name: env
+            - name: DEBUG
+              valueFrom:
+                configMapKeyRef:
+                  key: DEBUG
+                  name: env
+            - name: FRONTEND_LISTEN_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: FRONTEND_LISTEN_PORT
+                  name: env
+            - name: LOGGER_DEBUG
+              valueFrom:
+                configMapKeyRef:
+                  key: LOGGER_DEBUG
+                  name: env
+            - name: LOGGER_PRETTY
+              valueFrom:
+                configMapKeyRef:
+                  key: LOGGER_PRETTY
+                  name: env
+            - name: REDIS_MASTER_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_MASTER_PASSWORD
+                  name: env
+            - name: REDIS_MASTER_SET
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_MASTER_SET
+                  name: env
+            - name: REDIS_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_PASSWORD
+                  name: env
+            - name: REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS
+                  name: env
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_SENTINEL_PASSWORD
+                  name: env
+            - name: REDIS_SENTINEL_QUORUM
+              valueFrom:
+                configMapKeyRef:
+                  key: REDIS_SENTINEL_QUORUM
+                  name: env
+            - name: RMQ_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_NAME
+                  name: env
+            - name: RMQ_NUM_CONSUMERS
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_NUM_CONSUMERS
+                  name: env
+            - name: RMQ_REDIS_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_DATABASE
+                  name: env
+            - name: RMQ_REDIS_MASTER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_MASTER_NAME
+                  name: env
+            - name: RMQ_REDIS_MASTER_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_MASTER_PASSWORD
+                  name: env
+            - name: RMQ_REDIS_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_NAME
+                  name: env
+            - name: RMQ_REDIS_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_PASSWORD
+                  name: env
+            - name: RMQ_REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_SENTINEL_PASSWORD
+                  name: env
+            - name: RMQ_REDIS_SENTINEL_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_SENTINEL_SERVERS
+                  name: env
+            - name: RMQ_REDIS_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_REDIS_SERVER
+                  name: env
+            - name: RMQ_RETURNER_LIMIT
+              valueFrom:
+                configMapKeyRef:
+                  key: RMQ_RETURNER_LIMIT
+                  name: env
+            - name: TZ
+              valueFrom:
+                configMapKeyRef:
+                  key: TZ
+                  name: env
+          image: grpcscanner
+          name: worker
+          resources: {}
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          volumeMounts:
+            - mountPath: /etc/scanner/cert
+              name: worker-claim0
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: worker-claim0
+          persistentVolumeClaim:
+            claimName: worker-claim0
+            readOnly: true
+status: {}

@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	nmap "github.com/Ullaakut/nmap/v2"
+	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/pkg/errors"
-	"math/rand"
 	"strings"
 	"time"
 )
@@ -25,6 +25,7 @@ var (
 type Engine struct {
 	ctx    context.Context
 	db     database.Database
+	locker *redislock.Client
 	State  pb.ScannerResponse_Status
 	config config.NMAPConfig
 }
@@ -40,8 +41,8 @@ type ParamsParsed struct {
 }
 
 // New create a new nmap engine
-func New(ctx context.Context, db database.Database, conf config.NMAPConfig) *Engine {
-	return &Engine{ctx: ctx, db: db, config: conf}
+func New(ctx context.Context, db database.Database, conf config.NMAPConfig, locker *redislock.Client) *Engine {
+	return &Engine{ctx: ctx, db: db, config: conf, locker: locker}
 }
 
 // Start the scan
@@ -163,12 +164,32 @@ func (e *Engine) startScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRe
 func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
 	var srs []*pb.ScannerResponse
 	var smr *pb.ScannerMainResponse
+	var err error
+	var lock *redislock.Lock
 
-	// delay a little the start of the scan
-	rand.Seed(time.Now().UnixNano())
-	delay := time.Duration(rand.Intn(5)) * time.Second
-	time.Sleep(delay)
-	log.Debug().Msgf("nmap waiting %v before start", delay)
+	defer func() {
+		if err = lock.Release(e.ctx); err != nil {
+			log.Error().Stack().Err(err).Msgf("%s: can't release lock", params.Key)
+		}
+	}()
+
+	// take a lock to prevent race condition on db
+	// ideally we should use a parent/child nodes to
+	// prevent this without locking
+	retryTime := 50 * time.Millisecond
+	for {
+		lock, err = e.locker.Obtain(e.ctx, params.Key, 1000*time.Millisecond, nil)
+		if err == redislock.ErrNotObtained {
+			log.Error().Msgf("%s: could not obtain lock!, retring in %v", params.Key, retryTime)
+		} else if err != nil {
+			log.Error().Stack().Err(err)
+		} else {
+			log.Debug().Msgf("%s: I have a lock!", params.Key)
+			break
+		}
+		time.Sleep(retryTime)
+	}
+
 	smrJSON, err := e.db.Get(e.ctx, params.Key)
 	if err != nil {
 		return params, nil, err
@@ -187,6 +208,14 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 	}
 	smr.Response = srs
 
+	if ttl, err := lock.TTL(e.ctx); err != nil {
+		if err := lock.Refresh(e.ctx, 1000*time.Millisecond, nil); err != nil {
+			log.Error().Stack().Err(err).Msgf("%s: can't renew my lock!", params.Key)
+		}
+	} else if ttl > 0 {
+		log.Debug().Msgf("%s: yay, I still have my lock!", params.Key)
+	}
+
 	if smr.Request != nil && smr.Request.Targets != "" {
 		hosts := strings.Split(smr.Request.Targets, ",")
 		hosts = append(hosts, params.Targets)
@@ -201,6 +230,10 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 	_, err = e.db.Set(e.ctx, params.Key, string(smrNewJSON), params.RetentionDuration.AsDuration())
 	if err != nil {
 		return params, nil, err
+	}
+
+	if err = lock.Release(e.ctx); err != nil {
+		log.Error().Stack().Err(err).Msgf("%s: can't release lock", params.Key)
 	}
 
 	params, result, err := e.run(params)
@@ -360,6 +393,6 @@ func progressNmap(progress chan float32, params *pb.ParamsScannerRequest, parsed
 		} else {
 			continue
 		}
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(10000 * time.Millisecond)
 	}
 }
