@@ -383,7 +383,7 @@ func progressNmap(progress chan float32, params *pb.ParamsScannerRequest, parsed
 	var previous float32
 	for p := range progress {
 		if p > previous {
-			log.Debug().Msgf("scan %s : %v%% - host: %s, port: %s",
+			log.Debug().Msgf("running scan %s : %v%% - host: %s, port: %s",
 				params.Key,
 				p,
 				parsedParams.hosts,

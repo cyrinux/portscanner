@@ -40,21 +40,25 @@ func loadTLSCredentials(caFile, certFile, keyFile string) (credentials.Transport
 	return credentials.NewTLS(config), nil
 }
 
-// Auth functions, TODO: cleanup doc
-func streamInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	if err := authorize(stream.Context()); err != nil {
-		return err
-	}
-
-	return handler(srv, stream)
-}
-
+// auth func
 func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	if err := authorize(ctx); err != nil {
 		return nil, err
 	}
 
+	log.Debug().Msgf("---> unary interceptor: %s", info.FullMethod)
+
 	return handler(ctx, req)
+}
+
+func streamInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	if err := authorize(stream.Context()); err != nil {
+		return err
+	}
+
+	log.Debug().Msgf("---> stream interceptor: %s", info.FullMethod)
+
+	return handler(srv, stream)
 }
 
 func authorize(ctx context.Context) error {

@@ -99,6 +99,42 @@ type Server struct {
 	tasksStatus TasksStatus
 }
 
+// NewServer create a new server and init the database connection
+func NewServer(ctx context.Context, conf config.Config, taskType string) *Server {
+	errChan := make(chan error)
+	go broker.RmqLogErrors(errChan)
+
+	//redis
+	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
+
+	// distributed lock - with redis
+	locker := redislock.New(redisClient)
+
+	// Broker init nmap queue
+	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)
+	// clean the queues
+	go brker.Cleaner()
+
+	// Storage database init
+	db, err := database.Factory(ctx, conf)
+	if err != nil {
+		log.Fatal().Stack().Err(err).Msg("can't open the database")
+	}
+
+	// start the rmq stats to prometheus
+	go brokerStatsToProm(brker, taskType)
+
+	return &Server{
+		ctx:      ctx,
+		taskType: taskType,
+		config:   conf,
+		broker:   *brker,
+		db:       db,
+		err:      err,
+		locker:   locker,
+	}
+}
+
 // Listen start the frontend grpc server
 func Listen(ctx context.Context, conf config.Config) {
 	log.Info().Msg("prepare to serve the gRPC api")
@@ -195,64 +231,6 @@ func Listen(ctx context.Context, conf config.Config) {
 	pb.RegisterBackendServiceServer(srvBackend, server)
 	if err = srvBackend.Serve(backendListener); err != nil {
 		log.Fatal().Msg("can't serve the gRPC backend service")
-	}
-}
-
-// brokerStatsToProm read broker stats each 2s and write to prometheus
-func brokerStatsToProm(brker *broker.Broker, name string) {
-	var prevReady, prevReject int64
-	for range time.Tick(1000 * time.Millisecond) {
-		stats, err := brker.GetStats()
-		if err != nil {
-			log.Error().Stack().Err(err).Msg("can't get RMQ statistics")
-			continue
-		}
-		queue := fmt.Sprintf("%s-incoming", name)
-		s := stats.QueueStats[queue]
-		opsReady.Set(float64(s.ReadyCount))
-		opsRejected.Set(float64(s.RejectedCount))
-		consumersCount.Set(float64(s.ConsumerCount()))
-		if (s.ReadyCount > 0 || s.RejectedCount > 0) && (prevReady != s.ReadyCount || prevReject != s.RejectedCount) {
-			log.Debug().Msgf("broker %s incoming queue ready: %v, rejected: %v", name, s.ReadyCount, s.RejectedCount)
-		}
-		prevReady = s.ReadyCount
-		prevReject = s.RejectedCount
-	}
-}
-
-// NewServer create a new server and init the database connection
-func NewServer(ctx context.Context, conf config.Config, taskType string) *Server {
-	errChan := make(chan error)
-	go broker.RmqLogErrors(errChan)
-
-	//redis
-	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
-
-	// distributed lock - with redis
-	locker := redislock.New(redisClient)
-
-	// Broker init nmap queue
-	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)
-	// clean the queues
-	go brker.Cleaner()
-
-	// Storage database init
-	db, err := database.Factory(ctx, conf)
-	if err != nil {
-		log.Fatal().Stack().Err(err).Msg("can't open the database")
-	}
-
-	// start the rmq stats to prometheus
-	go brokerStatsToProm(brker, taskType)
-
-	return &Server{
-		ctx:      ctx,
-		taskType: taskType,
-		config:   conf,
-		broker:   *brker,
-		db:       db,
-		err:      err,
-		locker:   locker,
 	}
 }
 
@@ -574,4 +552,26 @@ func parseRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
 	request.DeferTime = timestamppb.New(time.Now().Add(request.DeferDuration.AsDuration()))
 
 	return request
+}
+
+// brokerStatsToProm read broker stats each 2s and write to prometheus
+func brokerStatsToProm(brker *broker.Broker, name string) {
+	var prevReady, prevReject int64
+	for range time.Tick(1000 * time.Millisecond) {
+		stats, err := brker.GetStats()
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't get RMQ statistics")
+			continue
+		}
+		queue := fmt.Sprintf("%s-incoming", name)
+		s := stats.QueueStats[queue]
+		opsReady.Set(float64(s.ReadyCount))
+		opsRejected.Set(float64(s.RejectedCount))
+		consumersCount.Set(float64(s.ConsumerCount()))
+		if (s.ReadyCount > 0 || s.RejectedCount > 0) && (prevReady != s.ReadyCount || prevReject != s.RejectedCount) {
+			log.Debug().Msgf("broker %s incoming queue ready: %v, rejected: %v", name, s.ReadyCount, s.RejectedCount)
+		}
+		prevReady = s.ReadyCount
+		prevReject = s.RejectedCount
+	}
 }
