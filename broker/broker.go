@@ -33,14 +33,16 @@ func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClien
 			Password:         conf.Redis.Password,
 			SentinelPassword: conf.Redis.SentinelPassword,
 			DB:               conf.Database,
-			MaxRetries:       5,
+			MaxRetries:       3,
+			MinRetryBackoff:  100 * time.Millisecond,
+			MaxRetryBackoff:  1 * time.Second,
 		})
 	}
 
 	var connection rmq.Connection
 	var err error
+	retryTime := 500 * time.Millisecond
 	for {
-		retryTime := 5000 * time.Millisecond
 		connection, err = rmq.OpenConnectionWithRedisClient(
 			conf.Name, redisClient, errChan,
 		)

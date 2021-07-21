@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bsm/redislock"
+	"github.com/cyrinux/grpcnmapscanner/auth"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -29,6 +30,11 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+)
+
+const (
+	secretKey     = "secret"
+	tokenDuration = 15 * time.Minute
 )
 
 var (
@@ -62,20 +68,19 @@ var (
 		Name: "scanner_consumers_count",
 		Help: "The total number of scanner consumers",
 	})
+
+	kaep = keepalive.EnforcementPolicy{
+		MinTime:             5 * time.Second, // If a client pings more than once every 5 seconds, terminate the connection
+		PermitWithoutStream: true,            // Allow pings even when there are no active streams
+	}
+	kasp = keepalive.ServerParameters{
+		MaxConnectionIdle:     3600 * time.Second, // If a client is idle for 3600 seconds, send a GOAWAY
+		MaxConnectionAge:      1800 * time.Second, // If any connection is alive for more than 1800 seconds, send a GOAWAY
+		MaxConnectionAgeGrace: 5 * time.Second,    // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
+		Time:                  5 * time.Second,    // Ping the client if it is idle for 5 seconds to ensure the connection is still active
+		Timeout:               2 * time.Second,    // Wait 1 second for the ping ack before assuming the connection is dead
+	}
 )
-
-var kaep = keepalive.EnforcementPolicy{
-	MinTime:             5 * time.Second, // If a client pings more than once every 5 seconds, terminate the connection
-	PermitWithoutStream: true,            // Allow pings even when there are no active streams
-}
-
-var kasp = keepalive.ServerParameters{
-	MaxConnectionIdle:     3600 * time.Second, // If a client is idle for 3600 seconds, send a GOAWAY
-	MaxConnectionAge:      1800 * time.Second, // If any connection is alive for more than 1800 seconds, send a GOAWAY
-	MaxConnectionAgeGrace: 5 * time.Second,    // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
-	Time:                  5 * time.Second,    // Ping the client if it is idle for 5 seconds to ensure the connection is still active
-	Timeout:               2 * time.Second,    // Wait 1 second for the ping ack before assuming the connection is dead
-}
 
 // TasksStatus define the status of all tasks
 type TasksStatus struct {
@@ -97,6 +102,8 @@ type Server struct {
 	locker      *redislock.Client
 	taskType    string
 	tasksStatus TasksStatus
+	jwtManager  *auth.JWTManager
+	userStore   *auth.InMemoryUserStore
 }
 
 // NewServer create a new server and init the database connection
@@ -112,6 +119,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 
 	// Broker init nmap queue
 	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)
+
 	// clean the queues
 	go brker.Cleaner()
 
@@ -124,14 +132,28 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	// start the rmq stats to prometheus
 	go brokerStatsToProm(brker, taskType)
 
+	// allocate the jwtManager
+	jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
+
+	// seed the users
+	userStore := auth.NewInMemoryUserStore()
+	err = seedUsers(userStore)
+	if err != nil {
+		log.Fatal().Msgf("cannot seed users: ", err)
+	} else {
+		log.Debug().Msg("users seeded")
+	}
+
 	return &Server{
-		ctx:      ctx,
-		taskType: taskType,
-		config:   conf,
-		broker:   *brker,
-		db:       db,
-		err:      err,
-		locker:   locker,
+		ctx:        ctx,
+		taskType:   taskType,
+		config:     conf,
+		broker:     *brker,
+		db:         db,
+		err:        err,
+		locker:     locker,
+		jwtManager: jwtManager,
+		userStore:  userStore,
 	}
 }
 
@@ -151,7 +173,7 @@ func Listen(ctx context.Context, conf config.Config) {
 			)
 		}
 
-		tlsCredentials, err := loadTLSCredentials(
+		tlsCredentials, err := auth.LoadTLSCredentials(
 			s.config.Frontend.CAFile,
 			s.config.Frontend.ServerCertFile,
 			s.config.Frontend.ServerKeyFile,
@@ -160,12 +182,13 @@ func Listen(ctx context.Context, conf config.Config) {
 			log.Fatal().Msgf("cannot load TLS credentials: %v", err)
 		}
 
+		interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
 		srvFrontend := grpc.NewServer(
 			grpc.KeepaliveEnforcementPolicy(kaep),
 			grpc.KeepaliveParams(kasp),
 			grpc.Creds(tlsCredentials),
-			grpc.StreamInterceptor(streamInterceptor),
-			grpc.UnaryInterceptor(unaryInterceptor),
+			grpc.UnaryInterceptor(interceptor.Unary()),
+			grpc.StreamInterceptor(interceptor.Stream()),
 		)
 
 		// graceful shutdown
@@ -183,7 +206,12 @@ func Listen(ctx context.Context, conf config.Config) {
 		}()
 
 		reflection.Register(srvFrontend)
+
+		authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
+		pb.RegisterAuthServiceServer(srvFrontend, authServer)
+
 		pb.RegisterScannerServiceServer(srvFrontend, server)
+
 		if err = srvFrontend.Serve(frontListener); err != nil {
 			log.Fatal().Msg("can't serve the gRPC frontend service")
 		}
@@ -197,21 +225,23 @@ func Listen(ctx context.Context, conf config.Config) {
 		)
 	}
 
-	tlsCredentials, err := loadTLSCredentials(
+	tlsCredentials, err := auth.LoadTLSCredentials(
 		conf.Backend.CAFile,
 		conf.Backend.ServerCertFile,
 		conf.Backend.ServerKeyFile,
 	)
+
 	if err != nil {
 		log.Fatal().Msgf("cannot load TLS credentials: %v", err)
 	}
 
+	interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
 	srvBackend := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 		grpc.Creds(tlsCredentials),
-		grpc.StreamInterceptor(streamInterceptor),
-		grpc.UnaryInterceptor(unaryInterceptor),
+		grpc.StreamInterceptor(interceptor.Stream()),
+		grpc.UnaryInterceptor(interceptor.Unary()),
 	)
 
 	// graceful shutdown
@@ -227,7 +257,11 @@ func Listen(ctx context.Context, conf config.Config) {
 		}
 	}()
 
-	// reflection.Register(srvBackend)
+	reflection.Register(srvBackend)
+
+	authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
+	pb.RegisterAuthServiceServer(srvBackend, authServer)
+
 	pb.RegisterBackendServiceServer(srvBackend, server)
 	if err = srvBackend.Serve(backendListener); err != nil {
 		log.Fatal().Msg("can't serve the gRPC backend service")
@@ -573,5 +607,44 @@ func brokerStatsToProm(brker *broker.Broker, name string) {
 		}
 		prevReady = s.ReadyCount
 		prevReject = s.RejectedCount
+	}
+}
+
+// createUser create the users
+func createUser(userStore auth.UserStore, username, password, role string) error {
+	user, err := auth.NewUser(username, password, role)
+	if err != nil {
+		return err
+	}
+	return userStore.Save(user)
+}
+
+func seedUsers(userStore auth.UserStore) error {
+	err := createUser(userStore, "admin1", "secret", "admin")
+	if err != nil {
+		return err
+	}
+	err = createUser(userStore, "worker1", "secret1", "worker")
+	if err != nil {
+		return err
+	}
+	return createUser(userStore, "user1", "secret", "user")
+}
+
+func accessibleRoles() map[string][]string {
+	const backendServicePath = "/proto.BackendService/"
+	const frontendServicePath = "/proto.ScannerService/"
+
+	return map[string][]string{
+		backendServicePath + "StreamServiceControl": {"worker", "admin"},
+		backendServicePath + "StreamTasksStatus":    {"worker", "admin"},
+
+		frontendServicePath + "StartAsyncScan": {"user"},
+		frontendServicePath + "StartScan":      {"user"},
+
+		frontendServicePath + "GetScan": {"user", "admin"},
+
+		frontendServicePath + "GetAllScans":    {"admin"},
+		frontendServicePath + "ServiceControl": {"admin"},
 	}
 }
