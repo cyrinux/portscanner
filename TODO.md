@@ -1,7 +1,8 @@
 # TODO
 
 - use s6-overlay as init to start TOR https://github.com/just-containers/s6-overlay
-- envoy config https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/examples
+- nginx LB https://dev.to/techschoolguru/load-balancing-grpc-service-with-nginx-3fio#config-nginx-for-grpc-with-tls
+- generate k8s deploy files with kompose
 - use default grpc code and status?
   "google.golang.org/grpc/codes"
   "google.golang.org/grpc/status"
@@ -9,7 +10,7 @@
 - get worker/consumer state on server start or register the last server state in redis
 - Use go-cron for reccuring scan tasks (crontal in ParamsScannerRequest)
 - scan nmap export to defectdojo
-- generate k8s deploy files with kompose
+- envoy config https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/examples
 
 # Done
 

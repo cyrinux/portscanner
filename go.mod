@@ -7,6 +7,7 @@ require (
 	github.com/Ullaakut/nmap/v2 v2.1.2-0.20210714084856-6808659f49d1
 	github.com/adjust/rmq/v4 v4.0.1
 	github.com/bsm/redislock v0.7.1
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-redis/redis/v8 v8.11.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
@@ -18,6 +19,7 @@ require (
 	github.com/prometheus/procfs v0.7.0 // indirect
 	github.com/rs/zerolog v1.23.0
 	github.com/stretchr/testify v1.7.0 // indirect
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20210716203947-853a461950ff
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	google.golang.org/genproto v0.0.0-20210719143636-1d5a45f8e492 // indirect

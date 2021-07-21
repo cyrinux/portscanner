@@ -9,6 +9,7 @@ import (
 	"github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/broker"
+	"github.com/cyrinux/grpcnmapscanner/client"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
@@ -17,6 +18,12 @@ import (
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+)
+
+const (
+	username        = "worker1"
+	password        = "secret"
+	refreshDuration = 30 * time.Second
 )
 
 var (
@@ -42,7 +49,7 @@ type Worker struct {
 	state       pb.ServiceStateValues
 	consumers   []*Consumer
 	db          database.Database
-	grpcServer  *grpc.ClientConn
+	grpcClient  pb.BackendServiceClient
 	returned    chan int64
 }
 
@@ -80,19 +87,36 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		log.Fatal().Msgf("can't load TLS credentials: %v", err)
 	}
 
-	grpcServer, err := grpc.Dial(
+	// authentication
+	cc1, err := grpc.DialContext(
+		ctx,
 		conf.BackendServer,
 		grpc.WithTransportCredentials(tlsCredentials),
 		grpc.WithKeepaliveParams(kacp),
-		grpc.WithPerRPCCredentials(&loginCreds{
-			Username: "admin",
-			Password: "admin123",
-		}),
 	)
-
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
 	}
+
+	authClient := client.NewAuthClient(cc1, username, password)
+	interceptor, err := client.NewAuthInterceptor(authClient, authMethods(), refreshDuration)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("cannot create auth interceptor to %s: %v", conf.BackendServer, err)
+	}
+
+	cc2, err := grpc.DialContext(
+		ctx,
+		conf.BackendServer,
+		grpc.WithTransportCredentials(tlsCredentials),
+		grpc.WithKeepaliveParams(kacp),
+		grpc.WithUnaryInterceptor(interceptor.Unary()),
+		grpc.WithStreamInterceptor(interceptor.Stream()),
+	)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
+	}
+
+	client := pb.NewBackendServiceClient(cc2)
 
 	return &Worker{
 		name:        name,
@@ -103,7 +127,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		consumers:   make([]*Consumer, 0),
 		db:          db,
 		redisClient: redisClient,
-		grpcServer:  grpcServer,
+		grpcClient:  client,
 		returned:    make(chan int64),
 	}
 }
@@ -120,21 +144,22 @@ func (worker *Worker) StartWorker() {
 
 // StreamControlService return the workers status and control them
 func (worker *Worker) StreamServiceControl() {
-	client := pb.NewBackendServiceClient(worker.grpcServer)
+
 	getState := &pb.ServiceStateValues{State: 0}
 	for {
-		stream, err := client.StreamServiceControl(worker.ctx, getState)
+		stream, err := worker.grpcClient.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
 			break
 		}
 		log.Debug().Msgf("%s connected to server control", worker.name)
 
-		for range time.Tick(500 * time.Millisecond) {
+		for range time.Tick(1000 * time.Millisecond) {
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
+				log.Error().Stack().Err(err).Msg("can't get service control state ")
 				break
 			}
 			if serviceControl.State == 1 && worker.state.State != 1 { //pb.ServiceStateValues_START
@@ -148,14 +173,16 @@ func (worker *Worker) StreamServiceControl() {
 
 		// wait before try to reconnect
 		reconnectTime := 1000 * time.Millisecond
+
 		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, reconnectTime)
+
 		time.Sleep(reconnectTime)
 	}
 }
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
-	log.Info().Msg("starting the returner routine")
+	log.Info().Msgf("starting the returner routine on %s", worker.name)
 	for {
 		// Try to obtain lock.
 		lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
@@ -184,15 +211,20 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 	}
 }
 
-func (worker *Worker) startConsuming() *Worker {
+func (worker *Worker) startConsuming() (*Worker, error) {
 	conf := worker.conf
 	numConsumers := conf.RMQ.NumConsumers
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 	log.Info().Msgf("start consuming %s with %d consumers...", worker.name, numConsumers)
 
-	worker.broker = broker.New(worker.ctx, worker.name, conf.RMQ, worker.redisClient)
+	newBroker, err := broker.New(worker.ctx, worker.name, conf.RMQ, worker.redisClient)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s can't start the broker connection", worker.name)
+		return nil, err
+	}
+	worker.broker = newBroker
 
-	err := worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration)
+	err = worker.broker.Incoming.StartConsuming(prefetchLimit, conf.RMQ.PollDuration)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s queue incoming consume error", worker.name)
 	}
@@ -225,7 +257,7 @@ func (worker *Worker) startConsuming() *Worker {
 
 	go worker.startReturner(worker.broker.Incoming, worker.returned)
 
-	return worker
+	return worker, nil
 }
 
 // StopConsuming stop consumer messages on the broker
@@ -247,10 +279,10 @@ func (worker *Worker) StopConsuming() *Worker {
 
 // collectConsumerStats manage the tasks prometheus counters
 func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64, returned chan int64) {
-	client := pb.NewBackendServiceClient(worker.grpcServer)
 	for {
-		stream, err := client.StreamTasksStatus(worker.ctx)
+		stream, err := worker.grpcClient.StreamTasksStatus(worker.ctx)
 		if err != nil {
+			log.Error().Stack().Err(err).Msg("")
 			break
 		}
 		log.Debug().Msgf("%s stats collector connected to server control", worker.name)
@@ -276,5 +308,14 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 		reconnectTime := 5 * time.Second
 		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, reconnectTime)
 		time.Sleep(reconnectTime)
+	}
+}
+
+func authMethods() map[string]bool {
+	const backendServicePath = "/proto.BackendService/"
+
+	return map[string]bool{
+		backendServicePath + "StreamServiceControl": true,
+		backendServicePath + "StreamTasksStatus":    true,
 	}
 }

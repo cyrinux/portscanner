@@ -1,29 +1,18 @@
 package worker
 
 import (
-	"context"
+	// "context"
 	"crypto/tls"
 	"crypto/x509"
+	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"io/ioutil"
+	// "google.golang.org/grpc/codes"
+	// "google.golang.org/grpc/metadata"
+	// "google.golang.org/grpc/status"
 )
-
-// GRPC Auth
-type loginCreds struct {
-	Username, Password string
-}
-
-func (c *loginCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
-	return map[string]string{
-		"username": c.Username,
-		"password": c.Password,
-	}, nil
-}
-
-func (c *loginCreds) RequireTransportSecurity() bool {
-	return true
-}
 
 func loadTLSCredentials(caFile, certFile, keyFile string) (credentials.TransportCredentials, error) {
 	// Load certificate of the CA who signed server's certificate
@@ -50,4 +39,15 @@ func loadTLSCredentials(caFile, certFile, keyFile string) (credentials.Transport
 	}
 
 	return credentials.NewTLS(config), nil
+}
+
+// WorkerClient is a client to call worker service RPCs
+type WorkerClient struct {
+	service pb.BackendServiceClient
+}
+
+// NewWorkerClient returns a new worker client
+func NewWorkerClient(cc *grpc.ClientConn) *WorkerClient {
+	service := pb.NewBackendServiceClient(cc)
+	return &WorkerClient{service}
 }

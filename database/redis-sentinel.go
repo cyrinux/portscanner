@@ -4,10 +4,12 @@ import (
 	"context"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/go-redis/redis/v8"
+	"sync"
 	"time"
 )
 
 type redisSentinelDatabase struct {
+	mutex  sync.RWMutex
 	client *redis.Client
 }
 
@@ -26,10 +28,12 @@ func createRedisSentinelDatabase(ctx context.Context, conf config.DBConfig) (Dat
 	if err != nil {
 		return nil, &CreateDatabaseError{}
 	}
-	return redisSentinelDatabase{client: client}, nil
+	return &redisSentinelDatabase{client: client}, nil
 }
 
-func (r redisSentinelDatabase) Set(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
+func (r *redisSentinelDatabase) Set(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	_, err := r.client.Set(ctx, key, value, retention).Result()
 	if err != nil {
 		return generateError("set", err)
@@ -37,15 +41,19 @@ func (r redisSentinelDatabase) Set(ctx context.Context, key string, value string
 	return key, nil
 }
 
-func (r redisSentinelDatabase) WatchAndSet(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
-	_, err := r.client.Set(ctx, key, value, retention).Result()
-	if err != nil {
-		return generateError("set", err)
-	}
-	return key, nil
-}
+// func (r *redisSentinelDatabase) WatchAndSet(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
+// 	r.mutex.Lock()
+// 	defer r.mutex.Unlock()
+// 	_, err := r.client.Set(ctx, key, value, retention).Result()
+// 	if err != nil {
+// 		return generateError("set", err)
+// 	}
+// 	return key, nil
+// }
 
-func (r redisSentinelDatabase) Get(ctx context.Context, key string) (string, error) {
+func (r *redisSentinelDatabase) Get(ctx context.Context, key string) (string, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
 	value, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		return generateError("get", err)
@@ -53,7 +61,10 @@ func (r redisSentinelDatabase) Get(ctx context.Context, key string) (string, err
 	return value, nil
 }
 
-func (r redisSentinelDatabase) GetAll(ctx context.Context, key string) ([]string, error) {
+func (r *redisSentinelDatabase) GetAll(ctx context.Context, key string) ([]string, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
 	arr := make([]string, 0)
 	iter := r.client.Scan(ctx, 0, key, 0).Iterator()
 	for iter.Next(ctx) {
@@ -65,7 +76,9 @@ func (r redisSentinelDatabase) GetAll(ctx context.Context, key string) ([]string
 	return arr, nil
 }
 
-func (r redisSentinelDatabase) Delete(ctx context.Context, key string) (string, error) {
+func (r *redisSentinelDatabase) Delete(ctx context.Context, key string) (string, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	_, err := r.client.Del(ctx, key).Result()
 	if err != nil {
 		return generateError("delete", err)

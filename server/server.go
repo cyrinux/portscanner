@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bsm/redislock"
+	"github.com/cyrinux/grpcnmapscanner/auth"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -29,6 +30,11 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+)
+
+const (
+	secretKey     = "secret"
+	tokenDuration = 15 * time.Minute
 )
 
 var (
@@ -97,6 +103,7 @@ type Server struct {
 	locker      *redislock.Client
 	taskType    string
 	tasksStatus TasksStatus
+	jwtManager  *auth.JWTManager
 }
 
 // NewServer create a new server and init the database connection
@@ -124,14 +131,18 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	// start the rmq stats to prometheus
 	go brokerStatsToProm(brker, taskType)
 
+	// allocate the jwtManager
+	var jwtManager = new(auth.JWTManager)
+
 	return &Server{
-		ctx:      ctx,
-		taskType: taskType,
-		config:   conf,
-		broker:   *brker,
-		db:       db,
-		err:      err,
-		locker:   locker,
+		ctx:        ctx,
+		taskType:   taskType,
+		config:     conf,
+		broker:     *brker,
+		db:         db,
+		err:        err,
+		locker:     locker,
+		jwtManager: jwtManager,
 	}
 }
 
@@ -151,7 +162,7 @@ func Listen(ctx context.Context, conf config.Config) {
 			)
 		}
 
-		tlsCredentials, err := loadTLSCredentials(
+		tlsCredentials, err := auth.LoadTLSCredentials(
 			s.config.Frontend.CAFile,
 			s.config.Frontend.ServerCertFile,
 			s.config.Frontend.ServerKeyFile,
@@ -160,12 +171,13 @@ func Listen(ctx context.Context, conf config.Config) {
 			log.Fatal().Msgf("cannot load TLS credentials: %v", err)
 		}
 
+		interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
 		srvFrontend := grpc.NewServer(
 			grpc.KeepaliveEnforcementPolicy(kaep),
 			grpc.KeepaliveParams(kasp),
 			grpc.Creds(tlsCredentials),
-			grpc.StreamInterceptor(streamInterceptor),
-			grpc.UnaryInterceptor(unaryInterceptor),
+			grpc.UnaryInterceptor(interceptor.Unary()),
+			grpc.StreamInterceptor(interceptor.Stream()),
 		)
 
 		// graceful shutdown
@@ -183,7 +195,18 @@ func Listen(ctx context.Context, conf config.Config) {
 		}()
 
 		reflection.Register(srvFrontend)
+		userStore := auth.NewInMemoryUserStore()
+		err = seedUsers(userStore)
+		if err != nil {
+			log.Fatal().Msgf("cannot seed users: ", err)
+		}
+
+		jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
+		authServer := auth.NewAuthServer(userStore, jwtManager)
+		pb.RegisterAuthServiceServer(srvFrontend, authServer)
+
 		pb.RegisterScannerServiceServer(srvFrontend, server)
+
 		if err = srvFrontend.Serve(frontListener); err != nil {
 			log.Fatal().Msg("can't serve the gRPC frontend service")
 		}
@@ -197,21 +220,23 @@ func Listen(ctx context.Context, conf config.Config) {
 		)
 	}
 
-	tlsCredentials, err := loadTLSCredentials(
+	tlsCredentials, err := auth.LoadTLSCredentials(
 		conf.Backend.CAFile,
 		conf.Backend.ServerCertFile,
 		conf.Backend.ServerKeyFile,
 	)
+
 	if err != nil {
 		log.Fatal().Msgf("cannot load TLS credentials: %v", err)
 	}
 
+	// interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
 	srvBackend := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 		grpc.Creds(tlsCredentials),
-		grpc.StreamInterceptor(streamInterceptor),
-		grpc.UnaryInterceptor(unaryInterceptor),
+		// grpc.StreamInterceptor(interceptor.Stream()),
+		// grpc.UnaryInterceptor(interceptor.Unary()),
 	)
 
 	// graceful shutdown
@@ -227,7 +252,18 @@ func Listen(ctx context.Context, conf config.Config) {
 		}
 	}()
 
-	// reflection.Register(srvBackend)
+	reflection.Register(srvBackend)
+
+	userStore := auth.NewInMemoryUserStore()
+	err = seedUsers(userStore)
+	if err != nil {
+		log.Fatal().Msgf("cannot seed users: ", err)
+	}
+
+	jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
+	authServer := auth.NewAuthServer(userStore, jwtManager)
+	pb.RegisterAuthServiceServer(srvBackend, authServer)
+
 	pb.RegisterBackendServiceServer(srvBackend, server)
 	if err = srvBackend.Serve(backendListener); err != nil {
 		log.Fatal().Msg("can't serve the gRPC backend service")
@@ -573,5 +609,44 @@ func brokerStatsToProm(brker *broker.Broker, name string) {
 		}
 		prevReady = s.ReadyCount
 		prevReject = s.RejectedCount
+	}
+}
+
+// createUser create the users
+func createUser(userStore auth.UserStore, username, password, role string) error {
+	user, err := auth.NewUser(username, password, role)
+	if err != nil {
+		return err
+	}
+	return userStore.Save(user)
+}
+
+func seedUsers(userStore auth.UserStore) error {
+	err := createUser(userStore, "admin1", "secret", "admin")
+	if err != nil {
+		return err
+	}
+	err = createUser(userStore, "worker1", "secret", "worker")
+	if err != nil {
+		return err
+	}
+	return createUser(userStore, "user1", "secret", "user")
+}
+
+func accessibleRoles() map[string][]string {
+	const backendServicePath = "/proto.BackendService/"
+	const frontendServicePath = "/proto.ScannerService/"
+
+	return map[string][]string{
+		backendServicePath + "StreamServiceControl": {"worker"},
+		backendServicePath + "StreamTasksStatus":    {"worker"},
+
+		frontendServicePath + "StartAsyncScan": {"user"},
+		frontendServicePath + "StartScan":      {"user"},
+
+		frontendServicePath + "GetScan": {"user", "admin"},
+
+		frontendServicePath + "GetAllScans":    {"admin"},
+		frontendServicePath + "ServiceControl": {"admin"},
 	}
 }
