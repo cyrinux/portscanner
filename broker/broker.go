@@ -21,7 +21,7 @@ type Broker struct {
 }
 
 // NewBroker open the broker queues
-func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClient *redis.Client) (*Broker, error) {
+func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClient *redis.Client) *Broker {
 	errChan := make(chan error, 10)
 
 	go RmqLogErrors(errChan)
@@ -33,38 +33,33 @@ func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClien
 			Password:         conf.Redis.Password,
 			SentinelPassword: conf.Redis.SentinelPassword,
 			DB:               conf.Database,
-			MaxRetries:       15,
+			MaxRetries:       1000,
+			MinRetryBackoff:  500 * time.Millisecond,
+			MaxRetryBackoff:  30 * time.Second,
 		})
 	}
 
-	var connection rmq.Connection
-	var err error
-	for {
-		retryTime := 2000 * time.Millisecond
-		connection, err = rmq.OpenConnectionWithRedisClient(
-			conf.Name, redisClient, errChan,
-		)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("can't open RMQ connection, retrying in %v...", retryTime)
-			time.Sleep(retryTime)
-		} else {
-			log.Info().Msg("connected to RMQ database")
-			break
-		}
+	connection, err := rmq.OpenConnectionWithRedisClient(
+		conf.Name, redisClient, errChan,
+	)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("can't open RMQ connection")
+	} else {
+		log.Info().Msg("connected to RMQ database")
 	}
 
 	queueIncomingName := fmt.Sprintf("%s-incoming", taskType)
 	queueIncoming, err := connection.OpenQueue(queueIncomingName)
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		log.Error().Stack().Err(err).Msgf("can't open %s queue", queueIncomingName)
-		return nil, err
+		return nil
 	}
 
 	queuePushName := fmt.Sprintf("%s-rejected", taskType)
 	queuePushed, err := connection.OpenQueue(queuePushName)
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
 		log.Error().Stack().Err(err).Msgf("can't open %s queue", queuePushName)
-		return nil, err
+		return nil
 	}
 
 	queueIncoming.SetPushQueue(queuePushed)
@@ -75,7 +70,7 @@ func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClien
 		Pushed:     queuePushed,
 		Connection: connection,
 		taskType:   taskType,
-	}, nil
+	}
 }
 
 // RmqLogErrors display the rmq errors log

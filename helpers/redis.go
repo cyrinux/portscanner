@@ -29,15 +29,18 @@ func NewRedisClient(ctx context.Context, conf config.Config) *RedisClient {
 		SentinelPassword: conf.RMQ.Redis.SentinelPassword,
 		DB:               conf.RMQ.Database,
 		MaxRetries:       10,
+		MinRetryBackoff:  50 * time.Millisecond,
+		MaxRetryBackoff:  10 * time.Second,
 	})
 	return &RedisClient{ctx: ctx, client: redisClient, conf: conf}
 }
 
 func (rc *RedisClient) Connect() *redis.Client {
-	timeRetry := 5000 * time.Millisecond
+	timeRetry := 50 * time.Millisecond
 	var err error
 	var redisClient RedisClient
 	for {
+		timeRetry *= 2
 		redisClient = *NewRedisClient(rc.ctx, rc.conf)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("cannot connected to redis, retrying in %v...", timeRetry)

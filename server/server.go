@@ -68,20 +68,19 @@ var (
 		Name: "scanner_consumers_count",
 		Help: "The total number of scanner consumers",
 	})
+
+	kaep = keepalive.EnforcementPolicy{
+		MinTime:             5 * time.Second, // If a client pings more than once every 5 seconds, terminate the connection
+		PermitWithoutStream: true,            // Allow pings even when there are no active streams
+	}
+	kasp = keepalive.ServerParameters{
+		MaxConnectionIdle:     3600 * time.Second, // If a client is idle for 3600 seconds, send a GOAWAY
+		MaxConnectionAge:      1800 * time.Second, // If any connection is alive for more than 1800 seconds, send a GOAWAY
+		MaxConnectionAgeGrace: 5 * time.Second,    // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
+		Time:                  5 * time.Second,    // Ping the client if it is idle for 5 seconds to ensure the connection is still active
+		Timeout:               2 * time.Second,    // Wait 1 second for the ping ack before assuming the connection is dead
+	}
 )
-
-var kaep = keepalive.EnforcementPolicy{
-	MinTime:             5 * time.Second, // If a client pings more than once every 5 seconds, terminate the connection
-	PermitWithoutStream: true,            // Allow pings even when there are no active streams
-}
-
-var kasp = keepalive.ServerParameters{
-	MaxConnectionIdle:     3600 * time.Second, // If a client is idle for 3600 seconds, send a GOAWAY
-	MaxConnectionAge:      1800 * time.Second, // If any connection is alive for more than 1800 seconds, send a GOAWAY
-	MaxConnectionAgeGrace: 5 * time.Second,    // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
-	Time:                  5 * time.Second,    // Ping the client if it is idle for 5 seconds to ensure the connection is still active
-	Timeout:               2 * time.Second,    // Wait 1 second for the ping ack before assuming the connection is dead
-}
 
 // TasksStatus define the status of all tasks
 type TasksStatus struct {
@@ -119,6 +118,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 
 	// Broker init nmap queue
 	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)
+
 	// clean the queues
 	go brker.Cleaner()
 
@@ -195,10 +195,13 @@ func Listen(ctx context.Context, conf config.Config) {
 		}()
 
 		reflection.Register(srvFrontend)
+
 		userStore := auth.NewInMemoryUserStore()
 		err = seedUsers(userStore)
 		if err != nil {
 			log.Fatal().Msgf("cannot seed users: ", err)
+		} else {
+			log.Debug().Msg("users seeded")
 		}
 
 		jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
@@ -230,13 +233,13 @@ func Listen(ctx context.Context, conf config.Config) {
 		log.Fatal().Msgf("cannot load TLS credentials: %v", err)
 	}
 
-	// interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
+	interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
 	srvBackend := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 		grpc.Creds(tlsCredentials),
-		// grpc.StreamInterceptor(interceptor.Stream()),
-		// grpc.UnaryInterceptor(interceptor.Unary()),
+		grpc.StreamInterceptor(interceptor.Stream()),
+		grpc.UnaryInterceptor(interceptor.Unary()),
 	)
 
 	// graceful shutdown
@@ -258,6 +261,8 @@ func Listen(ctx context.Context, conf config.Config) {
 	err = seedUsers(userStore)
 	if err != nil {
 		log.Fatal().Msgf("cannot seed users: ", err)
+	} else {
+		log.Debug().Msg("users seeded")
 	}
 
 	jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
@@ -626,7 +631,7 @@ func seedUsers(userStore auth.UserStore) error {
 	if err != nil {
 		return err
 	}
-	err = createUser(userStore, "worker1", "secret", "worker")
+	err = createUser(userStore, "worker1", "secret1", "worker")
 	if err != nil {
 		return err
 	}
@@ -638,8 +643,8 @@ func accessibleRoles() map[string][]string {
 	const frontendServicePath = "/proto.ScannerService/"
 
 	return map[string][]string{
-		backendServicePath + "StreamServiceControl": {"worker"},
-		backendServicePath + "StreamTasksStatus":    {"worker"},
+		backendServicePath + "StreamServiceControl": {"worker", "admin"},
+		backendServicePath + "StreamTasksStatus":    {"worker", "admin"},
 
 		frontendServicePath + "StartAsyncScan": {"user"},
 		frontendServicePath + "StartScan":      {"user"},
