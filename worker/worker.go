@@ -44,7 +44,7 @@ var (
 
 	grpcUnaryRetryParams = []grpc_retry.CallOption{
 		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(1000 * time.Millisecond)),
-		grpc_retry.WithMax(1000),
+		grpc_retry.WithMax(100),
 	}
 )
 
@@ -60,7 +60,6 @@ type Worker struct {
 	consumers   []*Consumer
 	db          database.Database
 	grpcClient  pb.BackendServiceClient
-	cc          *grpc.ClientConn
 	returned    chan int64
 }
 
@@ -71,13 +70,13 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	// Storage database connection init, dedicated context to keep access to the database
 	var db database.Database
 	var err error
-	timeRetry := 50 * time.Millisecond
+	wait := 50 * time.Millisecond
 	for {
-		timeRetry *= 2
+		wait *= 2
 		db, err = database.Factory(context.Background(), conf)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("can't connected to main database, retrying in %v...", timeRetry)
-			time.Sleep(timeRetry)
+			log.Error().Stack().Err(err).Msgf("can't connected to main database, retrying in %v...", wait)
+			time.Sleep(wait)
 		} else {
 			log.Info().Msg("connected to main database")
 			break
@@ -102,8 +101,8 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		conf.BackendServer,
 		grpc.WithTransportCredentials(tlsCredentials),
 		grpc.WithKeepaliveParams(kacp),
-		// grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpcUnaryRetryParams...)),
-		// grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(grpcStreamRetryParams...)),
+		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpcUnaryRetryParams...)),
+		grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(grpcStreamRetryParams...)),
 	)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
@@ -122,14 +121,12 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		grpc.WithKeepaliveParams(kacp),
 		grpc.WithUnaryInterceptor(interceptor.Unary()),
 		grpc.WithStreamInterceptor(interceptor.Stream()),
-		// grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpcUnaryRetryParams...)),
-		// grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(grpcStreamRetryParams...)),
+		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpcUnaryRetryParams...)),
+		grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(grpcStreamRetryParams...)),
 	)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
 	}
-
-	client := pb.NewBackendServiceClient(cc2)
 
 	return &Worker{
 		name:        name,
@@ -140,8 +137,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		consumers:   make([]*Consumer, 0),
 		db:          db,
 		redisClient: redisClient,
-		cc:          cc2,
-		grpcClient:  client,
+		grpcClient:  pb.NewBackendServiceClient(cc2),
 		returned:    make(chan int64),
 	}
 }
@@ -159,15 +155,11 @@ func (worker *Worker) StartWorker() {
 // StreamControlService return the workers status and control them
 func (worker *Worker) StreamServiceControl() {
 
-	reconnectTime := 50 * time.Millisecond
-
-	// client := pb.NewBackendServiceClient(worker.cc)
-
+	wait := 50 * time.Millisecond
 	getState := &pb.ServiceStateValues{State: 0}
 	for {
-		reconnectTime *= 2
+		wait *= 2
 		stream, err := worker.grpcClient.StreamServiceControl(worker.ctx, getState)
-		// stream, err := client.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
 			break
 		}
@@ -194,9 +186,9 @@ func (worker *Worker) StreamServiceControl() {
 			}
 		}
 
-		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, reconnectTime)
+		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, wait)
 
-		time.Sleep(reconnectTime)
+		time.Sleep(wait)
 	}
 }
 
@@ -294,12 +286,12 @@ func (worker *Worker) StopConsuming() *Worker {
 
 // collectConsumerStats manage the tasks prometheus counters
 func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64, returned chan int64) {
-	reconnectTime := 50 * time.Millisecond
-	client := pb.NewBackendServiceClient(worker.cc)
+	wait := 50 * time.Millisecond
+	// client := pb.NewBackendServiceClient(worker.cc)
 	for {
-		reconnectTime *= 2
-		// stream, err := worker.grpcClient.StreamTasksStatus(worker.ctx)
-		stream, err := client.StreamTasksStatus(worker.ctx)
+		wait *= 2
+		stream, err := worker.grpcClient.StreamTasksStatus(worker.ctx)
+		// stream, err := client.StreamTasksStatus(worker.ctx)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("")
 			break
@@ -324,8 +316,8 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 			time.Sleep(500 * time.Millisecond)
 		}
 		// wait before try to reconnect
-		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, reconnectTime)
-		time.Sleep(reconnectTime)
+		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, wait)
+		time.Sleep(wait)
 	}
 }
 

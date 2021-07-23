@@ -33,7 +33,9 @@ func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClien
 			Password:         conf.Redis.Password,
 			SentinelPassword: conf.Redis.SentinelPassword,
 			DB:               conf.Database,
-			MaxRetries:       5,
+			MaxRetries:       10,
+			MinRetryBackoff:  100 * time.Millisecond,
+			MaxRetryBackoff:  2 * time.Second,
 		})
 	}
 
