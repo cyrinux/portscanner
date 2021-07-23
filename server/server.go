@@ -121,7 +121,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 
 	// clean the queues
 	go brker.Cleaner()
-
+	log.Debug().Msg("DEBUUUUGG 3")
 	// Storage database init
 	db, err := database.Factory(ctx, conf)
 	if err != nil {
@@ -171,6 +171,8 @@ func Listen(ctx context.Context, conf config.Config) {
 			log.Fatal().Msgf("cannot load TLS credentials: %v", err)
 		}
 
+		log.Info().Msg("DEBUUGGGG 12")
+
 		interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
 		srvFrontend := grpc.NewServer(
 			grpc.KeepaliveEnforcementPolicy(kaep),
@@ -188,6 +190,7 @@ func Listen(ctx context.Context, conf config.Config) {
 				// sig is a ^C, handle it
 				log.Info().Msg("shutting down gRPC server...")
 
+				log.Info().Msg("DEBUUGGGG 13")
 				srvFrontend.GracefulStop()
 
 				<-ctx.Done()
@@ -204,15 +207,21 @@ func Listen(ctx context.Context, conf config.Config) {
 			log.Debug().Msg("users seeded")
 		}
 
+		log.Info().Msg("DEBUUGGGG 14")
 		jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
 		authServer := auth.NewAuthServer(userStore, jwtManager)
+		log.Info().Msg("DEBUUGGGG 16")
 		pb.RegisterAuthServiceServer(srvFrontend, authServer)
 
+		log.Info().Msg("DEBUUGGGG 17")
 		pb.RegisterScannerServiceServer(srvFrontend, server)
 
+		log.Info().Msg("DEBUUGGGG 18")
 		if err = srvFrontend.Serve(frontListener); err != nil {
 			log.Fatal().Msg("can't serve the gRPC frontend service")
 		}
+		log.Info().Msg("DEBUUGGGG 1")
+
 	}(server)
 
 	// Serve the backend
@@ -273,6 +282,7 @@ func Listen(ctx context.Context, conf config.Config) {
 	if err = srvBackend.Serve(backendListener); err != nil {
 		log.Fatal().Msg("can't serve the gRPC backend service")
 	}
+	log.Info().Msg("DEBUUGGGG 2")
 }
 
 // DeleteScan delele a scan from the database

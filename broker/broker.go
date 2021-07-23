@@ -33,33 +33,37 @@ func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClien
 			Password:         conf.Redis.Password,
 			SentinelPassword: conf.Redis.SentinelPassword,
 			DB:               conf.Database,
-			MaxRetries:       1000,
-			MinRetryBackoff:  500 * time.Millisecond,
-			MaxRetryBackoff:  30 * time.Second,
+			MaxRetries:       5,
 		})
 	}
 
-	connection, err := rmq.OpenConnectionWithRedisClient(
-		conf.Name, redisClient, errChan,
-	)
-	if err != nil {
-		log.Error().Stack().Err(err).Msgf("can't open RMQ connection")
-	} else {
-		log.Info().Msg("connected to RMQ database")
+	var connection rmq.Connection
+	var err error
+	retryTime := 50 * time.Millisecond
+	for {
+		retryTime *= 2
+		connection, err = rmq.OpenConnectionWithRedisClient(
+			conf.Name, redisClient, errChan,
+		)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("can't open RMQ connection, retrying in %v...", retryTime)
+			time.Sleep(retryTime)
+		} else {
+			log.Info().Msg("connected to RMQ database")
+			break
+		}
 	}
 
 	queueIncomingName := fmt.Sprintf("%s-incoming", taskType)
 	queueIncoming, err := connection.OpenQueue(queueIncomingName)
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		log.Error().Stack().Err(err).Msgf("can't open %s queue", queueIncomingName)
-		return nil
+		log.Fatal().Stack().Err(err).Msgf("can't open %s queue", queueIncomingName)
 	}
 
 	queuePushName := fmt.Sprintf("%s-rejected", taskType)
 	queuePushed, err := connection.OpenQueue(queuePushName)
 	if err != nil && err != rmq.ErrorAlreadyConsuming {
-		log.Error().Stack().Err(err).Msgf("can't open %s queue", queuePushName)
-		return nil
+		log.Fatal().Stack().Err(err).Msgf("can't open %s queue", queuePushName)
 	}
 
 	queueIncoming.SetPushQueue(queuePushed)

@@ -36,35 +36,35 @@ services:
     networks:
       - backend
 
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: grpcscanner
-    env_file:
-      - .env
-    command: "-worker -pprof"
-    restart: always
-    cap_add:
-      - NET_ADMIN
-    depends_on:
-      - redis-sentinel
-      - tor
-    networks:
-      - backend
-    ports:
-      - "127.0.0.1:16060-16070:6060/tcp"
-    volumes:
-      - "./cert:/etc/scanner/cert:ro"
-    deploy:
-      mode: replicated
-      replicas: 3
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   image: grpcscanner
+  #   env_file:
+  #     - .env
+  #   command: "-worker -pprof"
+  #   restart: always
+  #   cap_add:
+  #     - NET_ADMIN
+  #   depends_on:
+  #     - redis-sentinel
+  #     - tor
+  #   networks:
+  #     - backend
+  #   ports:
+  #     - "127.0.0.1:16060-16070:6060/tcp"
+  #   volumes:
+  #     - "./cert:/etc/scanner/cert:ro"
+  #   deploy:
+  #     mode: replicated
+  #     replicas: 3
 
-  tor:
-    image: dperson/torproxy
-    restart: always
-    networks:
-      - backend
+  # tor:
+  #   image: dperson/torproxy
+  #   restart: always
+  #   networks:
+  #     - backend
 
   redis-primary:
     image: docker.io/bitnami/redis:6.2
