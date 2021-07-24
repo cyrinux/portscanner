@@ -91,12 +91,14 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 
 	// grpc conn
 	var cc *grpc.ClientConn
+	wait = 1000 * time.Millisecond
 	for {
 		cc, err = connectToServer(ctx, conf, name)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("can't connect to the control server, retrying in %v...", wait)
 			time.Sleep(wait)
 		} else {
+			log.Info().Msgf("%s connected to the control server", name)
 			break
 		}
 	}
@@ -137,7 +139,7 @@ func connectToServer(ctx context.Context, conf config.Config, name string) (*grp
 		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
 		return nil, err
 	}
-	log.Info().Msgf("%s cc1: connected to the server", name)
+	log.Debug().Msgf("%s cc1: connected to the control server: %s", name, conf.BackendServer)
 
 	authClient := client.NewAuthClient(cc1, username, password)
 	interceptor, err := client.NewAuthInterceptor(authClient, authMethods(), refreshDuration)
@@ -155,10 +157,10 @@ func connectToServer(ctx context.Context, conf config.Config, name string) (*grp
 		grpc.WithStreamInterceptor(interceptor.Stream()),
 	)
 	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
+		log.Error().Stack().Err(err).Msgf("%s could not connect to control server: %s", name, conf.BackendServer)
 		return nil, err
 	}
-	log.Info().Msgf("%s cc2: connected to the server", name)
+	log.Debug().Msgf("%s cc2: connected to the control server: %s", name, conf.BackendServer)
 
 	return cc2, nil
 }
@@ -180,15 +182,14 @@ func (worker *Worker) StreamServiceControl() {
 	getState := &pb.ServiceStateValues{State: 0}
 	for {
 		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, wait)
-
 		stream, err := worker.grpcClient.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't get stream connection")
 			break
 		}
-		log.Debug().Msgf("%s connected to server control", worker.name)
+		log.Info().Msgf("%s connected to server control", worker.name)
 
-		for {
+		for range time.Tick(wait) {
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
 				break
@@ -205,8 +206,8 @@ func (worker *Worker) StreamServiceControl() {
 				worker.state.State = pb.ServiceStateValues_STOP
 				worker.StopConsuming()
 			}
-			time.Sleep(1000 * time.Millisecond)
 		}
+
 		time.Sleep(wait)
 	}
 }
@@ -314,7 +315,7 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 			log.Error().Stack().Err(err).Msg("")
 			break
 		}
-		log.Debug().Msgf("%s stats collector connected to server control", worker.name)
+		log.Info().Msgf("%s stats collector connected to server control", worker.name)
 		for {
 			var s, f, r int64
 			select {

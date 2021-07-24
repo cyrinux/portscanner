@@ -112,6 +112,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
 		}
 	}
+
 	time.Sleep(consumer.conf.RMQ.ConsumeDuration)
 }
 
