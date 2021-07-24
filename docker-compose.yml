@@ -12,25 +12,49 @@ volumes:
     driver: local
 
 services:
-  server:
-    hostname: server
+  server1:
+    hostname: server1
     build:
       context: .
       dockerfile: Dockerfile
     image: grpcscanner
     env_file:
       - .env
-    command: "-server -prometheus -pprof"
+    command: "-server -prometheus"
     cap_add:
       - NET_ADMIN
     restart: always
     depends_on:
       - redis-sentinel
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - "9000"
+      - "9001"
       - "127.0.0.1:6060:6060"
       - "127.0.0.1:2112:2112"
+    volumes:
+      - "./cert:/etc/scanner/cert:ro"
+    networks:
+      - backend
+
+  server2:
+    hostname: server2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grpcscanner
+    env_file:
+      - .env
+    command: "-server -prometheus"
+    cap_add:
+      - NET_ADMIN
+    restart: always
+    depends_on:
+      - redis-sentinel
+    ports:
+      - "9000"
+      - "9001"
+      - "127.0.0.1:6061:6060"
+      - "127.0.0.1:2113:2112"
     volumes:
       - "./cert:/etc/scanner/cert:ro"
     networks:
@@ -53,7 +77,7 @@ services:
     networks:
       - backend
     ports:
-      - "127.0.0.1:16060-16070:6060/tcp"
+      - "127.0.0.1:16060-16070:6060"
     volumes:
       - "./cert:/etc/scanner/cert:ro"
     deploy:
@@ -131,15 +155,21 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
     ports:
-      - "127.0.0.1:9090:9090/tcp"
+      - "127.0.0.1:9090:9090"
     networks:
       - backend
 
-  # envoy:
-  #   image: envoyproxy/envoy-alpine:v1.18-latest
-  #   ports:
-  #     - "10000:10000"
-  #   volumes:
-  #     - ./envoy.yaml:/etc/envoy/envoy.yaml
-  #   networks:
-  #     - backend
+  nginx:
+    image: nginx:latest
+    volumes:
+      - "./nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+      - "./nginx/conf.d:/etc/nginx/conf.d:ro"
+      - "./cert:/etc/nginx/cert:ro"
+    restart: always
+    depends_on:
+      - server1
+      - server2
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - backend

@@ -39,11 +39,11 @@ var (
 	}
 
 	grpcStreamRetryParams = []grpc_retry.CallOption{
-		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(1000 * time.Millisecond)),
+		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(1 * time.Second)),
 	}
 
 	grpcUnaryRetryParams = []grpc_retry.CallOption{
-		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(1000 * time.Millisecond)),
+		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(1 * time.Second)),
 		grpc_retry.WithMax(10),
 	}
 )
