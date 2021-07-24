@@ -103,6 +103,7 @@ type Server struct {
 	taskType    string
 	tasksStatus TasksStatus
 	jwtManager  *auth.JWTManager
+	userStore   *auth.InMemoryUserStore
 }
 
 // NewServer create a new server and init the database connection
@@ -121,24 +122,28 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 
 	// clean the queues
 	go brker.Cleaner()
-	log.Debug().Msg("DEBUUUUGG 3")
 
 	// Storage database init
 	db, err := database.Factory(ctx, conf)
-	log.Debug().Msg("DEBUUUUGG 4444")
 	if err != nil {
 		log.Fatal().Stack().Err(err).Msg("can't open the database")
 	}
 
-	log.Debug().Msg("DEBUUUUGGGG 7")
 	// start the rmq stats to prometheus
 	go brokerStatsToProm(brker, taskType)
 
-	log.Debug().Msg("DEBUUUUGGG 8")
 	// allocate the jwtManager
-	var jwtManager = new(auth.JWTManager)
+	jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
 
-	log.Debug().Msg("DEBUUUUGGG 9")
+	// seed the users
+	userStore := auth.NewInMemoryUserStore()
+	err = seedUsers(userStore)
+	if err != nil {
+		log.Fatal().Msgf("cannot seed users: ", err)
+	} else {
+		log.Debug().Msg("users seeded")
+	}
+
 	return &Server{
 		ctx:        ctx,
 		taskType:   taskType,
@@ -148,6 +153,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 		err:        err,
 		locker:     locker,
 		jwtManager: jwtManager,
+		userStore:  userStore,
 	}
 }
 
@@ -201,16 +207,7 @@ func Listen(ctx context.Context, conf config.Config) {
 
 		reflection.Register(srvFrontend)
 
-		userStore := auth.NewInMemoryUserStore()
-		err = seedUsers(userStore)
-		if err != nil {
-			log.Fatal().Msgf("cannot seed users: ", err)
-		} else {
-			log.Debug().Msg("users seeded")
-		}
-
-		jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
-		authServer := auth.NewAuthServer(userStore, jwtManager)
+		authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
 		pb.RegisterAuthServiceServer(srvFrontend, authServer)
 
 		pb.RegisterScannerServiceServer(srvFrontend, server)
@@ -262,16 +259,7 @@ func Listen(ctx context.Context, conf config.Config) {
 
 	reflection.Register(srvBackend)
 
-	userStore := auth.NewInMemoryUserStore()
-	err = seedUsers(userStore)
-	if err != nil {
-		log.Fatal().Msgf("cannot seed users: ", err)
-	} else {
-		log.Debug().Msg("users seeded")
-	}
-
-	jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
-	authServer := auth.NewAuthServer(userStore, jwtManager)
+	authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
 	pb.RegisterAuthServiceServer(srvBackend, authServer)
 
 	pb.RegisterBackendServiceServer(srvBackend, server)

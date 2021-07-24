@@ -44,7 +44,7 @@ var (
 
 	grpcUnaryRetryParams = []grpc_retry.CallOption{
 		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(1000 * time.Millisecond)),
-		grpc_retry.WithMax(100),
+		grpc_retry.WithMax(10),
 	}
 )
 
@@ -67,15 +67,15 @@ type Worker struct {
 func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	log.Info().Msgf("%s worker is starting", name)
 
+	var err error
+
 	// Storage database connection init, dedicated context to keep access to the database
 	var db database.Database
-	var err error
-	wait := 50 * time.Millisecond
+	wait := 500 * time.Millisecond
 	for {
-		wait *= 2
 		db, err = database.Factory(context.Background(), conf)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("can't connected to main database, retrying in %v...", wait)
+			log.Error().Stack().Err(err).Msgf("can't connect to main database, retrying in %v...", wait)
 			time.Sleep(wait)
 		} else {
 			log.Info().Msg("connected to main database")
@@ -89,43 +89,16 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	// distributed lock - with redis
 	locker := redislock.New(redisClient)
 
-	// tls client config
-	tlsCredentials, err := loadTLSCredentials(conf.Backend.CAFile, conf.Backend.ClientCertFile, conf.Backend.ClientKeyFile)
-	if err != nil {
-		log.Fatal().Stack().Err(err).Msgf("can't load TLS credentials")
-	}
-
-	// authentication
-	cc1, err := grpc.DialContext(
-		ctx,
-		conf.BackendServer,
-		grpc.WithTransportCredentials(tlsCredentials),
-		grpc.WithKeepaliveParams(kacp),
-		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpcUnaryRetryParams...)),
-		grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(grpcStreamRetryParams...)),
-	)
-	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
-	}
-
-	authClient := client.NewAuthClient(cc1, username, password)
-	interceptor, err := client.NewAuthInterceptor(authClient, authMethods(), refreshDuration)
-	if err != nil {
-		log.Error().Stack().Err(err).Msgf("cannot create auth interceptor to %s", conf.BackendServer)
-	}
-
-	cc2, err := grpc.DialContext(
-		ctx,
-		conf.BackendServer,
-		grpc.WithTransportCredentials(tlsCredentials),
-		grpc.WithKeepaliveParams(kacp),
-		grpc.WithUnaryInterceptor(interceptor.Unary()),
-		grpc.WithStreamInterceptor(interceptor.Stream()),
-		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpcUnaryRetryParams...)),
-		grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(grpcStreamRetryParams...)),
-	)
-	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
+	// grpc conn
+	var cc *grpc.ClientConn
+	for {
+		cc, err = connectToServer(ctx, conf, name)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("can't connect to the control server, retrying in %v...", wait)
+			time.Sleep(wait)
+		} else {
+			break
+		}
 	}
 
 	return &Worker{
@@ -136,10 +109,58 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		locker:      locker,
 		consumers:   make([]*Consumer, 0),
 		db:          db,
+		grpcClient:  pb.NewBackendServiceClient(cc),
 		redisClient: redisClient,
-		grpcClient:  pb.NewBackendServiceClient(cc2),
 		returned:    make(chan int64),
 	}
+}
+
+// connectToServer connect to the server
+func connectToServer(ctx context.Context, conf config.Config, name string) (*grpc.ClientConn, error) {
+	// tls client config
+	tlsCredentials, err := loadTLSCredentials(conf.Backend.CAFile, conf.Backend.ClientCertFile, conf.Backend.ClientKeyFile)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("can't load TLS credentials")
+		return nil, err
+	}
+
+	cc1, err := grpc.DialContext(
+		ctx,
+		conf.BackendServer,
+		grpc.WithTransportCredentials(tlsCredentials),
+		grpc.WithKeepaliveParams(kacp),
+		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpcUnaryRetryParams...)),
+		grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(grpcStreamRetryParams...)),
+	)
+
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
+		return nil, err
+	}
+	log.Info().Msgf("%s cc1: connected to the server", name)
+
+	authClient := client.NewAuthClient(cc1, username, password)
+	interceptor, err := client.NewAuthInterceptor(authClient, authMethods(), refreshDuration)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("cannot create auth interceptor to %s", conf.BackendServer)
+		return nil, err
+	}
+
+	cc2, err := grpc.DialContext(
+		ctx,
+		conf.BackendServer,
+		grpc.WithTransportCredentials(tlsCredentials),
+		grpc.WithKeepaliveParams(kacp),
+		grpc.WithUnaryInterceptor(interceptor.Unary()),
+		grpc.WithStreamInterceptor(interceptor.Stream()),
+	)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s could not connect to server %s", name, conf.BackendServer)
+		return nil, err
+	}
+	log.Info().Msgf("%s cc2: connected to the server", name)
+
+	return cc2, nil
 }
 
 // StartWorker start a scanner worker
@@ -154,18 +175,20 @@ func (worker *Worker) StartWorker() {
 
 // StreamControlService return the workers status and control them
 func (worker *Worker) StreamServiceControl() {
+	wait := 1000 * time.Millisecond
 
-	wait := 50 * time.Millisecond
 	getState := &pb.ServiceStateValues{State: 0}
 	for {
-		wait *= 2
+		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, wait)
+
 		stream, err := worker.grpcClient.StreamServiceControl(worker.ctx, getState)
 		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't get stream connection")
 			break
 		}
 		log.Debug().Msgf("%s connected to server control", worker.name)
 
-		for range time.Tick(1000 * time.Millisecond) {
+		for {
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
 				break
@@ -175,8 +198,6 @@ func (worker *Worker) StreamServiceControl() {
 				break
 			}
 
-			log.Debug().Msg(serviceControl.State.String())
-
 			if serviceControl.State == 1 && worker.state.State != 1 { //pb.ServiceStateValues_START
 				worker.state.State = pb.ServiceStateValues_START
 				worker.startConsuming()
@@ -184,10 +205,8 @@ func (worker *Worker) StreamServiceControl() {
 				worker.state.State = pb.ServiceStateValues_STOP
 				worker.StopConsuming()
 			}
+			time.Sleep(1000 * time.Millisecond)
 		}
-
-		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, wait)
-
 		time.Sleep(wait)
 	}
 }
@@ -286,12 +305,11 @@ func (worker *Worker) StopConsuming() *Worker {
 
 // collectConsumerStats manage the tasks prometheus counters
 func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64, returned chan int64) {
-	wait := 50 * time.Millisecond
-	// client := pb.NewBackendServiceClient(worker.cc)
+	wait := 1000 * time.Millisecond
 	for {
-		wait *= 2
+		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, wait)
+
 		stream, err := worker.grpcClient.StreamTasksStatus(worker.ctx)
-		// stream, err := client.StreamTasksStatus(worker.ctx)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("")
 			break
@@ -316,11 +334,11 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 			time.Sleep(500 * time.Millisecond)
 		}
 		// wait before try to reconnect
-		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, wait)
 		time.Sleep(wait)
 	}
 }
 
+// authMethods allowed grpc endpoints
 func authMethods() map[string]bool {
 	const backendServicePath = "/proto.BackendService/"
 
