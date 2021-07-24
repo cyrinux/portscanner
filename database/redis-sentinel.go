@@ -22,6 +22,7 @@ func createRedisSentinelDatabase(ctx context.Context, conf config.DBConfig) (Dat
 		MaxRetries:       3,
 		MinRetryBackoff:  500 * time.Millisecond,
 		MaxRetryBackoff:  1 * time.Second,
+		DialTimeout:      5 * time.Second,
 	})
 	_, err := client.Ping(ctx).Result() // makes sure database is connected
 	if err != nil {

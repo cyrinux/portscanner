@@ -59,6 +59,12 @@ type Global struct {
 	BackendListenPort  int    `default:"9001" split_words:"true"`
 }
 
+// JWT contains JWT config
+type JWT struct {
+	SecretKey     string        `default:"secret" split_words:"true"`
+	TokenDuration time.Duration `default:"15m" split_words:"true"`
+}
+
 // Config is the main global config struct
 type Config struct {
 	DB         DBConfig
@@ -78,6 +84,7 @@ type GRPCBackend struct {
 	ServerKeyFile  string `default:"/etc/scanner/cert/server-key.pem" split_words:"true"`
 	ClientCertFile string `default:"/etc/scanner/cert/client-worker-cert.pem" split_words:"true"`
 	ClientKeyFile  string `default:"/etc/scanner/cert/client-worker-key.pem" split_words:"true"`
+	JWT            JWT
 }
 
 // GRPCBackendServer is the GRPC backend endpoint config
@@ -85,6 +92,7 @@ type GRPCFrontend struct {
 	CAFile         string `default:"/etc/scanner/cert/ca-cert.pem" split_words:"true"`
 	ServerCertFile string `default:"/etc/scanner/cert/server-cert.pem" split_words:"true"`
 	ServerKeyFile  string `default:"/etc/scanner/cert/server-key.pem" split_words:"true"`
+	JWT            JWT
 }
 
 // GetConfig get the configuration

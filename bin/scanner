@@ -1,15 +1,17 @@
-#!/bin/sh
+#!/bin/bash
 server=127.0.0.1:9000
 
 client() {
-    grpcurl -protoset ./proto/grpcnmapscanner.protoset -d @ -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -H "Username: user1" -H "Password: secret" $server "$@"
+    JWT=$(grpcurl -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -d "{\"username\":\"$GRPCUSER\", \"password\":\"$GRPCPASS\"}" localhost:9000 proto.AuthService.Login | jq -r '.accessToken')
+    echo "$token"
+    grpcurl -protoset ./proto/grpcnmapscanner.protoset -d @ -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -H "authorization: $JWT" $server "$@"
 }
 
 if [ $# -eq 0 ]; then
-    grpcurl -protoset ./proto/grpcnmapscanner.protoset -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server -H "Username: user1" -H "Password: secret" $server list
+    grpcurl -protoset ./proto/grpcnmapscanner.protoset -cacert ./cert/ca-cert.pem -key ./cert/client-cyrinux-key.pem -cert ./cert/client-cyrinux-cert.pem -servername server $server list
     exit 1
 fi
 
 action=$1
 shift
-echo -n "$@" | client proto.ScannerService.$action | jq .
+echo -n "$@" | client proto.ScannerService.$action

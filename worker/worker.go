@@ -56,7 +56,7 @@ type Worker struct {
 	conf        config.Config
 	redisClient *redis.Client
 	locker      *redislock.Client
-	state       pb.ServiceStateValues
+	state       *pb.ServiceStateValues
 	consumers   []*Consumer
 	db          database.Database
 	grpcClient  pb.BackendServiceClient
@@ -75,10 +75,10 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	for {
 		db, err = database.Factory(context.Background(), conf)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("can't connect to main database, retrying in %v...", wait)
+			log.Error().Stack().Err(err).Msgf("%s cannot connect to main database, retrying in %v...", name, wait)
 			time.Sleep(wait)
 		} else {
-			log.Info().Msg("connected to main database")
+			log.Info().Msgf("%s connected to main database", name)
 			break
 		}
 	}
@@ -95,13 +95,15 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	for {
 		cc, err = connectToServer(ctx, conf, name)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("can't connect to the control server, retrying in %v...", wait)
+			log.Error().Stack().Err(err).Msgf("%s cannot connect to the control server, retrying in %v...", name, wait)
 			time.Sleep(wait)
 		} else {
 			log.Info().Msgf("%s connected to the control server", name)
 			break
 		}
 	}
+
+	state := &pb.ServiceStateValues{State: pb.ServiceStateValues_START}
 
 	return &Worker{
 		name:        name,
@@ -111,6 +113,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		locker:      locker,
 		consumers:   make([]*Consumer, 0),
 		db:          db,
+		state:       state,
 		grpcClient:  pb.NewBackendServiceClient(cc),
 		redisClient: redisClient,
 		returned:    make(chan int64),
@@ -175,11 +178,11 @@ func (worker *Worker) StartWorker() {
 	worker.StreamServiceControl()
 }
 
-// StreamControlService return the workers status and control them
+// StreamServiceControl return the workers status and control them
 func (worker *Worker) StreamServiceControl() {
-	wait := 1000 * time.Millisecond
+	wait := 500 * time.Millisecond
 
-	getState := &pb.ServiceStateValues{State: 0}
+	getState := &pb.ServiceStateValues{State: pb.ServiceStateValues_UNKNOWN}
 	for {
 		log.Debug().Msgf("%s trying to connect in %v to server control", worker.name, wait)
 		stream, err := worker.grpcClient.StreamServiceControl(worker.ctx, getState)
@@ -198,7 +201,6 @@ func (worker *Worker) StreamServiceControl() {
 				log.Error().Stack().Err(err).Msg("can't get service control state ")
 				break
 			}
-
 			if serviceControl.State == 1 && worker.state.State != 1 { //pb.ServiceStateValues_START
 				worker.state.State = pb.ServiceStateValues_START
 				worker.startConsuming()
@@ -297,6 +299,7 @@ func (worker *Worker) StopConsuming() *Worker {
 			consumer.cancel()
 		}
 	}
+
 	<-worker.broker.Incoming.StopConsuming()
 	<-worker.broker.Pushed.StopConsuming()
 	<-worker.broker.Connection.StopAllConsuming() // wait for all Consume() calls to finish
@@ -308,14 +311,13 @@ func (worker *Worker) StopConsuming() *Worker {
 func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64, returned chan int64) {
 	wait := 1000 * time.Millisecond
 	for {
-		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, wait)
-
 		stream, err := worker.grpcClient.StreamTasksStatus(worker.ctx)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("")
 			break
 		}
 		log.Info().Msgf("%s stats collector connected to server control", worker.name)
+
 		for {
 			var s, f, r int64
 			select {
@@ -335,6 +337,7 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 			time.Sleep(500 * time.Millisecond)
 		}
 		// wait before try to reconnect
+		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, wait)
 		time.Sleep(wait)
 	}
 }

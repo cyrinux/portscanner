@@ -32,11 +32,6 @@ import (
 	"time"
 )
 
-const (
-	secretKey     = "secret"
-	tokenDuration = 15 * time.Minute
-)
-
 var (
 	confLogger = config.GetConfig().Logger
 	log        = logger.New(confLogger.Debug, confLogger.Pretty)
@@ -133,15 +128,18 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	go brokerStatsToProm(brker, taskType)
 
 	// allocate the jwtManager
-	jwtManager := auth.NewJWTManager(secretKey, tokenDuration)
+	jwtManager := auth.NewJWTManager(
+		conf.Backend.JWT.SecretKey,
+		conf.Backend.JWT.TokenDuration,
+	)
 
 	// seed the users
 	userStore := auth.NewInMemoryUserStore()
 	err = seedUsers(userStore)
 	if err != nil {
-		log.Fatal().Msgf("cannot seed users: ", err)
+		log.Fatal().Stack().Err(err).Msgf("cannot seed users")
 	} else {
-		log.Debug().Msg("users seeded")
+		log.Debug().Msg("database users seeded")
 	}
 
 	return &Server{
@@ -620,7 +618,7 @@ func createUser(userStore auth.UserStore, username, password, role string) error
 }
 
 func seedUsers(userStore auth.UserStore) error {
-	err := createUser(userStore, "admin1", "secret", "admin")
+	err := createUser(userStore, "admin1", "secret1", "admin")
 	if err != nil {
 		return err
 	}
@@ -628,7 +626,7 @@ func seedUsers(userStore auth.UserStore) error {
 	if err != nil {
 		return err
 	}
-	return createUser(userStore, "user1", "secret", "user")
+	return createUser(userStore, "user1", "secret1", "user")
 }
 
 func accessibleRoles() map[string][]string {

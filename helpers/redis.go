@@ -14,6 +14,7 @@ var (
 	log  = logger.New(conf.Debug, conf.Pretty)
 )
 
+// RedisClient is a redis client struct
 type RedisClient struct {
 	ctx    context.Context
 	conf   config.Config
@@ -29,12 +30,14 @@ func NewRedisClient(ctx context.Context, conf config.Config) *RedisClient {
 		SentinelPassword: conf.RMQ.Redis.SentinelPassword,
 		DB:               conf.RMQ.Database,
 		MaxRetries:       3,
-		MinRetryBackoff:  500 * time.Millisecond,
-		MaxRetryBackoff:  1 * time.Second,
+		MinRetryBackoff:  1 * time.Second,
+		MaxRetryBackoff:  3 * time.Second,
+		DialTimeout:      5 * time.Second,
 	})
 	return &RedisClient{ctx: ctx, client: redisClient, conf: conf}
 }
 
+// Connect is use to connect to redis
 func (rc *RedisClient) Connect() *redis.Client {
 	wait := 500 * time.Millisecond
 	var err error

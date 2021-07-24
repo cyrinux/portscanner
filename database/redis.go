@@ -20,6 +20,7 @@ func createRedisDatabase(ctx context.Context, conf config.DBConfig) (Database, e
 		MaxRetries:      10,
 		MinRetryBackoff: 1 * time.Second,
 		MaxRetryBackoff: 3 * time.Second,
+		DialTimeout:     5 * time.Second,
 	})
 	_, err := client.Ping(ctx).Result() // makes sure database is connected
 	if err != nil {
