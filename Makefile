@@ -1,4 +1,6 @@
 export DOCKER_BUILDKIT=1
+export GRPCUSER=user1
+export GRPCPASS=secret1
 
 all: up
 
@@ -62,8 +64,7 @@ proto-docker:
 	@rm ./gen -rf
 
 testscan:
-	./bin/scanner
-	./bin/scanner StartAsyncScan '{"hosts":"scanme.nmap.org","fast_mode":true}'
+	./bin/scanner StartAsyncScan '{"targets":"scanme.nmap.org","fast_mode":true}'
 
 .PHONY: cert
 cert:
