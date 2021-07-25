@@ -103,7 +103,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		}
 	}
 
-	state := &pb.ServiceStateValues{State: pb.ServiceStateValues_START}
+	state := &pb.ServiceStateValues{State: pb.ServiceStateValues_UNKNOWN}
 
 	return &Worker{
 		name:        name,
@@ -192,7 +192,8 @@ func (worker *Worker) StreamServiceControl() {
 		}
 		log.Info().Msgf("%s connected to server control", worker.name)
 
-		for range time.Tick(wait) {
+		for range time.Tick(500 * time.Millisecond) {
+
 			serviceControl, err := stream.Recv()
 			if err == io.EOF {
 				break
@@ -201,6 +202,7 @@ func (worker *Worker) StreamServiceControl() {
 				log.Error().Stack().Err(err).Msg("can't get service control state ")
 				break
 			}
+
 			if serviceControl.State == 1 && worker.state.State != 1 { //pb.ServiceStateValues_START
 				worker.state.State = pb.ServiceStateValues_START
 				worker.startConsuming()
@@ -208,6 +210,7 @@ func (worker *Worker) StreamServiceControl() {
 				worker.state.State = pb.ServiceStateValues_STOP
 				worker.StopConsuming()
 			}
+
 		}
 
 		time.Sleep(wait)
@@ -216,7 +219,7 @@ func (worker *Worker) StreamServiceControl() {
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
-	wait := 1000 * time.Millisecond
+	wait := 500 * time.Millisecond
 	log.Info().Msgf("starting the returner routine on %s", worker.name)
 	for {
 		// Try to obtain lock.

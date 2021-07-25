@@ -58,7 +58,7 @@ func NewConsumer(
 	}
 }
 
-// onCancel is a function trigger on consumer context cancel
+// Cancel is a function trigger on consumer context cancel
 func (consumer *Consumer) Cancel() {
 	log.Debug().Msgf("%s cancelled, writing state to database", consumer.name)
 	// if scan fail or cancelled, mark task as cancel
@@ -83,6 +83,8 @@ func (consumer *Consumer) Cancel() {
 		}
 	}
 
+	time.Sleep(1000 * time.Millisecond)
+
 	consumer.cancel()
 }
 
@@ -94,6 +96,7 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	json.Unmarshal([]byte(payload), &request)
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
+
 	if consumer.state.State != pb.ServiceStateValues_START {
 		log.Info().Msgf("%s: start consume %s", consumer.name, payload)
 		if err := delivery.Reject(); err != nil {

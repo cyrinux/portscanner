@@ -162,6 +162,9 @@ func Listen(ctx context.Context, conf config.Config) {
 	// Start the server
 	server := NewServer(ctx, conf, "nmap")
 
+	// Update the server service state
+	go getServiceControl(server)
+
 	// Serve the frontend
 	go func(s *Server) {
 		frontListener, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.FrontendListenPort))
@@ -274,17 +277,19 @@ func (server *Server) DeleteScan(ctx context.Context, request *pb.GetScannerRequ
 
 // StreamServiceControl control the service
 func (server *Server) StreamServiceControl(request *pb.ServiceStateValues, stream pb.BackendService_StreamServiceControlServer) error {
+	wait := 500 * time.Millisecond
 	for {
 		if err := stream.Send(&server.State); err != nil {
 			log.Error().Stack().Err(err).Msgf("streamer service control send error")
 			return errors.Wrap(err, "streamer service control send error")
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(wait)
 	}
 }
 
 // StreamTasksStatus manage the tasks counter
 func (server *Server) StreamTasksStatus(stream pb.BackendService_StreamTasksStatusServer) error {
+	wait := 500 * time.Millisecond
 	for {
 		promStatus, err := stream.Recv()
 		if err == io.EOF {
@@ -303,21 +308,61 @@ func (server *Server) StreamTasksStatus(stream pb.BackendService_StreamTasksStat
 			Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned}},
 		)
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(wait)
 	}
 }
 
 // ServiceControl control the service
 func (server *Server) ServiceControl(ctx context.Context, request *pb.ServiceStateValues) (*pb.ServiceStateValues, error) {
+
+	var state pb.ServiceStateValues
 	if request.GetState() == pb.ServiceStateValues_UNKNOWN {
 		return &pb.ServiceStateValues{State: server.State.State}, nil
 	}
 
 	if server.State.State != request.GetState() {
-		server.State.State = request.GetState()
+		state = pb.ServiceStateValues{State: request.GetState()}
+		stateJSON, err := json.Marshal(&state)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't Unmarshal state")
+		}
+		_, err = server.db.Set(ctx, "worker-state", string(stateJSON), 0)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't set service state")
+		}
+		server.State.State = state.State
 	}
+	return &pb.ServiceStateValues{State: state.State}, nil
+}
 
-	return &pb.ServiceStateValues{State: server.State.State}, nil
+// getServiceControl get the service state from database
+// and update the server state
+func getServiceControl(server *Server) {
+	wait := 500 * time.Millisecond
+	var state pb.ServiceStateValues
+
+	for {
+		stateJSON, err := server.db.Get(server.ctx, "worker-state")
+		if err != nil || stateJSON == "" {
+			log.Error().Stack().Err(err).Msg("can't get service state, setting to START")
+			unknownState := pb.ServiceStateValues{State: pb.ServiceStateValues_START}
+			unknownStateJSON, _ := json.Marshal(&unknownState)
+			server.db.Set(server.ctx, "worker-state", string(unknownStateJSON), 0)
+			server.State.State = unknownState.State
+			time.Sleep(wait)
+			continue
+		}
+		err = json.Unmarshal([]byte(stateJSON), &state)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't Unmarshal service state")
+		}
+
+		if server.State.State != state.State {
+			log.Debug().Msgf("Server state changed to %v", state.State)
+			server.State.State = state.State
+		}
+		time.Sleep(wait)
+	}
 }
 
 // GetScan return the engine scan result
