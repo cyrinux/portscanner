@@ -6,11 +6,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/client"
 	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/consumer"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/logger"
@@ -51,7 +51,7 @@ type Worker struct {
 	redisClient *redis.Client
 	locker      *redislock.Client
 	state       *pb.ServiceStateValues
-	consumers   []*Consumer
+	consumers   []*consumer.Consumer
 	db          database.Database
 	grpcClient  pb.BackendServiceClient
 	returned    chan int64
@@ -64,8 +64,8 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	var err error
 
 	// Storage database connection init, dedicated context to keep access to the database
+	wait := 1000 * time.Millisecond
 	var db database.Database
-	wait := 500 * time.Millisecond
 	for {
 		db, err = database.Factory(context.Background(), conf)
 		if err != nil {
@@ -84,8 +84,8 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	locker := redislock.New(redisClient)
 
 	// grpc conn
-	var cc *grpc.ClientConn
 	wait = 1000 * time.Millisecond
+	var cc *grpc.ClientConn
 	for {
 		cc, err = connectToServer(ctx, conf, name)
 		if err != nil {
@@ -105,7 +105,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		ctx:         ctx,
 		broker:      new(broker.Broker),
 		locker:      locker,
-		consumers:   make([]*Consumer, 0),
+		consumers:   make([]*consumer.Consumer, 0),
 		db:          db,
 		state:       state,
 		grpcClient:  pb.NewBackendServiceClient(cc),
@@ -157,6 +157,7 @@ func connectToServer(ctx context.Context, conf config.Config, name string) (*grp
 		grpc.WithUnaryInterceptor(interceptor.Unary()),
 		grpc.WithStreamInterceptor(interceptor.Stream()),
 	)
+
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s could not connect to control server: %s", name, conf.BackendServer)
 		return nil, err
@@ -216,7 +217,7 @@ func (worker *Worker) StreamServiceControl() {
 }
 
 // Locker help to lock some tasks
-func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
+func (worker *Worker) startReturner(returner *broker.Returner) {
 	wait := 500 * time.Millisecond
 	log.Info().Msgf("starting the returner routine on %s", worker.name)
 	for {
@@ -230,14 +231,14 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 				log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 			} else if ttl > 0 {
 				// Yay, I still have my lock!
-				ret, err := queue.ReturnRejected(worker.conf.RMQ.ReturnerLimit)
+				ret, err := returner.Queue.ReturnRejected(worker.conf.RMQ.ReturnerLimit)
 				if err != nil {
 					log.Error().Stack().Err(err).Msg("error while returning message")
 				}
 				if ret > 0 {
 					log.Info().Msgf("returner success requeue %d tasks messages to incoming", ret)
 					// prometheus returned stats
-					returned <- ret
+					returner.Returned <- ret
 				}
 				lock.Refresh(worker.ctx, 5*time.Second, nil)
 			}
@@ -249,6 +250,7 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 
 func (worker *Worker) startConsuming() *Worker {
 	conf := worker.conf
+
 	numConsumers := conf.RMQ.NumConsumers
 	prefetchLimit := numConsumers + 1 // prefetchLimit need to be > numConsumers
 	log.Info().Msgf("start consuming %s with %d consumers...", worker.name, numConsumers)
@@ -268,25 +270,38 @@ func (worker *Worker) startConsuming() *Worker {
 	numConsumers++ // we got one consumer for the returned, lets add 2 more
 
 	for i := 0; i < int(numConsumers); i++ {
-		tag, incConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "incoming", worker.locker)
-		if _, err := worker.broker.Incoming.AddConsumer(tag, incConsumer); err != nil {
+		tag, incomingConsumer := consumer.New(
+			worker.ctx,
+			worker.db,
+			i,
+			worker.name,
+			worker.conf.NMAP,
+			"incoming",
+			worker.locker,
+		)
+		if _, err := worker.broker.Incoming.AddConsumer(tag, incomingConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
-		incConsumer.state.State = pb.ServiceStateValues_START
+		incomingConsumer.State.State = pb.ServiceStateValues_START
 
 		// store consumer pointer to the worker struct
-		worker.consumers = append(worker.consumers, incConsumer)
+		worker.consumers = append(worker.consumers, incomingConsumer)
 
 		// start prometheus collector
-		go worker.collectConsumerStats(incConsumer.success, incConsumer.failed, worker.returned)
+		go worker.collectConsumerStats(incomingConsumer.Success, incomingConsumer.Failed, worker.returned)
 
-		tag, rConsumer := NewConsumer(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "rejected", worker.locker)
-		if _, err := worker.broker.Pushed.AddConsumer(tag, rConsumer); err != nil {
+		tag, returnerConsumer := consumer.New(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "rejected", worker.locker)
+		if _, err := worker.broker.Pushed.AddConsumer(tag, returnerConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
 	}
 
-	go worker.startReturner(worker.broker.Incoming, worker.returned)
+	go worker.startReturner(
+		&broker.Returner{
+			Queue:    worker.broker.Incoming,
+			Returned: worker.returned,
+		},
+	)
 
 	return worker
 }
@@ -294,11 +309,11 @@ func (worker *Worker) startConsuming() *Worker {
 // StopConsuming stop consumer messages on the broker
 func (worker *Worker) StopConsuming() *Worker {
 	log.Info().Msgf("%s stop consuming...", worker.name)
-	for _, consumer := range worker.consumers {
-		if consumer.engine != nil {
-			log.Info().Msgf("%s cancelling consumer %s", worker.name, consumer.name)
-			consumer.state.State = worker.state.State
-			consumer.Cancel()
+	for _, c := range worker.consumers {
+		if c.Engine != nil {
+			log.Info().Msgf("%s cancelling consumer %s", worker.name, c.Name)
+			c.State.State = worker.state.State
+			c.Cancel()
 		}
 	}
 
@@ -315,7 +330,7 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 	for {
 		stream, err := worker.grpcClient.StreamTasksStatus(worker.ctx)
 		if err != nil {
-			log.Error().Stack().Err(err).Msg("")
+			log.Error().Stack().Err(err).Msg("can't get consumer stats")
 			break
 		}
 		log.Info().Msgf("%s stats collector connected to server control", worker.name)

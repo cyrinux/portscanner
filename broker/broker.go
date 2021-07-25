@@ -20,7 +20,13 @@ type Broker struct {
 	taskType   string
 }
 
-// NewBroker open the broker queues
+// Returner define a returner
+type Returner struct {
+	Queue    rmq.Queue
+	Returned chan int64
+}
+
+// New open the broker queues
 func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClient *redis.Client) *Broker {
 	errChan := make(chan error, 10)
 

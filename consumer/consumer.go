@@ -1,4 +1,4 @@
-package worker
+package consumer
 
 import (
 	"context"
@@ -9,29 +9,37 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
+	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"os"
 	"time"
+)
+
+var (
+	conf        = config.GetConfig().Logger
+	log         = logger.New(conf.Debug, conf.Pretty)
+	hostname, _ = os.Hostname()
 )
 
 // Consumer define a broker consumer
 type Consumer struct {
-	name     string
-	cancel   context.CancelFunc
 	ctx      context.Context
 	db       database.Database
-	engine   *engine.Engine
-	locker   *redislock.Client
-	state    pb.ServiceStateValues
+	Name     string
+	cancel   context.CancelFunc
+	Engine   *engine.Engine
+	Locker   *redislock.Client
+	State    pb.ServiceStateValues
 	conf     config.Config
 	taskType string
-	success  chan int64
-	failed   chan int64
+	Success  chan int64
+	Failed   chan int64
 	request  *pb.ParamsScannerRequest
 }
 
-// NewConsumer create a new consumer
-func NewConsumer(
+// New create a new consumer
+func New(
 	ctx context.Context,
 	db database.Database,
 	tag int,
@@ -47,28 +55,29 @@ func NewConsumer(
 
 	return name, &Consumer{
 		ctx:      ctx,
-		name:     name,
+		Name:     name,
 		cancel:   cancel,
 		db:       db,
-		engine:   engine,
+		Engine:   engine,
+		Locker:   locker,
 		conf:     config.GetConfig(),
 		taskType: taskType,
-		success:  make(chan int64),
-		failed:   make(chan int64),
+		Success:  make(chan int64),
+		Failed:   make(chan int64),
 	}
 }
 
 // Cancel is a function trigger on consumer context cancel
 func (consumer *Consumer) Cancel() {
-	log.Debug().Msgf("%s cancelled, writing state to database", consumer.name)
+	log.Debug().Msgf("%s cancelled, writing state to database", consumer.Name)
 	// if scan fail or cancelled, mark task as cancel
-	consumer.engine.State = pb.ScannerResponse_CANCEL
+	consumer.Engine.State = pb.ScannerResponse_CANCEL
 	scannerResponse := &pb.ScannerResponse{
 		Status: pb.ScannerResponse_CANCEL,
 	}
 	scanResultJSON, err := json.Marshal(scannerResponse)
 	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
+		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.Name)
 	}
 
 	if consumer.request != nil {
@@ -79,7 +88,7 @@ func (consumer *Consumer) Cancel() {
 			consumer.request.DeferDuration.AsDuration(),
 		)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
+			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.Name)
 		}
 	}
 
@@ -95,14 +104,14 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	var request *pb.ParamsScannerRequest
 	json.Unmarshal([]byte(payload), &request)
 
-	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
+	log.Debug().Msgf("%s: consumer state: %v", consumer.Name, consumer.State.State)
 
-	if consumer.state.State != pb.ServiceStateValues_START {
-		log.Info().Msgf("%s: start consume %s", consumer.name, payload)
+	if consumer.State.State != pb.ServiceStateValues_START {
+		log.Info().Msgf("%s: start consume %s", consumer.Name, payload)
 		if err := delivery.Reject(); err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to requeue %s: %s", consumer.name, payload, err)
+			log.Error().Stack().Err(err).Msgf("%s: failed to requeue %s: %s", consumer.Name, payload, err)
 		} else {
-			log.Debug().Msgf("%s: requeue %s, worker are stop", consumer.name, payload)
+			log.Debug().Msgf("%s: requeue %s, worker are stop", consumer.Name, payload)
 		}
 		return
 	}
@@ -111,9 +120,9 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 		consumer.consumeNow(delivery, request, payload)
 	} else {
 		if err := delivery.Reject(); err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to reject %s", consumer.name, payload)
+			log.Error().Stack().Err(err).Msgf("%s: failed to reject %s", consumer.Name, payload)
 		} else {
-			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.name, payload)
+			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.Name, payload)
 		}
 	}
 
@@ -128,21 +137,21 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 	var srs []*pb.ScannerResponse
 
 	startTime := timestamppb.Now()
-	params, result, err := consumer.engine.Start(request, true)
+	params, result, err := consumer.Engine.Start(request, true)
 	endTime := timestamppb.Now()
 
-	if err != nil && consumer.engine.State != pb.ScannerResponse_CANCEL {
+	if err != nil && consumer.Engine.State != pb.ScannerResponse_CANCEL {
 		// scan failed
-		consumer.failed <- 1
+		consumer.Failed <- 1
 		// if scan fail or cancelled, mark task as cancel
-		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.name, params.Key, result)
+		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, params.Key, result)
 		smrJSON, err := consumer.db.Get(consumer.ctx, request.Key)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.name, request.Key)
+			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
 		}
 		err = json.Unmarshal([]byte(smrJSON), &smr)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.name)
+			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
 		}
 		srs = smr.Response
 		srs = append(srs, &pb.ScannerResponse{
@@ -158,7 +167,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		}
 		scanResultJSON, err := json.Marshal(&smr)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
+			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.Name)
 		}
 		_, err = consumer.db.Set(
 			consumer.ctx,
@@ -167,7 +176,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 			params.RetentionDuration.AsDuration(),
 		)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
+			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.Name)
 		}
 	}
 
@@ -175,19 +184,19 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 	// parse the result
 	if err == nil && result != nil {
 		// success scan
-		consumer.success <- 1
+		consumer.Success <- 1
 
 		scanResult, err := engine.ParseScanResult(result)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.name, request.Key)
+			log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.Name, request.Key)
 		}
 		smrJSON, err := consumer.db.Get(consumer.ctx, request.Key)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.name, request.Key)
+			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
 		}
 		err = json.Unmarshal([]byte(smrJSON), &smr)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.name)
+			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
 		}
 		srs = smr.Response
 		childKey := fmt.Sprintf("%s-%s", params.Key, request.Targets)
@@ -210,18 +219,18 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 		scanResultJSON, err := json.Marshal(&smr)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.name)
+			log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.Name)
 		}
 		_, err = consumer.db.Set(
 			consumer.ctx, params.Key, string(scanResultJSON), request.RetentionDuration.AsDuration(),
 		)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.name)
+			log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.Name)
 		}
 	}
 	if err := delivery.Ack(); err != nil {
-		log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.name, payload)
+		log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.Name, payload)
 	} else {
-		log.Info().Msgf("%s: acked %v", consumer.name, payload)
+		log.Info().Msgf("%s: acked %v", consumer.Name, payload)
 	}
 }

@@ -82,7 +82,7 @@ services:
       - "./cert:/etc/scanner/cert:ro"
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 3
 
   tor:
     image: dperson/torproxy

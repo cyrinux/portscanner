@@ -29,6 +29,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -173,6 +174,8 @@ func Listen(ctx context.Context, conf config.Config) error {
 	authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
 
 	// Serve the frontend
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func(server *Server, authServer pb.AuthServiceServer) error {
 		frontendSrv, frontendListener, err := server.getGRPCServerAndListener(conf.FrontendListenPort)
 		if err != nil {
@@ -180,10 +183,14 @@ func Listen(ctx context.Context, conf config.Config) error {
 		}
 		pb.RegisterAuthServiceServer(frontendSrv, authServer)
 		pb.RegisterScannerServiceServer(frontendSrv, server)
-		return frontendSrv.Serve(frontendListener)
+		if err = frontendSrv.Serve(*frontendListener); err != nil {
+			wg.Done()
+		}
+		return err
 	}(server, authServer)
 
 	// Serve the backend
+	wg.Add(1)
 	go func(server *Server, authServer pb.AuthServiceServer) error {
 		backendSrv, backendListener, err := server.getGRPCServerAndListener(conf.BackendListenPort)
 		if err != nil {
@@ -192,13 +199,19 @@ func Listen(ctx context.Context, conf config.Config) error {
 		pb.RegisterAuthServiceServer(backendSrv, authServer)
 		pb.RegisterBackendServiceServer(backendSrv, server)
 
-		return backendSrv.Serve(backendListener)
+		if err = backendSrv.Serve(*backendListener); err != nil {
+			wg.Done()
+		}
+		return err
 	}(server, authServer)
+
+	wg.Wait()
+	log.Info().Msg("backend and fronted stopped")
 
 	return nil
 }
 
-func (server *Server) getGRPCServerAndListener(listenPort int) (*grpc.Server, net.Listener, error) {
+func (server *Server) getGRPCServerAndListener(listenPort int) (*grpc.Server, *net.Listener, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", listenPort))
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "can't start server, can't listen on tcp/%d", listenPort)
@@ -239,7 +252,7 @@ func (server *Server) getGRPCServerAndListener(listenPort int) (*grpc.Server, ne
 
 	reflection.Register(srv)
 
-	return srv, listener, nil
+	return srv, &listener, nil
 }
 
 // DeleteScan delele a scan from the database
