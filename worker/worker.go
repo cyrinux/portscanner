@@ -180,7 +180,7 @@ func (worker *Worker) StartWorker() {
 
 // StreamServiceControl return the workers status and control them
 func (worker *Worker) StreamServiceControl() {
-	wait := 500 * time.Millisecond
+	wait := 1000 * time.Millisecond
 
 	getState := &pb.ServiceStateValues{State: pb.ServiceStateValues_UNKNOWN}
 	for {
@@ -216,6 +216,7 @@ func (worker *Worker) StreamServiceControl() {
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
+	wait := 1000 * time.Millisecond
 	log.Info().Msgf("starting the returner routine on %s", worker.name)
 	for {
 		// Try to obtain lock.
@@ -241,7 +242,7 @@ func (worker *Worker) startReturner(queue rmq.Queue, returned chan int64) {
 			}
 		}
 		// cpu cooling
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(wait)
 	}
 }
 
@@ -296,7 +297,7 @@ func (worker *Worker) StopConsuming() *Worker {
 		if consumer.engine != nil {
 			log.Info().Msgf("%s cancelling consumer %s", worker.name, consumer.name)
 			consumer.state.State = worker.state.State
-			consumer.cancel()
+			consumer.Cancel()
 		}
 	}
 
@@ -334,8 +335,9 @@ func (worker *Worker) collectConsumerStats(success chan int64, failed chan int64
 			if err != nil {
 				break
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(wait)
 		}
+
 		// wait before try to reconnect
 		log.Debug().Msgf("%s trying to reconnect in %v to server control", worker.name, wait)
 		time.Sleep(wait)

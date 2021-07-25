@@ -27,6 +27,7 @@ type Consumer struct {
 	taskType string
 	success  chan int64
 	failed   chan int64
+	request  *pb.ParamsScannerRequest
 }
 
 // NewConsumer create a new consumer
@@ -58,10 +59,7 @@ func NewConsumer(
 }
 
 // onCancel is a function trigger on consumer context cancel
-func (consumer *Consumer) onCancel(request *pb.ParamsScannerRequest) {
-	<-consumer.ctx.Done()
-
-	// waiting for cancel signal
+func (consumer *Consumer) Cancel() {
 	log.Debug().Msgf("%s cancelled, writing state to database", consumer.name)
 	// if scan fail or cancelled, mark task as cancel
 	consumer.engine.State = pb.ScannerResponse_CANCEL
@@ -72,15 +70,20 @@ func (consumer *Consumer) onCancel(request *pb.ParamsScannerRequest) {
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.name)
 	}
-	_, err = consumer.db.Set(
-		context.Background(),
-		request.Key,
-		string(scanResultJSON),
-		request.DeferDuration.AsDuration(),
-	)
-	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
+
+	if consumer.request != nil {
+		_, err = consumer.db.Set(
+			consumer.ctx,
+			consumer.request.Key,
+			string(scanResultJSON),
+			consumer.request.DeferDuration.AsDuration(),
+		)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.name)
+		}
 	}
+
+	consumer.cancel()
 }
 
 // Consume consume the message tasks on the redis broker
@@ -89,8 +92,6 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 	var request *pb.ParamsScannerRequest
 	json.Unmarshal([]byte(payload), &request)
-
-	go consumer.onCancel(request)
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.name, consumer.state.State)
 	if consumer.state.State != pb.ServiceStateValues_START {
@@ -118,6 +119,8 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 
 // consumeNow really consume the message
 func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
+	consumer.request = request
+
 	var smr pb.ScannerMainResponse
 	var srs []*pb.ScannerResponse
 
