@@ -21,12 +21,6 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
-const (
-	username        = "worker1"
-	password        = "secret1"
-	refreshDuration = 30 * time.Second
-)
-
 var (
 	conf        = config.GetConfig().Logger
 	log         = logger.New(conf.Debug, conf.Pretty)
@@ -123,7 +117,11 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 // connectToServer connect to the server
 func connectToServer(ctx context.Context, conf config.Config, name string) (*grpc.ClientConn, error) {
 	// tls client config
-	tlsCredentials, err := loadTLSCredentials(conf.Backend.CAFile, conf.Backend.ClientCertFile, conf.Backend.ClientKeyFile)
+	tlsCredentials, err := loadTLSCredentials(
+		conf.Backend.CAFile,
+		conf.Backend.ClientCertFile,
+		conf.Backend.ClientKeyFile,
+	)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("can't load TLS credentials")
 		return nil, err
@@ -144,8 +142,8 @@ func connectToServer(ctx context.Context, conf config.Config, name string) (*grp
 	}
 	log.Debug().Msgf("%s cc1: connected to the control server: %s", name, conf.BackendServer)
 
-	authClient := client.NewAuthClient(cc1, username, password)
-	interceptor, err := client.NewAuthInterceptor(authClient, authMethods(), refreshDuration)
+	authClient := client.NewAuthClient(cc1, conf.Backend.Username, conf.Backend.Password)
+	interceptor, err := client.NewAuthInterceptor(authClient, authMethods(), conf.Backend.RefreshDuration)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("cannot create auth interceptor to %s", conf.BackendServer)
 		return nil, err

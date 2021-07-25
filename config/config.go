@@ -79,12 +79,15 @@ type Config struct {
 
 // GRPCBackendServer is the GRPC backend endpoint config
 type GRPCBackend struct {
-	CAFile         string `default:"/etc/scanner/cert/ca-cert.pem" split_words:"true"`
-	ServerCertFile string `default:"/etc/scanner/cert/server-cert.pem" split_words:"true"`
-	ServerKeyFile  string `default:"/etc/scanner/cert/server-key.pem" split_words:"true"`
-	ClientCertFile string `default:"/etc/scanner/cert/client-worker-cert.pem" split_words:"true"`
-	ClientKeyFile  string `default:"/etc/scanner/cert/client-worker-key.pem" split_words:"true"`
-	JWT            JWT
+	CAFile          string        `default:"/etc/scanner/cert/ca-cert.pem" split_words:"true"`
+	ServerCertFile  string        `default:"/etc/scanner/cert/server-cert.pem" split_words:"true"`
+	ServerKeyFile   string        `default:"/etc/scanner/cert/server-key.pem" split_words:"true"`
+	ClientCertFile  string        `default:"/etc/scanner/cert/client-worker-cert.pem" split_words:"true"`
+	ClientKeyFile   string        `default:"/etc/scanner/cert/client-worker-key.pem" split_words:"true"`
+	Username        string        `default:"worker1"`
+	Password        string        `default:"secret1"`
+	RefreshDuration time.Duration `default:"30s" split_words:"true"`
+	JWT             JWT
 }
 
 // GRPCBackendServer is the GRPC backend endpoint config

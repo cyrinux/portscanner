@@ -77,7 +77,8 @@ func handleSignalServer() {
 }
 
 func startServer(ctx context.Context, conf config.Config) {
-	server.Listen(ctx, conf)
+	err := server.Listen(ctx, conf)
+	log.Fatal(err)
 
 	go handleSignalServer()
 }

@@ -32,6 +32,10 @@ import (
 	"time"
 )
 
+const (
+	stateStatusKey = "worker-state"
+)
+
 var (
 	confLogger = config.GetConfig().Logger
 	log        = logger.New(confLogger.Debug, confLogger.Pretty)
@@ -101,7 +105,7 @@ type Server struct {
 	userStore   *auth.InMemoryUserStore
 }
 
-// NewServer create a new server and init the database connection
+// newServer create a new server and init the database connection
 func NewServer(ctx context.Context, conf config.Config, taskType string) *Server {
 	errChan := make(chan error)
 	go broker.RmqLogErrors(errChan)
@@ -156,7 +160,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 }
 
 // Listen start the frontend grpc server
-func Listen(ctx context.Context, conf config.Config) {
+func Listen(ctx context.Context, conf config.Config) error {
 	log.Info().Msg("prepare to serve the gRPC api")
 
 	// Start the server
@@ -165,84 +169,57 @@ func Listen(ctx context.Context, conf config.Config) {
 	// Update the server service state
 	go getServiceControl(server)
 
+	// start the auth server
+	authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
+
 	// Serve the frontend
-	go func(s *Server) {
-		frontListener, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.FrontendListenPort))
+	go func(server *Server, authServer pb.AuthServiceServer) error {
+		frontendSrv, frontendListener, err := server.getGRPCServerAndListener(conf.FrontendListenPort)
 		if err != nil {
-			log.Fatal().Err(err).Msgf(
-				"can't start frontend server, can't listen on tcp/%d", conf.FrontendListenPort,
-			)
+			log.Error().Stack().Err(err).Msg("")
 		}
-
-		tlsCredentials, err := auth.LoadTLSCredentials(
-			s.config.Frontend.CAFile,
-			s.config.Frontend.ServerCertFile,
-			s.config.Frontend.ServerKeyFile,
-		)
-		if err != nil {
-			log.Fatal().Msgf("cannot load TLS credentials: %v", err)
-		}
-
-		interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
-		srvFrontend := grpc.NewServer(
-			grpc.KeepaliveEnforcementPolicy(kaep),
-			grpc.KeepaliveParams(kasp),
-			grpc.Creds(tlsCredentials),
-			grpc.UnaryInterceptor(interceptor.Unary()),
-			grpc.StreamInterceptor(interceptor.Stream()),
-		)
-
-		// graceful shutdown
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		go func() {
-			for range c {
-				// sig is a ^C, handle it
-				log.Info().Msg("shutting down gRPC server...")
-
-				srvFrontend.GracefulStop()
-
-				<-ctx.Done()
-			}
-		}()
-
-		reflection.Register(srvFrontend)
-
-		authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
-		pb.RegisterAuthServiceServer(srvFrontend, authServer)
-
-		pb.RegisterScannerServiceServer(srvFrontend, server)
-
-		if err = srvFrontend.Serve(frontListener); err != nil {
-			log.Fatal().Msg("can't serve the gRPC frontend service")
-		}
-	}(server)
+		pb.RegisterAuthServiceServer(frontendSrv, authServer)
+		pb.RegisterScannerServiceServer(frontendSrv, server)
+		return frontendSrv.Serve(frontendListener)
+	}(server, authServer)
 
 	// Serve the backend
-	backendListener, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.BackendListenPort))
+	go func(server *Server, authServer pb.AuthServiceServer) error {
+		backendSrv, backendListener, err := server.getGRPCServerAndListener(conf.BackendListenPort)
+		if err != nil {
+			return err
+		}
+		pb.RegisterAuthServiceServer(backendSrv, authServer)
+		pb.RegisterBackendServiceServer(backendSrv, server)
+
+		return backendSrv.Serve(backendListener)
+	}(server, authServer)
+
+	return nil
+}
+
+func (server *Server) getGRPCServerAndListener(listenPort int) (*grpc.Server, net.Listener, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", listenPort))
 	if err != nil {
-		log.Fatal().Err(err).Msgf(
-			"can't start backend server, can't listen on tcp/%d", conf.BackendListenPort,
-		)
+		return nil, nil, errors.Wrapf(err, "can't start server, can't listen on tcp/%d", listenPort)
 	}
 
 	tlsCredentials, err := auth.LoadTLSCredentials(
-		conf.Backend.CAFile,
-		conf.Backend.ServerCertFile,
-		conf.Backend.ServerKeyFile,
+		server.config.Frontend.CAFile,
+		server.config.Frontend.ServerCertFile,
+		server.config.Frontend.ServerKeyFile,
 	)
-
 	if err != nil {
-		log.Fatal().Msgf("cannot load TLS credentials: %v", err)
+		return nil, nil, errors.Wrap(err, "can't load TLS credentials")
 	}
 
 	interceptor := auth.NewAuthInterceptor(server.jwtManager, accessibleRoles())
-	srvBackend := grpc.NewServer(
+	srv := grpc.NewServer(
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 		grpc.Creds(tlsCredentials),
-		grpc.StreamInterceptor(interceptor.Stream()),
 		grpc.UnaryInterceptor(interceptor.Unary()),
+		grpc.StreamInterceptor(interceptor.Stream()),
 	)
 
 	// graceful shutdown
@@ -253,20 +230,16 @@ func Listen(ctx context.Context, conf config.Config) {
 		for range c {
 			// sig is a ^C, handle it
 			log.Info().Msg("shutting down gRPC server...")
-			srvBackend.GracefulStop()
-			<-ctx.Done()
+
+			srv.GracefulStop()
+
+			<-server.ctx.Done()
 		}
 	}()
 
-	reflection.Register(srvBackend)
+	reflection.Register(srv)
 
-	authServer := auth.NewAuthServer(server.userStore, server.jwtManager)
-	pb.RegisterAuthServiceServer(srvBackend, authServer)
-
-	pb.RegisterBackendServiceServer(srvBackend, server)
-	if err = srvBackend.Serve(backendListener); err != nil {
-		log.Fatal().Msg("can't serve the gRPC backend service")
-	}
+	return srv, listener, nil
 }
 
 // DeleteScan delele a scan from the database
@@ -280,7 +253,6 @@ func (server *Server) StreamServiceControl(request *pb.ServiceStateValues, strea
 	wait := 500 * time.Millisecond
 	for {
 		if err := stream.Send(&server.State); err != nil {
-			log.Error().Stack().Err(err).Msgf("streamer service control send error")
 			return errors.Wrap(err, "streamer service control send error")
 		}
 		time.Sleep(wait)
@@ -326,7 +298,7 @@ func (server *Server) ServiceControl(ctx context.Context, request *pb.ServiceSta
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't Unmarshal state")
 		}
-		_, err = server.db.Set(ctx, "worker-state", string(stateJSON), 0)
+		_, err = server.db.Set(ctx, stateStatusKey, string(stateJSON), 0)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't set service state")
 		}
@@ -342,12 +314,12 @@ func getServiceControl(server *Server) {
 	var state pb.ServiceStateValues
 
 	for {
-		stateJSON, err := server.db.Get(server.ctx, "worker-state")
+		stateJSON, err := server.db.Get(server.ctx, stateStatusKey)
 		if err != nil || stateJSON == "" {
 			log.Error().Stack().Err(err).Msg("can't get service state, setting to START")
 			unknownState := pb.ServiceStateValues{State: pb.ServiceStateValues_START}
 			unknownStateJSON, _ := json.Marshal(&unknownState)
-			server.db.Set(server.ctx, "worker-state", string(unknownStateJSON), 0)
+			server.db.Set(server.ctx, stateStatusKey, string(unknownStateJSON), 0)
 			server.State.State = unknownState.State
 			time.Sleep(wait)
 			continue
