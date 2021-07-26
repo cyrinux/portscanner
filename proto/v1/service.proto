@@ -91,6 +91,7 @@ message ParamsScannerRequest {
     bool network_chuncked = 22;
     string username = 23;
     string role = 24;
+    bool burn_after_reading = 25;
 }
 
 message GetScannerRequest {

@@ -402,6 +402,13 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 		return generateResponse(request.Key, nil, errors.New("not allowed to access this resource"))
 	}
 
+	if smr.Request.BurnAfterReading {
+		_, err = server.db.Delete(ctx, request.Key)
+		if err != nil {
+			return generateResponse(request.Key, smr, errors.New("can't burn after reading"))
+		}
+	}
+
 	return generateResponse(request.Key, smr, nil)
 }
 
