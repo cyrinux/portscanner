@@ -354,7 +354,7 @@ func getServiceControl(server *Server) {
 // GetScan return the engine scan result
 func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest) (*pb.ServerResponse, error) {
 	// get username from metadata
-	username, err := server.getUsernameFromRequest(ctx)
+	username, role, err := server.getUsernameAndRoleFromRequest(ctx)
 	if err != nil {
 		return generateResponse(request.Key, nil, err)
 	}
@@ -373,7 +373,7 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 	}
 
 	// test is the request username == the scan response username
-	if smr.Request.GetUsername() == "" || smr.Request.GetUsername() != username {
+	if role != "admin" && (smr.Request.GetUsername() == "" || smr.Request.GetUsername() != username) {
 		return generateResponse(request.Key, nil, errors.New("not allowed to access this resource"))
 	}
 
@@ -412,18 +412,18 @@ func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetA
 	return nil
 }
 
-func (server *Server) getUsernameFromRequest(ctx context.Context) (string, error) {
+func (server *Server) getUsernameAndRoleFromRequest(ctx context.Context) (string, string, error) {
 	md, _ := metadata.FromIncomingContext(ctx)
 	values := md["authorization"]
 	if len(values) == 0 {
-		return "", errors.New("authorization token is not provided")
+		return "", "", errors.New("authorization token is not provided")
 	}
 	accessToken := values[0]
 	claims, err := server.jwtManager.Verify(accessToken)
 	if err != nil {
-		return "", errors.Wrapf(err, "access token is invalid: %v", err)
+		return "", "", errors.Wrapf(err, "access token is invalid: %v", err)
 	}
-	return claims.Username, nil
+	return claims.Username, claims.Role, nil
 }
 
 // StartScan function prepare a nmap scan
@@ -622,11 +622,12 @@ func generateResponse(key string, value *pb.ScannerMainResponse, err error) (*pb
 func (server *Server) parseRequest(ctx context.Context, request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
 
 	// get username from metadata
-	username, err := server.getUsernameFromRequest(ctx)
+	username, role, err := server.getUsernameAndRoleFromRequest(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("")
 	}
 	request.Username = username
+	request.Role = role
 
 	// if the Key is not forced, we generate one unique
 	guid := uuid.New()

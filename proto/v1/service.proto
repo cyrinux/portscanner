@@ -90,6 +90,7 @@ message ParamsScannerRequest {
     bool open_only = 21;
     bool network_chuncked = 22;
     string username = 23;
+    string role = 24;
 }
 
 message GetScannerRequest {
