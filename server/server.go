@@ -326,7 +326,6 @@ func (server *Server) StreamTasksStatus(stream pb.BackendService_StreamTasksStat
 		stream.Send(&pb.PrometheusStatus{TasksStatus: &pb.TasksStatus{
 			Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned}},
 		)
-
 		time.Sleep(wait)
 	}
 }
@@ -359,8 +358,8 @@ func (server *Server) ServiceControl(ctx context.Context, request *pb.ServiceSta
 func getServiceControl(server *Server) {
 	wait := 500 * time.Millisecond
 	var state pb.ServiceStateValues
-
 	for {
+		time.Sleep(wait)
 		stateJSON, err := server.db.Get(server.ctx, stateStatusKey)
 		if err != nil || stateJSON == "" {
 			log.Error().Stack().Err(err).Msg("can't get service state, setting to START")
@@ -368,7 +367,6 @@ func getServiceControl(server *Server) {
 			unknownStateJSON, _ := json.Marshal(&unknownState)
 			server.db.Set(server.ctx, stateStatusKey, string(unknownStateJSON), 0)
 			server.State.State = unknownState.State
-			time.Sleep(wait)
 			continue
 		}
 		err = json.Unmarshal([]byte(stateJSON), &state)
@@ -380,7 +378,6 @@ func getServiceControl(server *Server) {
 			log.Debug().Msgf("Server state changed to %v", state.State)
 			server.State.State = state.State
 		}
-		time.Sleep(wait)
 	}
 }
 
@@ -510,6 +507,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	return generateResponse(params.Key, &smr, nil)
 }
 
+// splitInSubnets split a subnet in several smaller
 func splitInSubnets(targets string, n int) ([]string, error) {
 	var networks []string
 
@@ -733,6 +731,7 @@ func seedUsers(userStore auth.UserStore) error {
 	return createUser(userStore, "user2", "secret2", "user")
 }
 
+// accessibleRoles contains the map of grant access by service
 func accessibleRoles() map[string][]string {
 	const backendServicePath = "/proto.BackendService/"
 	const frontendServicePath = "/proto.ScannerService/"
