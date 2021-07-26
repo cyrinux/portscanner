@@ -256,9 +256,42 @@ func (server *Server) getGRPCServerAndListener(listenPort int) (*grpc.Server, *n
 	return srv, &listener, nil
 }
 
+// getScan get the scan main response
+func (server *Server) getScanMainResponse(ctx context.Context, request *pb.GetScannerRequest) (*pb.ScannerMainResponse, error) {
+	var smr pb.ScannerMainResponse
+	dbSmr, err := server.db.Get(ctx, request.Key)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal([]byte(dbSmr), &smr)
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("can't read scan result")
+		return nil, err
+	}
+
+	return &smr, nil
+}
+
 // DeleteScan delele a scan from the database
 func (server *Server) DeleteScan(ctx context.Context, request *pb.GetScannerRequest) (*pb.ServerResponse, error) {
-	_, err := server.db.Delete(ctx, request.Key)
+	// get username from metadata
+	username, role, err := server.getUsernameAndRoleFromRequest(ctx)
+	if err != nil {
+		return generateResponse(request.Key, nil, err)
+	}
+
+	smr, err := server.getScanMainResponse(ctx, request)
+	if err != nil {
+		return generateResponse(request.Key, nil, errors.New("can't get scan result or not allowed to access this resource"))
+	}
+
+	// test is the request username == the scan response username
+	if role != "admin" && (smr.Request.GetUsername() == "" || smr.Request.GetUsername() != username) {
+		return generateResponse(request.Key, nil, errors.New("not allowed to access this resource"))
+	}
+
+	_, err = server.db.Delete(ctx, request.Key)
 	return generateResponse(request.Key, nil, err)
 }
 
@@ -359,17 +392,9 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 		return generateResponse(request.Key, nil, err)
 	}
 
-	var smr pb.ScannerMainResponse
-
-	dbSmr, err := server.db.Get(ctx, request.Key)
+	smr, err := server.getScanMainResponse(ctx, request)
 	if err != nil {
-		return generateResponse(request.Key, nil, err)
-	}
-
-	err = json.Unmarshal([]byte(dbSmr), &smr)
-	if err != nil {
-		log.Error().Stack().Err(err).Msg("can't read scan result")
-		return generateResponse(request.Key, nil, err)
+		return generateResponse(request.Key, nil, errors.New("can't get scan result or not allowed to access this resource"))
 	}
 
 	// test is the request username == the scan response username
@@ -377,7 +402,7 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 		return generateResponse(request.Key, nil, errors.New("not allowed to access this resource"))
 	}
 
-	return generateResponse(request.Key, &smr, nil)
+	return generateResponse(request.Key, smr, nil)
 }
 
 // GetAllScans return the engine scan result
@@ -712,7 +737,8 @@ func accessibleRoles() map[string][]string {
 		frontendServicePath + "StartAsyncScan": {"user"},
 		frontendServicePath + "StartScan":      {"user"},
 
-		frontendServicePath + "GetScan": {"user", "admin"},
+		frontendServicePath + "GetScan":    {"user", "admin"},
+		frontendServicePath + "DeleteScan": {"user", "admin"},
 
 		frontendServicePath + "GetAllScans":    {"admin"},
 		frontendServicePath + "ServiceControl": {"admin"},
