@@ -353,6 +353,12 @@ func getServiceControl(server *Server) {
 
 // GetScan return the engine scan result
 func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest) (*pb.ServerResponse, error) {
+	// get username from metadata
+	username, err := server.getUsernameFromRequest(ctx)
+	if err != nil {
+		return generateResponse(request.Key, nil, err)
+	}
+
 	var smr pb.ScannerMainResponse
 
 	dbSmr, err := server.db.Get(ctx, request.Key)
@@ -364,6 +370,11 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("can't read scan result")
 		return generateResponse(request.Key, nil, err)
+	}
+
+	// test is the request username == the scan response username
+	if smr.Request.GetUsername() == "" || smr.Request.GetUsername() != username {
+		return generateResponse(request.Key, nil, errors.New("not allowed to access this resource"))
 	}
 
 	return generateResponse(request.Key, &smr, nil)
@@ -682,7 +693,11 @@ func seedUsers(userStore auth.UserStore) error {
 	if err != nil {
 		return err
 	}
-	return createUser(userStore, "user1", "secret1", "user")
+	err = createUser(userStore, "user1", "secret1", "user")
+	if err != nil {
+		return err
+	}
+	return createUser(userStore, "user2", "secret2", "user")
 }
 
 func accessibleRoles() map[string][]string {

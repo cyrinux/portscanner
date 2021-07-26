@@ -82,7 +82,6 @@ func (interceptor *AuthInterceptor) authorize(ctx context.Context, method string
 
 	for _, role := range accessibleRoles {
 		if role == claims.Role {
-			ctx = metadata.AppendToOutgoingContext(ctx, "username", claims.Username)
 			return ctx, nil
 		}
 	}
