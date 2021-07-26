@@ -21,6 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -400,9 +401,23 @@ func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetA
 	return nil
 }
 
+func (server *Server) getUsernameFromRequest(ctx context.Context) (string, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	values := md["authorization"]
+	if len(values) == 0 {
+		return "", errors.New("authorization token is not provided")
+	}
+	accessToken := values[0]
+	claims, err := server.jwtManager.Verify(accessToken)
+	if err != nil {
+		return "", errors.Wrapf(err, "access token is invalid: %v", err)
+	}
+	return claims.Username, nil
+}
+
 // StartScan function prepare a nmap scan
 func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
-	params = parseRequest(params)
+	params = server.parseRequest(ctx, params)
 
 	createAt := timestamppb.Now()
 
@@ -430,6 +445,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 	// forge main response
 	smr := pb.ScannerMainResponse{
 		Key:      params.Key,
+		Request:  params,
 		CreateAt: createAt,
 		Response: sr,
 	}
@@ -472,7 +488,7 @@ func splitInSubnets(targets string, n int) ([]string, error) {
 // StartAsyncScan function prepare a nmap scan
 func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
 
-	params = parseRequest(params)
+	params = server.parseRequest(ctx, params)
 	targets := params.Targets
 	createAt := timestamppb.Now()
 
@@ -509,6 +525,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 		// if we split the scan, let use a key ID containing
 		// the main Key and host
 		subKey := params.Key
+
 		if (params.NetworkChuncked || params.ProcessPerTarget) && len(hosts) > 1 {
 			subKey = fmt.Sprintf("%s-%s", params.Key, host)
 		}
@@ -521,6 +538,7 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 
 		// then append it to the main task
 		srs = append(srs, sr)
+
 		// we override the Hosts param in case we split it
 		// for the scan request
 		params.Targets = host
@@ -590,7 +608,15 @@ func generateResponse(key string, value *pb.ScannerMainResponse, err error) (*pb
 }
 
 // parseRequest parse, sanitize the request
-func parseRequest(request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
+func (server *Server) parseRequest(ctx context.Context, request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
+
+	// get username from metadata
+	username, err := server.getUsernameFromRequest(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("")
+	}
+	request.Username = username
+
 	// if the Key is not forced, we generate one unique
 	guid := uuid.New()
 	if request.Key == "" {

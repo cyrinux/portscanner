@@ -89,6 +89,7 @@ message ParamsScannerRequest {
     bool process_per_target = 20;
     bool open_only = 21;
     bool network_chuncked = 22;
+    string username = 23;
 }
 
 message GetScannerRequest {

@@ -29,7 +29,7 @@ func (interceptor *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 	) (interface{}, error) {
 		log.Debug().Msgf("--> unary interceptor: %s", info.FullMethod)
 
-		err := interceptor.authorize(ctx, info.FullMethod)
+		ctx, err := interceptor.authorize(ctx, info.FullMethod)
 		if err != nil {
 			return nil, err
 		}
@@ -48,7 +48,7 @@ func (interceptor *AuthInterceptor) Stream() grpc.StreamServerInterceptor {
 	) error {
 		log.Debug().Msgf("--> stream interceptor: %s", info.FullMethod)
 
-		err := interceptor.authorize(stream.Context(), info.FullMethod)
+		_, err := interceptor.authorize(stream.Context(), info.FullMethod)
 		if err != nil {
 			return err
 		}
@@ -57,35 +57,35 @@ func (interceptor *AuthInterceptor) Stream() grpc.StreamServerInterceptor {
 	}
 }
 
-func (interceptor *AuthInterceptor) authorize(ctx context.Context, method string) error {
+func (interceptor *AuthInterceptor) authorize(ctx context.Context, method string) (context.Context, error) {
 	accessibleRoles, ok := interceptor.accessibleRoles[method]
 	if !ok {
 		// everyone can access
-		return nil
+		return nil, nil
 	}
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return status.Errorf(codes.Unauthenticated, "metadata is not provided")
+		return nil, status.Errorf(codes.Unauthenticated, "metadata is not provided")
 	}
 
 	values := md["authorization"]
-	// log.Debug().Msgf("%v", values)
 	if len(values) == 0 {
-		return status.Errorf(codes.Unauthenticated, "authorization token is not provided")
+		return nil, status.Errorf(codes.Unauthenticated, "authorization token is not provided")
 	}
 
 	accessToken := values[0]
 	claims, err := interceptor.jwtManager.Verify(accessToken)
 	if err != nil {
-		return status.Errorf(codes.Unauthenticated, "access token is invalid: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "access token is invalid: %v", err)
 	}
 
 	for _, role := range accessibleRoles {
 		if role == claims.Role {
-			return nil
+			ctx = metadata.AppendToOutgoingContext(ctx, "username", claims.Username)
+			return ctx, nil
 		}
 	}
 
-	return status.Error(codes.PermissionDenied, "no permission to access this RPC")
+	return nil, status.Error(codes.PermissionDenied, "no permission to access this RPC")
 }
