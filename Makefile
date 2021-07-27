@@ -79,3 +79,5 @@ chaos-loss:
 chaos-delay:
 	docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock gaiaadm/pumba --label com.docker.compose.project=grpcnmapscanner -l info --random --interval 30s netem --tc-image gaiadocker/iproute2 --duration 15s delay --time 5000
 
+test:
+	go test -v ./...
