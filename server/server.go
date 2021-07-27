@@ -399,7 +399,7 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 		return generateResponse(request.Key, nil, errors.New("not allowed to access this resource"))
 	}
 
-	if smr.Request.BurnAfterReading {
+	if smr.Request.BurnAfterReading && smr.Request.Role == "user" {
 		_, err = server.db.Delete(ctx, request.Key)
 		if err != nil {
 			return generateResponse(request.Key, smr, errors.New("can't burn after reading"))
