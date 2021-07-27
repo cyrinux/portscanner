@@ -186,7 +186,6 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 
 	if smr.Request != nil && smr.Request.Targets != "" {
 		hosts := strings.Split(smr.Request.Targets, ",")
-		hosts = append(hosts, params.Targets)
 		hosts = helpers.MakeUnique(hosts)
 		smr.Request.Targets = strings.Join(hosts, ",")
 	}
