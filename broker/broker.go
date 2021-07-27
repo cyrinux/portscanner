@@ -6,8 +6,14 @@ import (
 	"fmt"
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
+	"github.com/cyrinux/grpcnmapscanner/logger"
 	"github.com/go-redis/redis/v8"
 	"time"
+)
+
+var (
+	conf = config.GetConfig()
+	log  = logger.New(conf.Logger.Debug, conf.Logger.Pretty)
 )
 
 // Broker represent a RMQ broker
@@ -47,14 +53,14 @@ func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClien
 
 	var connection rmq.Connection
 	var err error
-	retryTime := 500 * time.Millisecond
+	wait := 500 * time.Millisecond
 	for {
 		connection, err = rmq.OpenConnectionWithRedisClient(
 			conf.Name, redisClient, errChan,
 		)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("can't open RMQ connection, retrying in %v...", retryTime)
-			time.Sleep(retryTime)
+			log.Error().Stack().Err(err).Msgf("can't open RMQ connection, retrying in %v...", wait)
+			time.Sleep(wait)
 		} else {
 			log.Info().Msg("connected to RMQ database")
 			break
