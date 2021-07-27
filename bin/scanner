@@ -15,4 +15,4 @@ fi
 
 action=$1
 shift
-echo -n "$@" | client proto.ScannerService.$action
+echo -n "$@" | client proto.ScannerService.$action | jq .
