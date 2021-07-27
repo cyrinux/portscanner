@@ -272,9 +272,14 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 	portList := []*pb.Port{}
 	resultJSON := []*pb.HostResult{}
 	totalPorts := 0
+	var err error
 	if result == nil || len(result.Hosts) == 0 {
-		err := errors.New("scan timeout or not result")
-		log.Error().Err(err).Msg("")
+		if result.NmapErrors == nil {
+			err = errors.Wrap(err, "scan timeout, no result or network unreachable?")
+		} else {
+			err = errors.Wrap(err, "scan timeout, no result or network unreachable?")
+		}
+		log.Error().Stack().Err(err).Msg("")
 		return nil, err
 	}
 	for _, host := range result.Hosts {
