@@ -748,8 +748,8 @@ func accessibleRoles() map[string][]string {
 		backendServicePath + "StreamServiceControl": {"worker", "admin"},
 		backendServicePath + "StreamTasksStatus":    {"worker", "admin"},
 
-		frontendServicePath + "StartAsyncScan": {"user"},
-		frontendServicePath + "StartScan":      {"user"},
+		frontendServicePath + "StartAsyncScan": {"user", "admin"},
+		frontendServicePath + "StartScan":      {"user", "admin"},
 
 		frontendServicePath + "GetScan":    {"user", "admin"},
 		frontendServicePath + "DeleteScan": {"user", "admin"},
