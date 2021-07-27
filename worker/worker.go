@@ -223,6 +223,9 @@ func (worker *Worker) startReturner(returner *broker.Returner) {
 	for {
 		// Try to obtain lock.
 		lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
+
+		defer lock.Release(worker.ctx)
+
 		if err != nil && err != redislock.ErrNotObtained {
 			log.Error().Stack().Err(err).Msg("returner can't obtain lock")
 		} else if err != redislock.ErrNotObtained {
