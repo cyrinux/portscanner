@@ -667,9 +667,9 @@ func (server *Server) parseRequest(ctx context.Context, request *pb.ParamsScanne
 	request.Username = username
 	request.Role = role
 
-	// if the Key is not forced, we generate one unique
-	guid := uuid.New()
-	if request.Key == "" {
+	// if the Key is forced and we are admin we use it, else we generate an uuid
+	if !(request.Key != "" && request.Role == "admin") {
+		guid := uuid.New()
 		request.Key = guid.String()
 	}
 
