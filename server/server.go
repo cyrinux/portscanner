@@ -457,9 +457,13 @@ func (server *Server) getUsernameAndRoleFromRequest(ctx context.Context) (string
 
 // StartScan function prepare a nmap scan
 func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
-	params = server.parseRequest(ctx, params)
 
 	createAt := timestamppb.Now()
+
+	params, err := server.parseRequest(ctx, params)
+	if err != nil {
+		return generateResponse(params.Key, nil, err)
+	}
 
 	// we start the scan
 	newEngine := engine.New(ctx, server.db, server.config.NMAP, server.locker)
@@ -529,7 +533,11 @@ func splitInSubnets(targets string, n int) ([]string, error) {
 // StartAsyncScan function prepare a nmap scan
 func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScannerRequest) (*pb.ServerResponse, error) {
 
-	params = server.parseRequest(ctx, params)
+	params, err := server.parseRequest(ctx, params)
+	if err != nil {
+		return generateResponse(params.Key, nil, err)
+	}
+
 	targets := params.Targets
 	createAt := timestamppb.Now()
 
@@ -649,12 +657,12 @@ func generateResponse(key string, value *pb.ScannerMainResponse, err error) (*pb
 }
 
 // parseRequest parse, sanitize the request
-func (server *Server) parseRequest(ctx context.Context, request *pb.ParamsScannerRequest) *pb.ParamsScannerRequest {
+func (server *Server) parseRequest(ctx context.Context, request *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, error) {
 
 	// get username from metadata
 	username, role, err := server.getUsernameAndRoleFromRequest(ctx)
 	if err != nil {
-		log.Error().Err(err).Msg("")
+		return nil, err
 	}
 	request.Username = username
 	request.Role = role
@@ -681,7 +689,7 @@ func (server *Server) parseRequest(ctx context.Context, request *pb.ParamsScanne
 	// defer Duration to defer Time
 	request.DeferTime = timestamppb.New(time.Now().Add(request.DeferDuration.AsDuration()))
 
-	return request
+	return request, nil
 }
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus
