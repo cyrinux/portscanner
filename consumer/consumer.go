@@ -133,8 +133,8 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
 	consumer.request = request
 
-	var smr pb.ScannerMainResponse
-	var srs []*pb.ScannerResponse
+	var scannerMainResponse pb.ScannerMainResponse
+	var scannerResponses []*pb.ScannerResponse
 
 	startTime := timestamppb.Now()
 	params, result, err := consumer.Engine.Start(request, true)
@@ -149,23 +149,23 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
 		}
-		err = json.Unmarshal([]byte(smrJSON), &smr)
+		err = json.Unmarshal([]byte(smrJSON), &scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
 		}
-		srs = smr.Response
-		srs = append(srs, &pb.ScannerResponse{
+		scannerResponses = scannerMainResponse.Response
+		scannerResponses = append(scannerResponses, &pb.ScannerResponse{
 			StartTime:         startTime,
 			Status:            pb.ScannerResponse_ERROR,
 			EndTime:           endTime,
 			RetentionDuration: params.RetentionDuration},
 		)
-		smr = pb.ScannerMainResponse{
+		scannerMainResponse = pb.ScannerMainResponse{
 			Key:      params.Key,
 			Request:  params,
-			Response: srs,
+			Response: scannerResponses,
 		}
-		scanResultJSON, err := json.Marshal(&smr)
+		scanResultJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.Name)
 		}
@@ -186,51 +186,89 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		// success scan
 		consumer.Success <- 1
 
-		scanResult, err := engine.ParseScanResult(result)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.Name, request.Key)
-		}
-		smrJSON, err := consumer.db.Get(consumer.ctx, request.Key)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
-		}
-		err = json.Unmarshal([]byte(smrJSON), &smr)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
-		}
-		srs = smr.Response
-		childKey := fmt.Sprintf("%s-%s", params.Key, request.Targets)
-		srs = append(srs, &pb.ScannerResponse{
-			Key:               childKey,
-			StartTime:         startTime,
-			HostResult:        scanResult,
-			EndTime:           endTime,
-			Status:            pb.ScannerResponse_OK,
-			RetentionDuration: params.RetentionDuration},
-		)
-		smr.Response = srs
+		wait := 500 * time.Millisecond
+		for {
+			// cpu cooling
+			time.Sleep(wait)
 
-		// change child scan status to OK
-		for i := range smr.Response {
-			if smr.Response[i].Key == childKey {
-				smr.Response[i].Status = pb.ScannerResponse_OK
+			// Try to obtain lock.
+			lock, err := consumer.Locker.Obtain(consumer.ctx, fmt.Sprintf("consumer-%s", request.Key), 10*time.Second, nil)
+
+			if err != nil && err != redislock.ErrNotObtained {
+				log.Error().Stack().Err(err).Msg("returner can't obtain lock")
+			} else if err != redislock.ErrNotObtained {
+				// Sleep and check the remaining TTL.
+				if ttl, err := lock.TTL(consumer.ctx); err != nil {
+					log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
+				} else if ttl > 0 {
+
+					smrJSON, err := consumer.db.Get(consumer.ctx, request.Key)
+					if err != nil {
+						log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
+					}
+					err = json.Unmarshal([]byte(smrJSON), &scannerMainResponse)
+					if err != nil {
+						log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
+					}
+
+					childKey := request.Key
+					if (request.ProcessPerTarget || request.NetworkChuncked) && len(request.Targets) > 1 {
+						childKey = fmt.Sprintf("%s-%s", params.Key, request.Targets)
+					}
+
+					scannerResponses = scannerMainResponse.Response
+
+					scannerResponse := &pb.ScannerResponse{
+						Key:               childKey,
+						StartTime:         startTime,
+						EndTime:           endTime,
+						RetentionDuration: params.RetentionDuration,
+					}
+					scannerResponse.Status = pb.ScannerResponse_OK
+
+					scanResult, err := engine.ParseScanResult(result)
+					if err != nil {
+						log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.Name, childKey)
+						scannerResponse.Status = pb.ScannerResponse_ERROR
+					}
+					scannerResponse.HostResult = scanResult
+
+					for i := range scannerResponses {
+						lock.Refresh(consumer.ctx, 1*time.Second, nil)
+						if scannerResponses[i].Key == childKey {
+							scannerResponses[i] = scannerResponse
+							break
+						}
+					}
+
+					scannerMainResponse.Response = scannerResponses
+
+					scanResultJSON, err := json.Marshal(&scannerMainResponse)
+					if err != nil {
+						log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.Name)
+					}
+
+					lock.Refresh(consumer.ctx, 2*time.Second, nil)
+
+					_, err = consumer.db.Set(
+						consumer.ctx, params.Key, string(scanResultJSON), request.RetentionDuration.AsDuration(),
+					)
+					if err != nil {
+						log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.Name)
+					}
+				}
+				if err := delivery.Ack(); err != nil {
+					log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.Name, payload)
+				} else {
+					log.Info().Msgf("%s: acked %v", consumer.Name, payload)
+				}
+
+				lock.Release(consumer.ctx)
+
+				break
 			}
-		}
 
-		scanResultJSON, err := json.Marshal(&smr)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.Name)
-		}
-		_, err = consumer.db.Set(
-			consumer.ctx, params.Key, string(scanResultJSON), request.RetentionDuration.AsDuration(),
-		)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.Name)
 		}
 	}
-	if err := delivery.Ack(); err != nil {
-		log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.Name, payload)
-	} else {
-		log.Info().Msgf("%s: acked %v", consumer.Name, payload)
-	}
+
 }

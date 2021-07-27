@@ -176,19 +176,25 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 	}
 	srs = smr.Response
 
-	for i, sr := range srs {
-		if sr.Key == fmt.Sprintf("%s-%s", params.Key, params.Targets) {
-			srs[i].Status = pb.ScannerResponse_RUNNING
-			break
-		}
-	}
-	smr.Response = srs
-
 	if smr.Request != nil && smr.Request.Targets != "" {
 		hosts := strings.Split(smr.Request.Targets, ",")
 		hosts = helpers.MakeUnique(hosts)
 		smr.Request.Targets = strings.Join(hosts, ",")
 	}
+
+	key := params.Key
+	if (params.ProcessPerTarget || params.NetworkChuncked) && len(params.Targets) > 1 {
+		key = fmt.Sprintf("%s-%s", params.Key, params.Targets)
+	}
+
+	for i, sr := range srs {
+		if sr.Key == key {
+			srs[i].Status = pb.ScannerResponse_RUNNING
+			break
+		}
+	}
+
+	smr.Response = srs
 
 	smrNewJSON, err := json.Marshal(smr)
 	if err != nil {
