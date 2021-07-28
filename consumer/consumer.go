@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Ullaakut/nmap/v2"
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
@@ -24,18 +25,20 @@ var (
 
 // Consumer define a broker consumer
 type Consumer struct {
-	ctx      context.Context
-	db       database.Database
-	Name     string
-	cancel   context.CancelFunc
-	Engine   *engine.Engine
-	Locker   *redislock.Client
-	State    pb.ServiceStateValues
-	conf     config.Config
-	taskType string
-	Success  chan int64
-	Failed   chan int64
-	request  *pb.ParamsScannerRequest
+	ctx       context.Context
+	db        database.Database
+	Name      string
+	cancel    context.CancelFunc
+	Engine    *engine.Engine
+	Locker    *redislock.Client
+	State     pb.ServiceStateValues
+	conf      config.Config
+	taskType  string
+	Success   chan int64
+	Failed    chan int64
+	request   *pb.ParamsScannerRequest
+	startTime *timestamppb.Timestamp
+	endTime   *timestamppb.Timestamp
 }
 
 // New create a new consumer
@@ -51,14 +54,14 @@ func New(
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", taskType, queue, hostname, tag)
 	log.Info().Msgf("new: %s", name)
 	ctx, cancel := context.WithCancel(ctx)
-	engine := engine.New(ctx, db, conf, locker)
+	newEngine := engine.New(ctx, db, conf, locker)
 
 	return name, &Consumer{
 		ctx:      ctx,
 		Name:     name,
 		cancel:   cancel,
 		db:       db,
-		Engine:   engine,
+		Engine:   newEngine,
 		Locker:   locker,
 		conf:     config.GetConfig(),
 		taskType: taskType,
@@ -102,7 +105,10 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
 
 	var request *pb.ParamsScannerRequest
-	json.Unmarshal([]byte(payload), &request)
+	err := json.Unmarshal([]byte(payload), &request)
+	if err != nil {
+		return
+	}
 
 	log.Debug().Msgf("%s: consumer state: %v", consumer.Name, consumer.State.State)
 
@@ -129,35 +135,30 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	time.Sleep(consumer.conf.RMQ.ConsumeDuration)
 }
 
-// consumeNow really consume the message
-func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
-	consumer.request = request
-
+func (consumer *Consumer) markTaskCancelled(params *pb.ParamsScannerRequest, result *nmap.Run) error {
 	var scannerMainResponse pb.ScannerMainResponse
 	var scannerResponses []*pb.ScannerResponse
 
-	startTime := timestamppb.Now()
-	params, result, err := consumer.Engine.Start(request, true)
-	endTime := timestamppb.Now()
-
-	if err != nil && consumer.Engine.State != pb.ScannerResponse_CANCEL {
+	if consumer.Engine.State != pb.ScannerResponse_CANCEL {
 		// scan failed
 		consumer.Failed <- 1
 		// if scan fail or cancelled, mark task as cancel
-		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, params.Key, result)
-		smrJSON, err := consumer.db.Get(consumer.ctx, request.Key)
+
+		smrJSON, err := consumer.db.Get(consumer.ctx, consumer.request.Key)
 		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
+			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, consumer.request.Key)
+			return err
 		}
 		err = json.Unmarshal([]byte(smrJSON), &scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
+			return err
 		}
 		scannerResponses = scannerMainResponse.Response
 		scannerResponses = append(scannerResponses, &pb.ScannerResponse{
-			StartTime:         startTime,
+			StartTime:         consumer.startTime,
 			Status:            pb.ScannerResponse_ERROR,
-			EndTime:           endTime,
+			EndTime:           consumer.endTime,
 			RetentionDuration: params.RetentionDuration},
 		)
 		scannerMainResponse = pb.ScannerMainResponse{
@@ -168,6 +169,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		scanResultJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.Name)
+			return err
 		}
 		_, err = consumer.db.Set(
 			consumer.ctx,
@@ -177,6 +179,31 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.Name)
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+// consumeNow really consume the message
+func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
+	consumer.request = request
+
+	var scannerMainResponse pb.ScannerMainResponse
+	var scannerResponses []*pb.ScannerResponse
+
+	consumer.startTime = timestamppb.Now()
+	params, result, err := consumer.Engine.Start(consumer.request, true)
+	consumer.endTime = timestamppb.Now()
+
+	// mark the task as cancel if fail
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, params.Key, result)
+		err := consumer.markTaskCancelled(params, result)
+		if err != nil {
+			return
 		}
 	}
 
@@ -220,8 +247,8 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 					scannerResponse := &pb.ScannerResponse{
 						Key:               childKey,
-						StartTime:         startTime,
-						EndTime:           endTime,
+						StartTime:         consumer.startTime,
+						EndTime:           consumer.endTime,
 						RetentionDuration: params.RetentionDuration,
 					}
 					scannerResponse.Status = pb.ScannerResponse_OK
@@ -234,7 +261,10 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					scannerResponse.HostResult = scanResult
 
 					for i := range scannerResponses {
-						lock.Refresh(consumer.ctx, 1*time.Second, nil)
+						err := lock.Refresh(consumer.ctx, 1*time.Second, nil)
+						if err != nil {
+							return
+						}
 						if scannerResponses[i].Key == childKey {
 							scannerResponses[i] = scannerResponse
 							break
@@ -248,7 +278,10 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 						log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.Name)
 					}
 
-					lock.Refresh(consumer.ctx, 2*time.Second, nil)
+					err = lock.Refresh(consumer.ctx, 2*time.Second, nil)
+					if err != nil {
+						return
+					}
 
 					_, err = consumer.db.Set(
 						consumer.ctx, params.Key, string(scanResultJSON), request.RetentionDuration.AsDuration(),
@@ -260,7 +293,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 				if err := delivery.Ack(); err != nil {
 					log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.Name, payload)
 				} else {
-					log.Info().Msgf("%s: acked %v", consumer.Name, payload)
+					log.Info().Msgf("%s: was acked %v", consumer.Name, payload)
 				}
 
 				break
