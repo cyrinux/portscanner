@@ -1,5 +1,6 @@
 # TODO
 
+- add GPG support
 - make the client ! with cobra maybe
 - use s6-overlay as init to start TOR https://github.com/just-containers/s6-overlay
 - nginx LB https://dev.to/techschoolguru/load-balancing-grpc-service-with-nginx-3fio#config-nginx-for-grpc-with-tls
