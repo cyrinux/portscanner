@@ -19,6 +19,7 @@ import (
 var (
 	confLogger = config.GetConfig().Logger
 	log        = logger.New(confLogger.Debug, confLogger.Pretty)
+	ErrTimeoutOrUnreachable = errors.New("scan timeout, no result or network unreachable?")
 )
 
 // Engine define a scanner engine
@@ -162,7 +163,7 @@ func (e *Engine) startScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRe
 }
 
 func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
-	var srs []*pb.ScannerResponse
+	var scannerResponses []*pb.ScannerResponse
 	var smr *pb.ScannerMainResponse
 	var err error
 
@@ -174,7 +175,7 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 	if err != nil {
 		return params, nil, err
 	}
-	srs = smr.Response
+	scannerResponses = smr.Response
 
 	if smr.Request != nil && smr.Request.Targets != "" {
 		hosts := strings.Split(smr.Request.Targets, ",")
@@ -187,14 +188,14 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 		key = fmt.Sprintf("%s-%s", params.Key, params.Targets)
 	}
 
-	for i, sr := range srs {
+	for i, sr := range scannerResponses {
 		if sr.Key == key {
-			srs[i].Status = pb.ScannerResponse_RUNNING
+			scannerResponses[i].Status = pb.ScannerResponse_RUNNING
 			break
 		}
 	}
 
-	smr.Response = srs
+	smr.Response = scannerResponses
 
 	smrNewJSON, err := json.Marshal(smr)
 	if err != nil {
@@ -269,34 +270,29 @@ func (e *Engine) run(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest,
 
 // ParseScanResult parse the nmap result and create the expected output
 func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
-	portList := []*pb.Port{}
-	resultJSON := []*pb.HostResult{}
-	totalPorts := 0
+	var portList []*pb.Port
+	var resultJSON []*pb.HostResult
+	var totalPorts int
 	var err error
-	if result == nil || len(result.Hosts) == 0 {
-		if result.NmapErrors == nil {
-			err = errors.Wrap(err, "scan timeout, no result or network unreachable?")
-		} else {
-			err = errors.Wrap(err, "scan timeout, no result or network unreachable?")
-		}
-		log.Error().Stack().Err(err).Msg("")
+	if result == nil || len(result.Hosts) == 0 || result.NmapErrors == nil {
+		log.Error().Stack().Err(ErrTimeoutOrUnreachable).Msg("")
 		return nil, err
 	}
 	for _, host := range result.Hosts {
-		var osversion string
+		var osVersion string
 		if len(host.Addresses) == 0 {
 			continue
 		}
 		if len(host.OS.Matches) > 0 {
 			fp := host.OS.Matches[0]
-			osversion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
+			osVersion = fmt.Sprintf("name: %v, accuracy: %v%%", fp.Name, fp.Accuracy)
 		}
 
 		for _, ip := range host.Addresses {
 			address := ip.Addr
 			hostResult := &pb.Host{
 				Address:   address,
-				OsVersion: osversion,
+				OsVersion: osVersion,
 				State:     host.Status.Reason,
 			}
 
@@ -331,7 +327,7 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 					Confidence:  int32(port.Service.Confidence),
 				}
 
-				newPort := &pb.Port{
+				var newPort = &pb.Port{
 					PortId:      fmt.Sprintf("%v", port.ID),
 					ServiceName: port.Service.Name,
 					Protocol:    port.Protocol,
@@ -355,15 +351,15 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 
 func progressNmap(progress chan float32, params *pb.ParamsScannerRequest, parsedParams *ParamsParsed) {
 	var previous float32
-	for p := range progress {
-		if p > previous {
+	for current := range progress {
+		if current > previous {
 			log.Debug().Msgf("running scan %s : %v%% - host: %s, port: %s",
 				params.Key,
-				p,
+				current,
 				parsedParams.hosts,
 				parsedParams.ports,
 			)
-			previous = p
+			previous = current
 		} else {
 			continue
 		}
