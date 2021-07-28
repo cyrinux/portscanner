@@ -224,11 +224,10 @@ func (worker *Worker) startReturner(returner *broker.Returner) {
 		// Try to obtain lock.
 		lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
 
-		defer lock.Release(worker.ctx)
-
 		if err != nil && err != redislock.ErrNotObtained {
 			log.Error().Stack().Err(err).Msg("returner can't obtain lock")
 		} else if err != redislock.ErrNotObtained {
+			defer lock.Release(worker.ctx)
 			// Sleep and check the remaining TTL.
 			if ttl, err := lock.TTL(worker.ctx); err != nil {
 				log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
