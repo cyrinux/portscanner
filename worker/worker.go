@@ -81,7 +81,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
 	// distributed lock - with redis
-	locker := locker.CreateRedisLock(ctx, conf)
+	locker := locker.CreateRedisLock(redisClient)
 
 	// grpc conn
 	wait = 1000 * time.Millisecond

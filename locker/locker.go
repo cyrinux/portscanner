@@ -3,10 +3,7 @@ package locker
 import (
 	"context"
 	"github.com/bsm/redislock"
-	"github.com/cyrinux/grpcnmapscanner/config"
-	"github.com/cyrinux/grpcnmapscanner/helpers"
-	// "github.com/pkg/errors"
-	// "github.com/cyrinux/grpcnmapscanner/database"
+	redis "github.com/go-redis/redis/v8"
 	"time"
 )
 
@@ -22,10 +19,9 @@ type redisLocker struct {
 	locks  map[string]*redislock.Lock
 }
 
-func CreateRedisLock(ctx context.Context, conf config.Config) MyLocker {
-	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
+func CreateRedisLock(redisClient *redis.Client) MyLocker {
 	locker := redislock.New(redisClient)
-	return &redisLocker{locker: locker}
+	return &redisLocker{locker: locker, locks: map[string]*redislock.Lock{}}
 }
 
 func (l *redisLocker) Obtain(ctx context.Context, key string, ttl time.Duration) (bool, error) {

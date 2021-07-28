@@ -70,6 +70,8 @@ func (e *Engine) parseNMAPParams(s *pb.ParamsScannerRequest) (*ParamsParsed, err
 		options = append(options, nmap.WithSkipHostDiscovery())
 	}
 
+	// options = append(options, nmap.WithCustomArguments("5dcfc63b-9fbd-48db-aa91-ffac2c2347dd"))
+
 	portsList := strings.Split(ports, ",")
 	if len(ports) == 0 && !s.GetPingOnly() {
 		if s.GetFastMode() {

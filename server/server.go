@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	// "github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/auth"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
@@ -117,7 +116,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
 	// distributed lock - with redis
-	locker := locker.CreateRedisLock(ctx, conf)
+	locker := locker.CreateRedisLock(redisClient)
 
 	// Broker init nmap queue
 	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)
