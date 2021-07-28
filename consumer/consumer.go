@@ -193,12 +193,10 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 			// Try to obtain lock.
 			lock, err := consumer.Locker.Obtain(consumer.ctx, fmt.Sprintf("consumer-%s", request.Key), 10*time.Second, nil)
-
-			defer lock.Release(consumer.ctx)
-
 			if err != nil && err != redislock.ErrNotObtained {
 				log.Error().Stack().Err(err).Msg("returner can't obtain lock")
 			} else if err != redislock.ErrNotObtained {
+				defer lock.Release(consumer.ctx)
 				// Sleep and check the remaining TTL.
 				if ttl, err := lock.TTL(consumer.ctx); err != nil {
 					log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
