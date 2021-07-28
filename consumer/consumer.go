@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"github.com/Ullaakut/nmap/v2"
 	rmq "github.com/adjust/rmq/v4"
-	"github.com/bsm/redislock"
+	// "github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
+	"github.com/cyrinux/grpcnmapscanner/locker"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -30,7 +31,7 @@ type Consumer struct {
 	Name      string
 	cancel    context.CancelFunc
 	Engine    *engine.Engine
-	Locker    *redislock.Client
+	Locker    locker.MyLocker
 	State     pb.ServiceStateValues
 	conf      config.Config
 	taskType  string
@@ -49,7 +50,7 @@ func New(
 	taskType string,
 	conf config.NMAPConfig,
 	queue string,
-	locker *redislock.Client) (string, *Consumer) {
+	locker locker.MyLocker) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", taskType, queue, hostname, tag)
 	log.Info().Msgf("new: %s", name)
@@ -219,13 +220,14 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 			time.Sleep(wait)
 
 			// Try to obtain lock.
-			lock, err := consumer.Locker.Obtain(consumer.ctx, fmt.Sprintf("consumer-%s", request.Key), 10*time.Second, nil)
-			if err != nil && err != redislock.ErrNotObtained {
+			lockerKey := fmt.Sprintf("consumer-%s", request.Key)
+			ok, err := consumer.Locker.Obtain(consumer.ctx, lockerKey, 10*time.Second)
+			if err != nil {
 				log.Error().Stack().Err(err).Msg("returner can't obtain lock")
-			} else if err != redislock.ErrNotObtained {
-				defer lock.Release(consumer.ctx)
+			} else if ok {
+				defer consumer.Locker.Release(consumer.ctx, lockerKey)
 				// Sleep and check the remaining TTL.
-				if ttl, err := lock.TTL(consumer.ctx); err != nil {
+				if ttl, err := consumer.Locker.TTL(consumer.ctx, lockerKey); err != nil {
 					log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 				} else if ttl > 0 {
 
@@ -261,7 +263,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					scannerResponse.HostResult = scanResult
 
 					for i := range scannerResponses {
-						err := lock.Refresh(consumer.ctx, 1*time.Second, nil)
+						err := consumer.Locker.Refresh(consumer.ctx, lockerKey, 1*time.Second)
 						if err != nil {
 							return
 						}
@@ -278,7 +280,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 						log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.Name)
 					}
 
-					err = lock.Refresh(consumer.ctx, 2*time.Second, nil)
+					err = consumer.Locker.Refresh(consumer.ctx, lockerKey, 2*time.Second)
 					if err != nil {
 						return
 					}

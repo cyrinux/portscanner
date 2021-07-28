@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bsm/redislock"
+	// "github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/auth"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
+	"github.com/cyrinux/grpcnmapscanner/locker"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -100,7 +101,7 @@ type Server struct {
 	err         error
 	broker      broker.Broker
 	State       pb.ServiceStateValues
-	locker      *redislock.Client
+	locker      locker.MyLocker
 	taskType    string
 	tasksStatus TasksStatus
 	jwtManager  *auth.JWTManager
@@ -116,7 +117,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
 	// distributed lock - with redis
-	locker := redislock.New(redisClient)
+	locker := locker.CreateRedisLock(ctx, conf)
 
 	// Broker init nmap queue
 	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)

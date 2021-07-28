@@ -6,13 +6,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/client"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/consumer"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
+	"github.com/cyrinux/grpcnmapscanner/locker"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/go-redis/redis/v8"
@@ -49,7 +49,7 @@ type Worker struct {
 	broker      *broker.Broker
 	conf        config.Config
 	redisClient *redis.Client
-	locker      *redislock.Client
+	locker      locker.MyLocker
 	state       *pb.ServiceStateValues
 	consumers   []*consumer.Consumer
 	db          database.Database
@@ -81,7 +81,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
 	// distributed lock - with redis
-	locker := redislock.New(redisClient)
+	locker := locker.CreateRedisLock(ctx, conf)
 
 	// grpc conn
 	wait = 1000 * time.Millisecond
@@ -220,16 +220,17 @@ func (worker *Worker) StreamServiceControl() {
 func (worker *Worker) startReturner(returner *broker.Returner) {
 	wait := 500 * time.Millisecond
 	log.Info().Msgf("starting the returner routine on %s", worker.name)
+	lockKey := "returner"
 	for {
 		// Try to obtain lock.
-		lock, err := worker.locker.Obtain(worker.ctx, "returner", 10*time.Second, nil)
+		ok, err := worker.locker.Obtain(worker.ctx, lockKey, 10*time.Second)
 
-		if err != nil && err != redislock.ErrNotObtained {
+		if err != nil {
 			log.Error().Stack().Err(err).Msg("returner can't obtain lock")
-		} else if err != redislock.ErrNotObtained {
-			defer lock.Release(worker.ctx)
+		} else if ok {
+			defer worker.locker.Release(worker.ctx, lockKey)
 			// Sleep and check the remaining TTL.
-			if ttl, err := lock.TTL(worker.ctx); err != nil {
+			if ttl, err := worker.locker.TTL(worker.ctx, lockKey); err != nil {
 				log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 			} else if ttl > 0 {
 				// Yay, I still have my lock!
@@ -242,7 +243,7 @@ func (worker *Worker) startReturner(returner *broker.Returner) {
 					// prometheus returned stats
 					returner.Returned <- ret
 				}
-				lock.Refresh(worker.ctx, 5*time.Second, nil)
+				worker.locker.Refresh(worker.ctx, lockKey, 5*time.Second)
 			}
 		}
 		// cpu cooling

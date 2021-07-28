@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	nmap "github.com/Ullaakut/nmap/v2"
-	"github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
+	"github.com/cyrinux/grpcnmapscanner/locker"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/pkg/errors"
@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	confLogger = config.GetConfig().Logger
-	log        = logger.New(confLogger.Debug, confLogger.Pretty)
+	confLogger              = config.GetConfig().Logger
+	log                     = logger.New(confLogger.Debug, confLogger.Pretty)
 	ErrTimeoutOrUnreachable = errors.New("scan timeout, no result or network unreachable?")
 )
 
@@ -26,7 +26,7 @@ var (
 type Engine struct {
 	ctx    context.Context
 	db     database.Database
-	locker *redislock.Client
+	locker locker.MyLocker
 	State  pb.ScannerResponse_Status
 	config config.NMAPConfig
 }
@@ -42,7 +42,7 @@ type ParamsParsed struct {
 }
 
 // New create a new nmap engine
-func New(ctx context.Context, db database.Database, conf config.NMAPConfig, locker *redislock.Client) *Engine {
+func New(ctx context.Context, db database.Database, conf config.NMAPConfig, locker locker.MyLocker) *Engine {
 	return &Engine{ctx: ctx, db: db, config: conf, locker: locker}
 }
 
