@@ -22,6 +22,10 @@ var (
 	ErrTimeoutOrUnreachable = errors.New("scan timeout, no result or network unreachable?")
 )
 
+type EngineInterface interface {
+	Start(params *pb.ParamsScannerRequest, async bool) (*nmap.Run, error)
+}
+
 // Engine define a scanner engine
 type Engine struct {
 	ctx    context.Context

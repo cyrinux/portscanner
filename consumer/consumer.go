@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/Ullaakut/nmap/v2"
 	rmq "github.com/adjust/rmq/v4"
-	// "github.com/bsm/redislock"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
 	"github.com/cyrinux/grpcnmapscanner/engine"
@@ -189,8 +188,12 @@ func (consumer *Consumer) markTaskCancelled(params *pb.ParamsScannerRequest, res
 }
 
 // consumeNow really consume the message
-func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) {
+func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) error {
 	consumer.request = request
+
+	// fmt.Printf("%#v", request)
+	// fmt.Printf("%v", request)
+	// fmt.Printf("%+v", request)
 
 	var scannerMainResponse pb.ScannerMainResponse
 	var scannerResponses []*pb.ScannerResponse
@@ -204,7 +207,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, params.Key, result)
 		err := consumer.markTaskCancelled(params, result)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
@@ -231,14 +234,16 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 				} else if ttl > 0 {
 
-					smrJSON, err := consumer.db.Get(consumer.ctx, request.Key)
+					scannerMainResponseJSON, err := consumer.db.Get(consumer.ctx, request.Key)
 					if err != nil {
 						log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
 					}
-					err = json.Unmarshal([]byte(smrJSON), &scannerMainResponse)
+					err = json.Unmarshal([]byte(scannerMainResponseJSON), &scannerMainResponse)
 					if err != nil {
 						log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
+						return err
 					}
+					fmt.Printf("%+v", &scannerMainResponse)
 
 					childKey := request.Key
 					if (request.ProcessPerTarget || request.NetworkChuncked) && len(request.Targets) > 1 {
@@ -265,7 +270,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					for i := range scannerResponses {
 						err := consumer.Locker.Refresh(consumer.ctx, lockerKey, 1*time.Second)
 						if err != nil {
-							return
+							return err
 						}
 						if scannerResponses[i].Key == childKey {
 							scannerResponses[i] = scannerResponse
@@ -282,7 +287,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 					err = consumer.Locker.Refresh(consumer.ctx, lockerKey, 2*time.Second)
 					if err != nil {
-						return
+						return err
 					}
 
 					_, err = consumer.db.Set(
@@ -304,4 +309,5 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 		}
 	}
 
+	return nil
 }

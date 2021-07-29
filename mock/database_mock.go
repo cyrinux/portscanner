@@ -2,8 +2,9 @@ package mock
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"github.com/cyrinux/grpcnmapscanner/database"
+	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"time"
 )
 
@@ -20,8 +21,9 @@ func (r mockDatabase) Set(ctx context.Context, key string, value string, retenti
 }
 
 func (r mockDatabase) Get(ctx context.Context, key string) (string, error) {
-	value := fmt.Sprintf("value-%s", key)
-	return value, nil
+	smr := pb.ScannerMainResponse{}
+	smrJSON, err := json.Marshal(&smr)
+	return string(smrJSON), err
 }
 
 func (r mockDatabase) GetAll(ctx context.Context, key string) ([]string, error) {
