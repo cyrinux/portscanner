@@ -107,7 +107,7 @@ type Server struct {
 	userStore   *auth.InMemoryUserStore
 }
 
-// newServer create a new server and init the database connection
+// NewServer create a new server and init the database connection
 func NewServer(ctx context.Context, conf config.Config, taskType string) *Server {
 	errChan := make(chan error)
 	go broker.RmqLogErrors(errChan)
@@ -116,13 +116,13 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
 	// distributed lock - with redis
-	locker := locker.CreateRedisLock(redisClient)
+	myLocker := locker.CreateRedisLock(redisClient)
 
 	// Broker init nmap queue
-	brker := broker.New(ctx, taskType, conf.RMQ, redisClient)
+	myBroker := broker.New(ctx, taskType, conf.RMQ, redisClient)
 
 	// clean the queues
-	go brker.Cleaner()
+	go myBroker.Cleaner()
 
 	// Storage database init
 	db, err := database.Factory(ctx, conf)
@@ -131,7 +131,7 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 	}
 
 	// start the rmq stats to prometheus
-	go brokerStatsToProm(brker, taskType)
+	go brokerStatsToProm(myBroker, taskType)
 
 	// allocate the jwtManager
 	jwtManager := auth.NewJWTManager(
@@ -152,10 +152,10 @@ func NewServer(ctx context.Context, conf config.Config, taskType string) *Server
 		ctx:        ctx,
 		taskType:   taskType,
 		config:     conf,
-		broker:     *brker,
+		broker:     *myBroker,
 		db:         db,
 		err:        err,
-		locker:     locker,
+		locker:     myLocker,
 		jwtManager: jwtManager,
 		userStore:  userStore,
 	}
@@ -177,34 +177,46 @@ func Listen(ctx context.Context, conf config.Config) error {
 	// Serve the frontend
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(server *Server, authServer pb.AuthServiceServer) error {
-		frontendSrv, frontendListener, err := server.getGRPCServerAndListener(conf.FrontendListenPort)
+	go func() {
+		err := func(server *Server, authServer pb.AuthServiceServer) error {
+			frontendSrv, frontendListener, err := server.getGRPCServerAndListener(conf.FrontendListenPort)
+			if err != nil {
+
+				log.Error().Stack().Err(err).Msg("")
+			}
+			pb.RegisterAuthServiceServer(frontendSrv, authServer)
+			pb.RegisterScannerServiceServer(frontendSrv, server)
+			if err = frontendSrv.Serve(*frontendListener); err != nil {
+				wg.Done()
+			}
+			return err
+		}(server, authServer)
 		if err != nil {
-			log.Error().Stack().Err(err).Msg("")
+			log.Fatal().Err(err)
 		}
-		pb.RegisterAuthServiceServer(frontendSrv, authServer)
-		pb.RegisterScannerServiceServer(frontendSrv, server)
-		if err = frontendSrv.Serve(*frontendListener); err != nil {
-			wg.Done()
-		}
-		return err
-	}(server, authServer)
+	}()
 
 	// Serve the backend
 	wg.Add(1)
-	go func(server *Server, authServer pb.AuthServiceServer) error {
-		backendSrv, backendListener, err := server.getGRPCServerAndListener(conf.BackendListenPort)
-		if err != nil {
-			return err
-		}
-		pb.RegisterAuthServiceServer(backendSrv, authServer)
-		pb.RegisterBackendServiceServer(backendSrv, server)
+	go func() {
+		err := func(server *Server, authServer pb.AuthServiceServer) error {
+			backendSrv, backendListener, err := server.getGRPCServerAndListener(conf.BackendListenPort)
+			if err != nil {
 
-		if err = backendSrv.Serve(*backendListener); err != nil {
-			wg.Done()
+				return err
+			}
+			pb.RegisterAuthServiceServer(backendSrv, authServer)
+			pb.RegisterBackendServiceServer(backendSrv, server)
+
+			if err = backendSrv.Serve(*backendListener); err != nil {
+				wg.Done()
+			}
+			return err
+		}(server, authServer)
+		if err != nil {
+			log.Fatal().Err(err)
 		}
-		return err
-	}(server, authServer)
+	}()
 
 	wg.Wait()
 	log.Info().Msg("backend and fronted stopped")
@@ -273,7 +285,7 @@ func (server *Server) getScanMainResponse(ctx context.Context, request *pb.GetSc
 	return &smr, nil
 }
 
-// DeleteScan delele a scan from the database
+// DeleteScan delete a scan from the database
 func (server *Server) DeleteScan(ctx context.Context, request *pb.GetScannerRequest) (*pb.ServerResponse, error) {
 	// get username from metadata
 	username, role, err := server.getUsernameAndRoleFromRequest(ctx)
@@ -296,11 +308,11 @@ func (server *Server) DeleteScan(ctx context.Context, request *pb.GetScannerRequ
 }
 
 // StreamServiceControl control the service
-func (server *Server) StreamServiceControl(request *pb.ServiceStateValues, stream pb.BackendService_StreamServiceControlServer) error {
+func (server *Server) StreamServiceControl(in *pb.ServiceStateValues, stream pb.BackendService_StreamServiceControlServer) error {
 	wait := 500 * time.Millisecond
 	for {
 		if err := stream.Send(&server.State); err != nil {
-			return errors.Wrap(err, "streamer service control send error")
+			return errors.Wrapf(err, "streamer service control send error: %v", in)
 		}
 		time.Sleep(wait)
 	}
@@ -310,6 +322,7 @@ func (server *Server) StreamServiceControl(request *pb.ServiceStateValues, strea
 func (server *Server) StreamTasksStatus(stream pb.BackendService_StreamTasksStatusServer) error {
 	wait := 500 * time.Millisecond
 	for {
+		time.Sleep(wait)
 		promStatus, err := stream.Recv()
 		if err == io.EOF {
 			return err
@@ -323,10 +336,13 @@ func (server *Server) StreamTasksStatus(stream pb.BackendService_StreamTasksStat
 		opsFailed.Add(float64(promStatus.TasksStatus.Failed))
 		server.tasksStatus.returned += promStatus.TasksStatus.Returned
 		opsReturned.Set(float64(promStatus.TasksStatus.Returned))
-		stream.Send(&pb.PrometheusStatus{TasksStatus: &pb.TasksStatus{
+		err = stream.Send(&pb.PrometheusStatus{TasksStatus: &pb.TasksStatus{
 			Success: server.tasksStatus.success, Failed: server.tasksStatus.failed, Returned: server.tasksStatus.returned}},
 		)
-		time.Sleep(wait)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't send prometheus stats")
+			// return err
+		}
 	}
 }
 
@@ -389,53 +405,57 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 		return generateResponse(request.Key, nil, err)
 	}
 
-	smr, err := server.getScanMainResponse(ctx, request)
+	scannerMainResponse, err := server.getScanMainResponse(ctx, request)
 	if err != nil {
 		return generateResponse(request.Key, nil, errors.New("can't get scan result or not allowed to access this resource"))
 	}
 
 	// test is the request username == the scan response username
-	if role != "admin" && (smr.Request.GetUsername() == "" || smr.Request.GetUsername() != username) {
+	if role != "admin" && (scannerMainResponse.Request.GetUsername() == "" || scannerMainResponse.Request.GetUsername() != username) {
 		return generateResponse(request.Key, nil, errors.New("not allowed to access this resource"))
 	}
 
-	if smr.Request.BurnAfterReading && smr.Request.Role == "user" {
+	if scannerMainResponse.Request.BurnAfterReading && scannerMainResponse.Request.Role == "user" {
 		_, err = server.db.Delete(ctx, request.Key)
 		if err != nil {
-			return generateResponse(request.Key, smr, errors.New("can't burn after reading"))
+			return generateResponse(request.Key, scannerMainResponse, errors.New("can't burn after reading"))
 		}
 	}
 
-	return generateResponse(request.Key, smr, nil)
+	return generateResponse(request.Key, scannerMainResponse, nil)
 }
 
 // GetAllScans return the engine scan result
-func (server *Server) GetAllScans(in *empty.Empty, stream pb.ScannerService_GetAllScansServer) error {
+func (server *Server) GetAllScans(_ *empty.Empty, stream pb.ScannerService_GetAllScansServer) error {
 	allKeys, err := server.db.GetAll(server.ctx, "*")
 	if err != nil {
 		return err
 	}
 
 	for _, key := range allKeys {
-		var smr pb.ScannerMainResponse
+		var scannerMainResponse pb.ScannerMainResponse
 		dbSmr, err := server.db.Get(server.ctx, key)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't get scan result")
 			continue
 		}
 
-		err = json.Unmarshal([]byte(dbSmr), &smr)
-		smr.Key = key
+		err = json.Unmarshal([]byte(dbSmr), &scannerMainResponse)
+		scannerMainResponse.Key = key
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't list scan result")
 			return err
 		}
 
-		response, err := generateResponse(key, &smr, err)
+		response, err := generateResponse(key, &scannerMainResponse, err)
 		if err != nil {
 			return err
 		}
-		stream.Send(response)
+		err = stream.Send(response)
+		if err != nil {
+			log.Error().Stack().Err(err).Msg("can't send getAllScans response")
+//			return err
+		}
 	}
 
 	return nil
@@ -462,7 +482,7 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 
 	params, err := server.parseRequest(ctx, params)
 	if err != nil {
-		return generateResponse(params.Key, nil, err)
+		return generateResponse("unknown key", nil, err)
 	}
 
 	// we start the scan
@@ -541,8 +561,8 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 	targets := params.Targets
 	createAt := timestamppb.Now()
 
-	srs := []*pb.ScannerResponse{}
-	smr := pb.ScannerMainResponse{}
+	var scannerResponses []*pb.ScannerResponse
+	var scannerMainResponse pb.ScannerMainResponse
 
 	// if we want to split a task by host
 	// we split host list by "," and then
@@ -553,15 +573,15 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 	if params.NetworkChuncked || params.ProcessPerTarget {
 		hosts = strings.Split(params.Targets, ",")
 		if params.NetworkChuncked {
-			var splittedNetworks []string
+			var splitNetworks []string
 			for _, network := range hosts {
 				splittedNetwork, err := splitInSubnets(network, 3)
 				if err != nil {
-					splittedNetworks = append(splittedNetworks, network)
+					splitNetworks = append(splitNetworks, network)
 				}
-				splittedNetworks = append(splittedNetworks, splittedNetwork...)
+				splitNetworks = append(splitNetworks, splittedNetwork...)
 			}
-			hosts = splittedNetworks
+			hosts = splitNetworks
 		}
 	} else {
 		// or we use the default behavior, passing all host
@@ -580,62 +600,62 @@ func (server *Server) StartAsyncScan(ctx context.Context, params *pb.ParamsScann
 		}
 
 		// we create the task response with queued status
-		sr := &pb.ScannerResponse{
+		scannerResponse := &pb.ScannerResponse{
 			Key:    subKey,
 			Status: pb.ScannerResponse_QUEUED,
 		}
 
 		// then append it to the main task
-		srs = append(srs, sr)
+		scannerResponses = append(scannerResponses, scannerResponse)
 
 		// we override the Hosts param in case we split it
 		// for the scan request
 		params.Targets = host
-		smr = pb.ScannerMainResponse{
+		scannerMainResponse = pb.ScannerMainResponse{
 			Key:      params.Key,
 			Request:  params,
 			CreateAt: createAt,
-			Response: srs,
+			Response: scannerResponses,
 		}
 
 		log.Info().Msgf("receive async task order: %v", params)
 
-		smrJSON, err := json.Marshal(&smr)
+		smrJSON, err := json.Marshal(&scannerMainResponse)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't create main JSON response")
-			return generateResponse(params.Key, &smr, err)
+			return generateResponse(params.Key, &scannerMainResponse, err)
 		}
 
 		// write main response to database
 		_, err = server.db.Set(ctx, params.Key, string(smrJSON), 0)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't write main response to database")
-			return generateResponse(params.Key, &smr, err)
+			return generateResponse(params.Key, &scannerMainResponse, err)
 		}
 
 		// create scan task and publish it to the RMQ broker
 		paramsJSON, err := json.Marshal(params)
 		if err != nil {
-			srs[i].Status = pb.ScannerResponse_ERROR
-			return generateResponse(params.Key, &smr, err)
+			scannerResponses[i].Status = pb.ScannerResponse_ERROR
+			return generateResponse(params.Key, &scannerMainResponse, err)
 		}
 
 		err = server.broker.Incoming.PublishBytes(paramsJSON)
 		if err != nil {
-			srs[i].Status = pb.ScannerResponse_ERROR
-			return generateResponse(params.Key, &smr, err)
+			scannerResponses[i].Status = pb.ScannerResponse_ERROR
+			return generateResponse(params.Key, &scannerMainResponse, err)
 		}
 
 	}
 
 	params.Targets = targets
-	smr = pb.ScannerMainResponse{
+	scannerMainResponse = pb.ScannerMainResponse{
 		Key:      params.Key,
 		Request:  params,
 		CreateAt: createAt,
-		Response: srs,
+		Response: scannerResponses,
 	}
-	return generateResponse(params.Key, &smr, nil)
+	return generateResponse(params.Key, &scannerMainResponse, nil)
 }
 
 // generateResponse generate the response for the grpc return
@@ -693,10 +713,10 @@ func (server *Server) parseRequest(ctx context.Context, request *pb.ParamsScanne
 }
 
 // brokerStatsToProm read broker stats each 2s and write to prometheus
-func brokerStatsToProm(brker *broker.Broker, name string) {
+func brokerStatsToProm(myBroker *broker.Broker, name string) {
 	var prevReady, prevReject int64
 	for range time.Tick(1000 * time.Millisecond) {
-		stats, err := brker.GetStats()
+		stats, err := myBroker.GetStats()
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't get RMQ statistics")
 			continue

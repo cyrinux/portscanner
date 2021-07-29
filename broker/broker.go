@@ -33,7 +33,7 @@ type Returner struct {
 }
 
 // New open the broker queues
-func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClient *redis.Client) *Broker {
+func New(_ context.Context, taskType string, conf config.RMQConfig, redisClient *redis.Client) *Broker {
 	errChan := make(chan error, 10)
 
 	go RmqLogErrors(errChan)
@@ -48,6 +48,7 @@ func New(ctx context.Context, taskType string, conf config.RMQConfig, redisClien
 			MaxRetries:       3,
 			MinRetryBackoff:  100 * time.Millisecond,
 			MaxRetryBackoff:  1 * time.Second,
+			RouteByLatency: true,
 		})
 	}
 

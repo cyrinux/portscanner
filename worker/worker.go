@@ -81,7 +81,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 	redisClient := helpers.NewRedisClient(ctx, conf).Connect()
 
 	// distributed lock - with redis
-	locker := locker.CreateRedisLock(redisClient)
+	myLocker := locker.CreateRedisLock(redisClient)
 
 	// grpc conn
 	wait = 1000 * time.Millisecond
@@ -104,7 +104,7 @@ func NewWorker(ctx context.Context, conf config.Config, name string) *Worker {
 		conf:        conf,
 		ctx:         ctx,
 		broker:      new(broker.Broker),
-		locker:      locker,
+		locker:      myLocker,
 		consumers:   make([]*consumer.Consumer, 0),
 		db:          db,
 		state:       state,
@@ -228,7 +228,12 @@ func (worker *Worker) startReturner(returner *broker.Returner) {
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("returner can't obtain lock")
 		} else if ok {
-			defer worker.locker.Release(worker.ctx, lockKey)
+			defer func(locker locker.MyLocker, ctx context.Context, key string) {
+				err = locker.Release(ctx, key)
+				if err != nil {
+					log.Error().Stack().Err(err).Msg("can't defer lock")
+				}
+			}(worker.locker, worker.ctx, lockKey)
 			// Sleep and check the remaining TTL.
 			if ttl, err := worker.locker.TTL(worker.ctx, lockKey); err != nil {
 				log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
@@ -243,7 +248,10 @@ func (worker *Worker) startReturner(returner *broker.Returner) {
 					// prometheus returned stats
 					returner.Returned <- ret
 				}
-				worker.locker.Refresh(worker.ctx, lockKey, 5*time.Second)
+				err = worker.locker.Refresh(worker.ctx, lockKey, 5*time.Second)
+				if err != nil {
+					log.Error().Stack().Err(err).Msg("can't refresh lock")
+				}
 			}
 		}
 		// cpu cooling

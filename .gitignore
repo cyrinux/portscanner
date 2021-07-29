@@ -5,3 +5,7 @@ vendor
 proto/*.pb.go
 version/xversion.go
 *.protoset
+coverage.out
+**/coverage.out
+cli
+

@@ -40,12 +40,12 @@ func NewRedisClient(ctx context.Context, conf config.Config) *RedisClient {
 // Connect is use to connect to redis
 func (rc *RedisClient) Connect() *redis.Client {
 	wait := 500 * time.Millisecond
-	var err error
 	var redisClient RedisClient
 	for {
 		redisClient = *NewRedisClient(rc.ctx, rc.conf)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("cannot connected to redis, retrying in %v...", wait)
+		err := redisClient.client.Ping(rc.ctx)
+		if err.Err() != nil {
+			log.Error().Stack().Err(err.Err()).Msgf("cannot connected to redis, retrying in %v...", wait)
 			time.Sleep(wait)
 		} else {
 			log.Info().Msg("connected to redis database")

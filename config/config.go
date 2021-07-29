@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Redis
+// Redis is a redis config struct
 type Redis struct {
 	Name             string   `default:"scanner"`
 	Database         int      `default:"0"`
@@ -25,6 +25,7 @@ type DBConfig struct {
 	Redis  Redis
 }
 
+// NMAPConfig is a NMAP config struct
 type NMAPConfig struct {
 	TorServer string `default:"socks4://tor:9050" split_words:"true"`
 }
@@ -52,7 +53,7 @@ type PrometheusConfig struct {
 	Server string `default:"prometheus:8140"`
 }
 
-// GlobalConfig contains some others params
+// Global contains some others params
 type Global struct {
 	BackendServer      string `default:"server:9001" split_words:"true"`
 	FrontendListenPort int    `default:"9000" split_words:"true"`
@@ -77,7 +78,7 @@ type Config struct {
 	Frontend GRPCFrontend
 }
 
-// GRPCBackendServer is the GRPC backend endpoint config
+// GRPCBackend is the GRPC backend endpoint config
 type GRPCBackend struct {
 	CAFile          string        `default:"/etc/scanner/cert/ca-cert.pem" split_words:"true"`
 	ServerCertFile  string        `default:"/etc/scanner/cert/server-cert.pem" split_words:"true"`
@@ -90,7 +91,7 @@ type GRPCBackend struct {
 	JWT             JWT
 }
 
-// GRPCBackendServer is the GRPC backend endpoint config
+// GRPCFrontend is the GRPC backend endpoint config
 type GRPCFrontend struct {
 	CAFile         string `default:"/etc/scanner/cert/ca-cert.pem" split_words:"true"`
 	ServerCertFile string `default:"/etc/scanner/cert/server-cert.pem" split_words:"true"`

@@ -35,11 +35,11 @@ func LoadTLSCredentials(caFile, certFile, keyFile string) (credentials.Transport
 	}
 
 	// Create the credentials and return it
-	config := &tls.Config{
+	conf := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    certPool,
 	}
 
-	return credentials.NewTLS(config), nil
+	return credentials.NewTLS(conf), nil
 }
