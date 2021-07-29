@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Ullaakut/nmap/v2"
 	rmq "github.com/adjust/rmq/v4"
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/database"
@@ -29,7 +28,7 @@ type Consumer struct {
 	db        database.Database
 	Name      string
 	cancel    context.CancelFunc
-	Engine    *engine.Engine
+	Engine    engine.EngineInterface
 	Locker    locker.MyLockerInterface
 	State     pb.ServiceStateValues
 	conf      config.Config
@@ -49,19 +48,19 @@ func New(
 	taskType string,
 	conf config.NMAPConfig,
 	queue string,
-	locker locker.MyLockerInterface) (string, *Consumer) {
+	locker locker.MyLockerInterface,
+	engine engine.EngineInterface) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", taskType, queue, hostname, tag)
 	log.Info().Msgf("new: %s", name)
 	ctx, cancel := context.WithCancel(ctx)
-	newEngine := engine.New(ctx, db, conf, locker)
 
 	return name, &Consumer{
 		ctx:      ctx,
 		Name:     name,
 		cancel:   cancel,
 		db:       db,
-		Engine:   newEngine,
+		Engine:   engine,
 		Locker:   locker,
 		conf:     config.GetConfig(),
 		taskType: taskType,
@@ -74,7 +73,7 @@ func New(
 func (consumer *Consumer) Cancel() {
 	log.Debug().Msgf("%s cancelled, writing state to database", consumer.Name)
 	// if scan fail or cancelled, mark task as cancel
-	consumer.Engine.State = pb.ScannerResponse_CANCEL
+	consumer.Engine.SetState(pb.ScannerResponse_CANCEL)
 	scannerResponse := &pb.ScannerResponse{
 		Status: pb.ScannerResponse_CANCEL,
 	}
@@ -135,11 +134,11 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	time.Sleep(consumer.conf.RMQ.ConsumeDuration)
 }
 
-func (consumer *Consumer) markTaskCancelled(params *pb.ParamsScannerRequest, result *nmap.Run) error {
+func (consumer *Consumer) markTaskCancelled(params *pb.ParamsScannerRequest) error {
 	var scannerMainResponse pb.ScannerMainResponse
 	var scannerResponses []*pb.ScannerResponse
 
-	if consumer.Engine.State != pb.ScannerResponse_CANCEL {
+	if consumer.Engine.GetState() != pb.ScannerResponse_CANCEL {
 		// scan failed
 		consumer.Failed <- 1
 		// if scan fail or cancelled, mark task as cancel
@@ -191,21 +190,21 @@ func (consumer *Consumer) markTaskCancelled(params *pb.ParamsScannerRequest, res
 func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) error {
 	consumer.request = request
 
-	// fmt.Printf("%#v", request)
-	// fmt.Printf("%v", request)
-	// fmt.Printf("%+v", request)
-
 	var scannerMainResponse pb.ScannerMainResponse
 	var scannerResponses []*pb.ScannerResponse
 
 	consumer.startTime = timestamppb.Now()
-	params, result, err := consumer.Engine.Start(consumer.request, true)
+	result, err := consumer.Engine.Start(consumer.request, true)
 	consumer.endTime = timestamppb.Now()
 
 	// mark the task as cancel if fail
 	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, params.Key, result)
-		err := consumer.markTaskCancelled(params, result)
+		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, request.Key, result)
+		// if err != nil {
+		// 	log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.Name, childKey)
+		// 	scannerResponse.Status = pb.ScannerResponse_ERROR
+		// }
+		err := consumer.markTaskCancelled(request)
 		if err != nil {
 			return err
 		}
@@ -243,11 +242,10 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 						log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
 						return err
 					}
-					fmt.Printf("%+v", &scannerMainResponse)
 
 					childKey := request.Key
 					if (request.ProcessPerTarget || request.NetworkChuncked) && len(request.Targets) > 1 {
-						childKey = fmt.Sprintf("%s-%s", params.Key, request.Targets)
+						childKey = fmt.Sprintf("%s-%s", request.Key, request.Targets)
 					}
 
 					scannerResponses = scannerMainResponse.Response
@@ -256,16 +254,12 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 						Key:               childKey,
 						StartTime:         consumer.startTime,
 						EndTime:           consumer.endTime,
-						RetentionDuration: params.RetentionDuration,
+						RetentionDuration: request.RetentionDuration,
 					}
 					scannerResponse.Status = pb.ScannerResponse_OK
 
-					scanResult, err := engine.ParseScanResult(result)
-					if err != nil {
-						log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.Name, childKey)
-						scannerResponse.Status = pb.ScannerResponse_ERROR
-					}
-					scannerResponse.HostResult = scanResult
+					// scanResult, err := engine.ParseScanResult(result)
+					scannerResponse.HostResult = result
 
 					for i := range scannerResponses {
 						err := consumer.Locker.Refresh(consumer.ctx, lockerKey, 1*time.Second)
@@ -291,7 +285,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					}
 
 					_, err = consumer.db.Set(
-						consumer.ctx, params.Key, string(scanResultJSON), request.RetentionDuration.AsDuration(),
+						consumer.ctx, request.Key, string(scanResultJSON), request.RetentionDuration.AsDuration(),
 					)
 					if err != nil {
 						log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.Name)

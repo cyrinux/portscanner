@@ -454,7 +454,7 @@ func (server *Server) GetAllScans(_ *empty.Empty, stream pb.ScannerService_GetAl
 		err = stream.Send(response)
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("can't send getAllScans response")
-//			return err
+			//			return err
 		}
 	}
 
@@ -491,19 +491,13 @@ func (server *Server) StartScan(ctx context.Context, params *pb.ParamsScannerReq
 		StartTime: timestamppb.Now(),
 		Status:    pb.ScannerResponse_UNKNOWN,
 	}}
-	params, result, err := newEngine.Start(params, false)
+	result, err := newEngine.Start(params, false)
 	if err != nil {
 		return generateResponse(params.Key, nil, err)
 	}
 	// end of scan
 	sr[0].EndTime = timestamppb.Now()
-
-	// parse result
-	scanParsedResult, err := engine.ParseScanResult(result)
-	if err != nil {
-		return generateResponse(params.Key, nil, err)
-	}
-	sr[0].HostResult = scanParsedResult
+	sr[0].HostResult = result
 	sr[0].Status = pb.ScannerResponse_OK
 
 	// forge main response

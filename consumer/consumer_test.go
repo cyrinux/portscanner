@@ -16,7 +16,8 @@ func Test_CreateMockLock_Create_New_Locker(t *testing.T) {
 	ctx := context.Background()
 	conf := config.GetConfig()
 	db, _ := mock.CreateMockDatabase(ctx)
-	tag, incConsumer := New(ctx, db, 1, "nmap", conf.NMAP, "incoming", mockLock)
+	engine := mock.CreateMockEngine()
+	tag, incConsumer := New(ctx, db, 1, "nmap", conf.NMAP, "incoming", mockLock, engine)
 	assert.NotEmpty(t, tag, "Tag should not be empty")
 	assert.NotNil(t, incConsumer, "Consumer should not be nil")
 }
@@ -25,8 +26,9 @@ func Test_consumeNow_Misc(t *testing.T) {
 	mockLock := mock.CreateMockLock()
 	ctx := context.Background()
 	conf := config.GetConfig()
+	engine := mock.CreateMockEngine()
 	db, _ := mock.CreateMockDatabase(ctx)
-	_, incConsumer := New(ctx, db, 1, "nmap", conf.NMAP, "incoming", mockLock)
+	_, incConsumer := New(ctx, db, 1, "nmap", conf.NMAP, "incoming", mockLock, engine)
 
 	rmqMock := mock.CreateMockRMQ()
 

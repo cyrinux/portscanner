@@ -23,7 +23,17 @@ var (
 )
 
 type EngineInterface interface {
-	Start(params *pb.ParamsScannerRequest, async bool) (*nmap.Run, error)
+	Start(params *pb.ParamsScannerRequest, async bool) ([]*pb.HostResult, error)
+	SetState(state pb.ScannerResponse_Status)
+	GetState() pb.ScannerResponse_Status
+}
+
+func (e *Engine) SetState(state pb.ScannerResponse_Status) {
+	e.State = state
+}
+
+func (e *Engine) GetState() pb.ScannerResponse_Status {
+	return e.State
 }
 
 // Engine define a scanner engine
@@ -51,12 +61,17 @@ func New(ctx context.Context, db database.Database, conf config.NMAPConfig, lock
 }
 
 // Start the scan
-func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) ([]*pb.HostResult, error) {
+	var result *nmap.Run
+	var err error
 	if async {
-		return e.startAsyncScan(params)
+		result, err = e.startAsyncScan(params)
 	} else {
-		return e.startScan(params)
+		result, err = e.startScan(params)
 	}
+
+	scanResult, err := ParseScanResult(result)
+	return scanResult, err
 }
 
 func (e *Engine) parseNMAPParams(s *pb.ParamsScannerRequest) (*ParamsParsed, error) {
@@ -145,7 +160,7 @@ func (e *Engine) parseNMAPParams(s *pb.ParamsScannerRequest) (*ParamsParsed, err
 	return &ParamsParsed{hosts: hostsList, ports: portsList, options: options}, nil
 }
 
-func (e *Engine) startScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+func (e *Engine) startScan(params *pb.ParamsScannerRequest) (*nmap.Run, error) {
 	sr := []*pb.ScannerResponse{
 		{Status: pb.ScannerResponse_RUNNING},
 	}
@@ -153,33 +168,33 @@ func (e *Engine) startScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRe
 
 	smrJSON, err := json.Marshal(&smr)
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
 	_, err = e.db.Set(e.ctx, params.Key, string(smrJSON), params.RetentionDuration.AsDuration())
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
 
 	params, result, err := e.run(params)
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
-	return params, result, nil
+	return result, nil
 
 }
 
-func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {
+func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*nmap.Run, error) {
 	var scannerResponses []*pb.ScannerResponse
 	var smr *pb.ScannerMainResponse
 	var err error
 
 	smrJSON, err := e.db.Get(e.ctx, params.Key)
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
 	err = json.Unmarshal([]byte(smrJSON), &smr)
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
 	scannerResponses = smr.Response
 
@@ -205,18 +220,18 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*pb.ParamsScan
 
 	smrNewJSON, err := json.Marshal(smr)
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
 	_, err = e.db.Set(e.ctx, params.Key, string(smrNewJSON), params.RetentionDuration.AsDuration())
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
 
 	params, result, err := e.run(params)
 	if err != nil {
-		return params, nil, err
+		return nil, err
 	}
-	return params, result, nil
+	return result, nil
 }
 
 func (e *Engine) run(params *pb.ParamsScannerRequest) (*pb.ParamsScannerRequest, *nmap.Run, error) {

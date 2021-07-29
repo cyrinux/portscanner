@@ -11,6 +11,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/config"
 	"github.com/cyrinux/grpcnmapscanner/consumer"
 	"github.com/cyrinux/grpcnmapscanner/database"
+	"github.com/cyrinux/grpcnmapscanner/engine"
 	"github.com/cyrinux/grpcnmapscanner/helpers"
 	"github.com/cyrinux/grpcnmapscanner/locker"
 	"github.com/cyrinux/grpcnmapscanner/logger"
@@ -281,6 +282,7 @@ func (worker *Worker) startConsuming() *Worker {
 	numConsumers++ // we got one consumer for the returned, lets add 2 more
 
 	for i := 0; i < int(numConsumers); i++ {
+		engine := engine.New(worker.ctx, worker.db, conf.NMAP, worker.locker)
 		tag, incomingConsumer := consumer.New(
 			worker.ctx,
 			worker.db,
@@ -289,6 +291,7 @@ func (worker *Worker) startConsuming() *Worker {
 			worker.conf.NMAP,
 			"incoming",
 			worker.locker,
+			engine,
 		)
 		if _, err := worker.broker.Incoming.AddConsumer(tag, incomingConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
@@ -301,7 +304,7 @@ func (worker *Worker) startConsuming() *Worker {
 		// start prometheus collector
 		go worker.collectConsumerStats(incomingConsumer.Success, incomingConsumer.Failed, worker.returned)
 
-		tag, returnerConsumer := consumer.New(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "rejected", worker.locker)
+		tag, returnerConsumer := consumer.New(worker.ctx, worker.db, i, worker.name, worker.conf.NMAP, "rejected", worker.locker, engine)
 		if _, err := worker.broker.Pushed.AddConsumer(tag, returnerConsumer); err != nil {
 			log.Error().Stack().Err(err).Msg("")
 		}
