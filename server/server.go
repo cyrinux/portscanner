@@ -100,7 +100,7 @@ type Server struct {
 	err         error
 	broker      broker.Broker
 	State       pb.ServiceStateValues
-	locker      locker.MyLocker
+	locker      locker.MyLockerInterface
 	taskType    string
 	tasksStatus TasksStatus
 	jwtManager  *auth.JWTManager

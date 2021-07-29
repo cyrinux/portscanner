@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// MyLocker create a mock locker interface
-type MyLocker interface {
+// MyLockerInterface create a mock locker interface
+type MyLockerInterface interface {
 	Obtain(ctx context.Context, key string, ttl time.Duration) (bool, error)
 	Release(ctx context.Context, key string) error
 	TTL(ctx context.Context, key string) (time.Duration, error)
@@ -21,7 +21,7 @@ type redisLocker struct {
 }
 
 // CreateRedisLock create a redis lock
-func CreateRedisLock(redisClient *redis.Client) MyLocker {
+func CreateRedisLock(redisClient *redis.Client) MyLockerInterface {
 	locker := redislock.New(redisClient)
 	return &redisLocker{locker: locker, locks: map[string]*redislock.Lock{}}
 }

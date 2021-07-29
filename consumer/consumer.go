@@ -31,7 +31,7 @@ type Consumer struct {
 	Name      string
 	cancel    context.CancelFunc
 	Engine    *engine.Engine
-	Locker    locker.MyLocker
+	Locker    locker.MyLockerInterface
 	State     pb.ServiceStateValues
 	conf      config.Config
 	taskType  string
@@ -50,7 +50,7 @@ func New(
 	taskType string,
 	conf config.NMAPConfig,
 	queue string,
-	locker locker.MyLocker) (string, *Consumer) {
+	locker locker.MyLockerInterface) (string, *Consumer) {
 
 	name := fmt.Sprintf("%s-consumer-%s-%s-%d", taskType, queue, hostname, tag)
 	log.Info().Msgf("new: %s", name)

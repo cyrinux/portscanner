@@ -49,7 +49,7 @@ type Worker struct {
 	broker      *broker.Broker
 	conf        config.Config
 	redisClient *redis.Client
-	locker      locker.MyLocker
+	locker      locker.MyLockerInterface
 	state       *pb.ServiceStateValues
 	consumers   []*consumer.Consumer
 	db          database.Database
@@ -228,7 +228,7 @@ func (worker *Worker) startReturner(returner *broker.Returner) {
 		if err != nil {
 			log.Error().Stack().Err(err).Msg("returner can't obtain lock")
 		} else if ok {
-			defer func(locker locker.MyLocker, ctx context.Context, key string) {
+			defer func(locker locker.MyLockerInterface, ctx context.Context, key string) {
 				err = locker.Release(ctx, key)
 				if err != nil {
 					log.Error().Stack().Err(err).Msg("can't defer lock")

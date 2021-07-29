@@ -26,7 +26,7 @@ var (
 type Engine struct {
 	ctx    context.Context
 	db     database.Database
-	locker locker.MyLocker
+	locker locker.MyLockerInterface
 	State  pb.ScannerResponse_Status
 	config config.NMAPConfig
 }
@@ -42,7 +42,7 @@ type ParamsParsed struct {
 }
 
 // New create a new nmap engine
-func New(ctx context.Context, db database.Database, conf config.NMAPConfig, locker locker.MyLocker) *Engine {
+func New(ctx context.Context, db database.Database, conf config.NMAPConfig, locker locker.MyLockerInterface) *Engine {
 	return &Engine{ctx: ctx, db: db, config: conf, locker: locker}
 }
 

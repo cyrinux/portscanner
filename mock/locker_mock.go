@@ -1,7 +1,8 @@
-package locker
+package mock
 
 import (
 	"context"
+	"github.com/cyrinux/grpcnmapscanner/locker"
 	"time"
 )
 
@@ -9,9 +10,9 @@ import (
 type MockLocker struct {
 }
 
-// CreateLock create a Mocklock
+// CreateMockLock create a Mocklock
 // return interface MyLocker
-func CreateLock(MockClient *MockLocker) MyLocker {
+func CreateMockLock() locker.MyLockerInterface {
 	return &MockLocker{}
 }
 
