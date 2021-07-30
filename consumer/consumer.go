@@ -64,8 +64,8 @@ func New(
 		Locker:   locker,
 		conf:     config.GetConfig(),
 		taskType: taskType,
-		Success:  make(chan int64),
-		Failed:   make(chan int64),
+		Success:  make(chan int64, 100),
+		Failed:   make(chan int64, 100),
 	}
 }
 

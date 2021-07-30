@@ -28,8 +28,13 @@ func (l *MockLocker) Release(ctx context.Context, key string) error {
 
 // TTL return the life duration of the lock from the lock key
 func (l *MockLocker) TTL(ctx context.Context, key string) (time.Duration, error) {
-	duration := time.Now().Sub(time.Now())
-	return duration, nil
+	now := time.Now()
+
+	duration := now.Add(5 * time.Second)
+
+	ttl := duration.Sub(now)
+
+	return ttl, nil
 }
 
 // Refresh add some time to the ttl life from the lock key and time to add

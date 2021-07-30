@@ -62,6 +62,9 @@ func New(ctx context.Context, db database.Database, conf config.NMAPConfig, lock
 
 // Start the scan
 func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) ([]*pb.HostResult, error) {
+	jsonA, _ := json.Marshal(params)
+	log.Debug().Msg(string(jsonA))
+
 	var result *nmap.Run
 	var err error
 	if async {
@@ -70,7 +73,11 @@ func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) ([]*pb.HostR
 		result, err = e.startScan(params)
 	}
 
+	// j, err := json.Marshal(result)
+	// log.Debug().Msgf("%v", string(j))
+
 	scanResult, err := ParseScanResult(result)
+
 	return scanResult, err
 }
 
