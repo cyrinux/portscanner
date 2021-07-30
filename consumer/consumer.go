@@ -134,56 +134,65 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	time.Sleep(consumer.conf.RMQ.ConsumeDuration)
 }
 
-func (consumer *Consumer) markTaskCancelled(params *pb.ParamsScannerRequest) error {
+func (consumer *Consumer) markTaskFailed(params *pb.ParamsScannerRequest) error {
 	var scannerMainResponse pb.ScannerMainResponse
 	var scannerResponses []*pb.ScannerResponse
 
-	if consumer.Engine.GetState() != pb.ScannerResponse_CANCEL {
-		// scan failed
-		consumer.Failed <- 1
-		// if scan fail or cancelled, mark task as cancel
+	// if consumer.Engine.GetState() != pb.ScannerResponse_CANCEL {
+	// scan failed
+	consumer.Failed <- 1
+	// if scan fail or cancelled, mark task as cancel
 
-		smrJSON, err := consumer.db.Get(consumer.ctx, consumer.request.Key)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, consumer.request.Key)
-			return err
-		}
-		err = json.Unmarshal([]byte(smrJSON), &scannerMainResponse)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
-			return err
-		}
-		scannerResponses = scannerMainResponse.Response
-		scannerResponses = append(scannerResponses, &pb.ScannerResponse{
-			StartTime:         consumer.startTime,
-			Status:            pb.ScannerResponse_ERROR,
-			EndTime:           consumer.endTime,
-			RetentionDuration: params.RetentionDuration},
-		)
-		scannerMainResponse = pb.ScannerMainResponse{
-			Key:      params.Key,
-			Request:  params,
-			Response: scannerResponses,
-		}
-		scanResultJSON, err := json.Marshal(&scannerMainResponse)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.Name)
-			return err
-		}
-		_, err = consumer.db.Set(
-			consumer.ctx,
-			params.Key,
-			string(scanResultJSON),
-			params.RetentionDuration.AsDuration(),
-		)
-		if err != nil {
-			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.Name)
-			return err
-		}
-
+	smrJSON, err := consumer.db.Get(consumer.ctx, consumer.request.Key)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, consumer.request.Key)
+		return err
+	}
+	err = json.Unmarshal([]byte(smrJSON), &scannerMainResponse)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
+		return err
+	}
+	scannerResponses = scannerMainResponse.Response
+	scannerResponses = append(scannerResponses, &pb.ScannerResponse{
+		StartTime:         consumer.startTime,
+		Status:            pb.ScannerResponse_ERROR,
+		EndTime:           consumer.endTime,
+		RetentionDuration: params.RetentionDuration},
+	)
+	scannerMainResponse = pb.ScannerMainResponse{
+		Key:      params.Key,
+		Request:  params,
+		Response: scannerResponses,
+	}
+	scanResultJSON, err := json.Marshal(&scannerMainResponse)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.Name)
+		return err
+	}
+	_, err = consumer.db.Set(
+		consumer.ctx,
+		params.Key,
+		string(scanResultJSON),
+		params.RetentionDuration.AsDuration(),
+	)
+	if err != nil {
+		log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.Name)
+		return err
 	}
 
+	// }
+
 	return nil
+}
+
+// ack acknowledged a message
+func (consumer *Consumer) ack(delivery rmq.Delivery, payload string) {
+	if err := delivery.Ack(); err != nil {
+		log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.Name, payload)
+	} else {
+		log.Info().Msgf("%s: was acked %v", consumer.Name, payload)
+	}
 }
 
 // consumeNow really consume the message
@@ -199,12 +208,12 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 	// mark the task as cancel if fail
 	if err != nil {
+
 		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, request.Key, result)
-		// if err != nil {
-		// 	log.Error().Stack().Err(err).Msgf("%s can't parse the scan result, key: %s", consumer.Name, childKey)
-		// 	scannerResponse.Status = pb.ScannerResponse_ERROR
-		// }
-		err := consumer.markTaskCancelled(request)
+
+		consumer.ack(delivery, payload)
+
+		err := consumer.markTaskFailed(request)
 		if err != nil {
 			return err
 		}
@@ -291,11 +300,8 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 						log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.Name)
 					}
 				}
-				if err := delivery.Ack(); err != nil {
-					log.Error().Stack().Err(err).Msgf("%s: failed to ack :%v", consumer.Name, payload)
-				} else {
-					log.Info().Msgf("%s: was acked %v", consumer.Name, payload)
-				}
+
+				consumer.ack(delivery, payload)
 
 				break
 			}
