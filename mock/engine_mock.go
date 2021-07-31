@@ -2,7 +2,6 @@ package mock
 
 import (
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
-	// "strings"
 )
 
 type MockEngine struct {
@@ -24,7 +23,3 @@ func (e *MockEngine) SetState(state pb.ScannerResponse_Status) {
 func (e *MockEngine) GetState() pb.ScannerResponse_Status {
 	return e.State
 }
-
-// func CreateMockEngine() *MockEngine {
-// 	return &MockEngine{}
-// }
