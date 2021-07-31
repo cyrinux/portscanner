@@ -70,20 +70,17 @@ func New(
 }
 
 // Cancel is a function trigger on consumer context cancel
-func (consumer *Consumer) Cancel() {
+func (consumer *Consumer) Cancel() error {
 	log.Debug().Msgf("%s cancelled, writing state to database", consumer.Name)
 	// if scan fail or cancelled, mark task as cancel
 	consumer.Engine.SetState(pb.ScannerResponse_CANCEL)
 	scannerResponse := &pb.ScannerResponse{
 		Status: pb.ScannerResponse_CANCEL,
 	}
-	scanResultJSON, err := json.Marshal(scannerResponse)
-	if err != nil {
-		log.Error().Stack().Err(err).Msgf("%s failed to parse failed result", consumer.Name)
-	}
+	scanResultJSON, _ := json.Marshal(scannerResponse)
 
 	if consumer.request != nil {
-		_, err = consumer.db.Set(
+		_, err := consumer.db.Set(
 			consumer.ctx,
 			consumer.request.Key,
 			string(scanResultJSON),
@@ -91,12 +88,15 @@ func (consumer *Consumer) Cancel() {
 		)
 		if err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to insert failed result", consumer.Name)
+			return err
 		}
 	}
 
-	time.Sleep(1000 * time.Millisecond)
+	// time.Sleep(2000 * time.Millisecond
 
 	consumer.cancel()
+
+	return nil
 }
 
 // Consume consume the message tasks on the redis broker
