@@ -92,8 +92,6 @@ func (consumer *Consumer) Cancel() error {
 		}
 	}
 
-	// time.Sleep(2000 * time.Millisecond
-
 	consumer.cancel()
 
 	return nil
@@ -103,8 +101,10 @@ func (consumer *Consumer) Cancel() error {
 func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	payload := delivery.Payload()
 
+	var err error
 	var request *pb.ParamsScannerRequest
-	err := json.Unmarshal([]byte(payload), &request)
+
+	err = json.Unmarshal([]byte(payload), &request)
 	if err != nil {
 		return
 	}
@@ -122,9 +122,12 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	}
 
 	if request.DeferTime.AsTime().Unix() <= time.Now().Unix() {
-		consumer.consumeNow(delivery, request, payload)
+		err = consumer.consumeNow(delivery, request, payload)
+		if err != nil {
+			log.Error().Stack().Err(err).Msgf("%s: consume failed %s", consumer.Name, payload)
+		}
 	} else {
-		if err := delivery.Reject(); err != nil {
+		if err = delivery.Reject(); err != nil {
 			log.Error().Stack().Err(err).Msgf("%s: failed to reject %s", consumer.Name, payload)
 		} else {
 			log.Debug().Msgf("%s: delayed %s, this is too early", consumer.Name, payload)
@@ -132,17 +135,16 @@ func (consumer *Consumer) Consume(delivery rmq.Delivery) {
 	}
 
 	time.Sleep(consumer.conf.RMQ.ConsumeDuration)
+
 }
 
 func (consumer *Consumer) markTaskFailed(params *pb.ParamsScannerRequest) error {
 	var scannerMainResponse pb.ScannerMainResponse
 	var scannerResponses []*pb.ScannerResponse
 
-	// if consumer.Engine.GetState() != pb.ScannerResponse_CANCEL {
-	// scan failed
 	consumer.Failed <- 1
-	// if scan fail or cancelled, mark task as cancel
 
+	// if scan fail or cancelled, mark task as cancel
 	smrJSON, err := consumer.db.Get(consumer.ctx, consumer.request.Key)
 	if err != nil {
 		log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, consumer.request.Key)
@@ -181,8 +183,6 @@ func (consumer *Consumer) markTaskFailed(params *pb.ParamsScannerRequest) error 
 		return err
 	}
 
-	// }
-
 	return nil
 }
 
@@ -206,17 +206,12 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 	result, err := consumer.Engine.Start(consumer.request, true)
 	consumer.endTime = timestamppb.Now()
 
-	// mark the task as cancel if fail
-	if err != nil {
-
+	if err != nil || request.Targets == "" {
 		log.Error().Stack().Err(err).Msgf("%s: scan %s: %v", consumer.Name, request.Key, result)
 
 		consumer.ack(delivery, payload)
 
-		err := consumer.markTaskFailed(request)
-		if err != nil {
-			return err
-		}
+		return consumer.markTaskFailed(request)
 	}
 
 	// if scan is cancel, result will be nil and we can't
@@ -227,8 +222,6 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 		wait := 500 * time.Millisecond
 		for {
-			// cpu cooling
-			time.Sleep(wait)
 
 			// Try to obtain lock.
 			lockerKey := fmt.Sprintf("consumer-%s", request.Key)
@@ -305,6 +298,9 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 				break
 			}
+
+			// cpu cooling
+			time.Sleep(wait)
 
 		}
 	}

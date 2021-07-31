@@ -2,23 +2,17 @@ package mock
 
 import (
 	"context"
-	"github.com/cyrinux/grpcnmapscanner/locker"
 	"time"
 )
 
 // MockLocker is a lock mocker
 type MockLocker struct {
-}
-
-// CreateMockLock create a Mocklock
-// return interface MyLocker
-func CreateMockLock() locker.MyLockerInterface {
-	return &MockLocker{}
+	ObtainImpl func(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
 // Obtain get a lock from a key and duration
 func (l *MockLocker) Obtain(ctx context.Context, key string, ttl time.Duration) (bool, error) {
-	return true, nil
+	return l.ObtainImpl(ctx, key, ttl)
 }
 
 // Release release the lock
@@ -30,7 +24,7 @@ func (l *MockLocker) Release(ctx context.Context, key string) error {
 func (l *MockLocker) TTL(ctx context.Context, key string) (time.Duration, error) {
 	now := time.Now()
 
-	duration := now.Add(5 * time.Second)
+	duration := now.Add(5 * time.Minute)
 
 	ttl := duration.Sub(now)
 

@@ -1,26 +1,25 @@
 package mock
 
-// CreateMockRMQ create RMQ mock
-func CreateMockRMQ() MockDelivery {
-	return MockDelivery{}
-}
-
 type MockDelivery struct {
-	Acks     int
-	Rejected int
+	Acks        int
+	Rejected    int
+	Pushed      int
+	PayloadImpl func() string
 }
 
 func (r *MockDelivery) Payload() string {
-	return ""
+	return r.PayloadImpl()
 }
+
 func (r *MockDelivery) Ack() error {
-	r.Acks += 1
+	r.Acks++
 	return nil
 }
 func (r *MockDelivery) Reject() error {
-	r.Rejected += 1
+	r.Rejected++
 	return nil
 }
 func (r *MockDelivery) Push() error {
+	r.Pushed++
 	return nil
 }

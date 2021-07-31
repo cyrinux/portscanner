@@ -8,4 +8,4 @@ version/xversion.go
 coverage.out
 **/coverage.out
 cli
-
+.idea/*
