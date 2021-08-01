@@ -95,6 +95,8 @@ func init() {
 }
 
 func Test_CreateMockLock_Create_New_Locker(t *testing.T) {
+	ctx := context.Background()
+	conf := config.GetConfig()
 	mockLock := &mock.MockLocker{
 		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 			return true, nil
@@ -102,8 +104,6 @@ func Test_CreateMockLock_Create_New_Locker(t *testing.T) {
 	}
 	assert.NotNil(t, mockLock, "Should not be nil")
 
-	ctx := context.Background()
-	conf := config.GetConfig()
 	db := mock.MockDatabase{
 		SetImpl: func(ctx context.Context, key string, value string, retention time.Duration) (string, error) {
 			return key, nil
@@ -127,13 +127,13 @@ func Test_CreateMockLock_Create_New_Locker(t *testing.T) {
 }
 
 func Test_consumeNow_ValidateConsumingOneTarget(t *testing.T) {
+	ctx := context.Background()
+	conf := config.GetConfig()
 	mockLock := &mock.MockLocker{
 		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 			return true, nil
 		},
 	}
-	ctx := context.Background()
-	conf := config.GetConfig()
 	delivery := mock.MockDelivery{
 		PayloadImpl: func() string {
 			reqJSON, _ := json.Marshal(&req1)
@@ -146,16 +146,13 @@ func Test_consumeNow_ValidateConsumingOneTarget(t *testing.T) {
 			return key, nil
 		},
 	}
-
 	engine := &mock.MockEngine{
 		StartImpl: func(params *pb.ParamsScannerRequest, async bool) ([]*pb.HostResult, error) {
 			var hostResults []*pb.HostResult
 			targets := strings.Split(params.Targets, ",")
-
-			for i := 0; i < len(targets); i++ {
-				hostResults = append(hostResults, &pb.HostResult{Host: &pb.Host{Address: "scanme.nmap.org"}})
+			for _, t := range targets {
+				hostResults = append(hostResults, &pb.HostResult{Host: &pb.Host{Address: t}})
 			}
-
 			return hostResults, nil
 		},
 	}
@@ -170,13 +167,13 @@ func Test_consumeNow_ValidateConsumingOneTarget(t *testing.T) {
 }
 
 func Test_consumeNow_ValidateConsumingZeroTarget(t *testing.T) {
+	ctx := context.Background()
+	conf := config.GetConfig()
 	mockLock := &mock.MockLocker{
 		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 			return true, nil
 		},
 	}
-	ctx := context.Background()
-	conf := config.GetConfig()
 	delivery := mock.MockDelivery{
 		PayloadImpl: func() string {
 			reqJSON, _ := json.Marshal(&req2)
@@ -205,13 +202,13 @@ func Test_consumeNow_ValidateConsumingZeroTarget(t *testing.T) {
 }
 
 func Test_Cancel_CancelSuccesfull(t *testing.T) {
+	ctx := context.Background()
+	conf := config.GetConfig()
 	mockLock := &mock.MockLocker{
 		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 			return true, nil
 		},
 	}
-	ctx := context.Background()
-	conf := config.GetConfig()
 	delivery := mock.MockDelivery{
 		PayloadImpl: func() string {
 			reqJSON, _ := json.Marshal(&req3)
@@ -246,13 +243,13 @@ func Test_Cancel_CancelSuccesfull(t *testing.T) {
 }
 
 func Test_Cancel_CancelDbError(t *testing.T) {
+	ctx := context.Background()
+	conf := config.GetConfig()
 	mockLock := &mock.MockLocker{
 		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 			return true, nil
 		},
 	}
-	ctx := context.Background()
-	conf := config.GetConfig()
 	delivery := mock.MockDelivery{
 		PayloadImpl: func() string {
 			reqJSON, _ := json.Marshal(&req3)
@@ -287,13 +284,13 @@ func Test_Cancel_CancelDbError(t *testing.T) {
 }
 
 func Test_Consumer_ConsumerIsStop(t *testing.T) {
+	ctx := context.Background()
+	conf := config.GetConfig()
 	mockLock := &mock.MockLocker{
 		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 			return true, nil
 		},
 	}
-	ctx := context.Background()
-	conf := config.GetConfig()
 	delivery := mock.MockDelivery{
 		PayloadImpl: func() string {
 			reqJSON, _ := json.Marshal(&req3)
@@ -319,7 +316,7 @@ func Test_Consumer_ConsumerIsStop(t *testing.T) {
 	_, consumer := New(ctx, db, 1, "nmap", conf.NMAP, "incoming", mockLock, engine)
 	consumer.State.State = pb.ServiceStateValues_STOP
 	consumer.Consume(&delivery)
-	assert.Equal(t, 0, len(db.Contents), "it must be one")
+	assert.Equal(t, 0, len(db.Contents), "it must be zero")
 	assert.Equal(t, 1, delivery.Rejected, "it must return one rejected msg")
 	assert.Nil(t, engine.Started, "engine need to take requests params as params engine")
 	assert.Equal(t, db.Contents["9c68bb98-2ba9-412a-a6b1-06963b408e84"], "")
@@ -358,7 +355,7 @@ func Test_Consumer_PayloadIsDefered(t *testing.T) {
 	_, consumer := New(ctx, db, 1, "nmap", conf.NMAP, "incoming", mockLock, engine)
 	consumer.State.State = pb.ServiceStateValues_START
 	consumer.Consume(&delivery)
-	assert.Equal(t, 0, len(db.Contents), "it must be one")
+	assert.Equal(t, 0, len(db.Contents), "it must be zero")
 	assert.Equal(t, 1, delivery.Rejected, "it must return one rejected msg")
 	assert.Nil(t, engine.Started, "engine need to take requests params as params engine")
 	assert.Equal(t, db.Contents["9c68bb98-2ba9-412a-a6b1-06963b408e84"], "")
