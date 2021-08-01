@@ -302,7 +302,7 @@ func ParseScanResult(result *nmap.Run) ([]*pb.HostResult, error) {
 	var resultJSON []*pb.HostResult
 	var totalPorts int
 	var err error
-	if result == nil || len(result.Hosts) == 0 || result.NmapErrors == nil {
+	if result == nil || len(result.Hosts) == 0 || result.NmapErrors != nil {
 		log.Error().Stack().Err(ErrTimeoutOrUnreachable).Msg("")
 		return nil, err
 	}
