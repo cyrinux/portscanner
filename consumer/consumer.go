@@ -225,7 +225,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 			// Try to obtain lock.
 			lockerKey := fmt.Sprintf("consumer-%s", request.Key)
-			ok, err := consumer.Locker.Obtain(consumer.ctx, lockerKey, 10*time.Second)
+			ok, err := consumer.Locker.Obtain(consumer.ctx, lockerKey, 2*time.Second)
 			if err != nil {
 				log.Error().Stack().Err(err).Msg("returner can't obtain lock")
 			} else if ok {
@@ -238,10 +238,13 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					scannerMainResponseJSON, err := consumer.db.Get(consumer.ctx, request.Key)
 					if err != nil {
 						log.Error().Stack().Err(err).Msgf("%s failed to get main response, key: %s", consumer.Name, request.Key)
+						consumer.ack(delivery, payload)
+						return err
 					}
 					err = json.Unmarshal([]byte(scannerMainResponseJSON), &scannerMainResponse)
 					if err != nil {
 						log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
+						consumer.ack(delivery, payload)
 						return err
 					}
 
@@ -279,10 +282,13 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					scanResultJSON, err := json.Marshal(&scannerMainResponse)
 					if err != nil {
 						log.Error().Stack().Err(err).Msgf("%s failed to parse result", consumer.Name)
+						consumer.ack(delivery, payload)
+						return err
 					}
 
 					err = consumer.Locker.Refresh(consumer.ctx, lockerKey, 2*time.Second)
 					if err != nil {
+						consumer.ack(delivery, payload)
 						return err
 					}
 
@@ -291,6 +297,8 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					)
 					if err != nil {
 						log.Error().Stack().Err(err).Msgf("%s: failed to insert result", consumer.Name)
+						consumer.ack(delivery, payload)
+						return err
 					}
 				}
 
