@@ -1,4 +1,4 @@
-# gRPC nmap scanner
+# gRPC nmap scanner (WIP)
 
 It's a distributed scanner
 
