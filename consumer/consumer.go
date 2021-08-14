@@ -155,6 +155,7 @@ func (consumer *Consumer) markTaskFailed(params *pb.ParamsScannerRequest) error 
 		log.Error().Stack().Err(err).Msgf("%s failed to read response from json", consumer.Name)
 		return err
 	}
+
 	scannerResponses = scannerMainResponse.Response
 	scannerResponses = append(scannerResponses, &pb.ScannerResponse{
 		StartTime:         consumer.startTime,
@@ -198,7 +199,7 @@ func (consumer *Consumer) ack(delivery rmq.Delivery, payload string) {
 // consumeNow really consume the message
 func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsScannerRequest, payload string) error {
 	consumer.request = request
-
+	lockerctx := context.Background()
 	var scannerMainResponse pb.ScannerMainResponse
 	var scannerResponses []*pb.ScannerResponse
 
@@ -222,16 +223,15 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 
 		wait := 500 * time.Millisecond
 		for {
-
 			// Try to obtain lock.
 			lockerKey := fmt.Sprintf("consumer-%s", request.Key)
-			ok, err := consumer.Locker.Obtain(consumer.ctx, lockerKey, 2*time.Second)
+			ok, err := consumer.Locker.Obtain(lockerctx, lockerKey, 10*time.Second)
 			if err != nil {
 				log.Error().Stack().Err(err).Msg("returner can't obtain lock")
 			} else if ok {
-				defer consumer.Locker.Release(consumer.ctx, lockerKey)
-				// Sleep and check the remaining TTL.
-				if ttl, err := consumer.Locker.TTL(consumer.ctx, lockerKey); err != nil {
+				defer consumer.Locker.Release(lockerctx, lockerKey)
+				//  Check the remaining TTL.
+				if ttl, err := consumer.Locker.TTL(lockerctx, lockerKey); err != nil {
 					log.Error().Stack().Err(err).Msgf("returner error, ttl: %v", ttl)
 				} else if ttl > 0 {
 
@@ -263,11 +263,10 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 					}
 					scannerResponse.Status = pb.ScannerResponse_OK
 
-					// scanResult, err := engine.ParseScanResult(result)
 					scannerResponse.HostResult = result
 
 					for i := range scannerResponses {
-						err := consumer.Locker.Refresh(consumer.ctx, lockerKey, 1*time.Second)
+						err := consumer.Locker.Refresh(lockerctx, lockerKey, 1*time.Second)
 						if err != nil {
 							return err
 						}
@@ -286,7 +285,7 @@ func (consumer *Consumer) consumeNow(delivery rmq.Delivery, request *pb.ParamsSc
 						return err
 					}
 
-					err = consumer.Locker.Refresh(consumer.ctx, lockerKey, 2*time.Second)
+					err = consumer.Locker.Refresh(lockerctx, lockerKey, 2*time.Second)
 					if err != nil {
 						consumer.ack(delivery, payload)
 						return err

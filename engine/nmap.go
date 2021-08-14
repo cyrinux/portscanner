@@ -12,6 +12,7 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
 	"github.com/pkg/errors"
+	"net"
 	"strings"
 	"time"
 )
@@ -62,9 +63,6 @@ func New(ctx context.Context, db database.Database, conf config.NMAPConfig, lock
 
 // Start the scan
 func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) ([]*pb.HostResult, error) {
-	jsonA, _ := json.Marshal(params)
-	log.Debug().Msg(string(jsonA))
-
 	var result *nmap.Run
 	var err error
 	if async {
@@ -72,9 +70,6 @@ func (e *Engine) Start(params *pb.ParamsScannerRequest, async bool) ([]*pb.HostR
 	} else {
 		result, err = e.startScan(params)
 	}
-
-	// j, err := json.Marshal(result)
-	// log.Debug().Msgf("%v", string(j))
 
 	scanResult, err := ParseScanResult(result)
 
@@ -209,10 +204,22 @@ func (e *Engine) startAsyncScan(params *pb.ParamsScannerRequest) (*nmap.Run, err
 		hosts := strings.Split(smr.Request.Targets, ",")
 		hosts = helpers.MakeUnique(hosts)
 		smr.Request.Targets = strings.Join(hosts, ",")
+
+		if params.NetworkChuncked {
+			for _, t := range hosts {
+				_, _, err := net.ParseCIDR(t)
+				if err != nil {
+
+					log.Debug().Msg(t)
+				}
+
+			}
+		}
+
 	}
 
 	key := params.Key
-	if (params.ProcessPerTarget || params.NetworkChuncked) && len(params.Targets) > 1 {
+	if params.ProcessPerTarget && len(params.Targets) > 1 {
 		key = fmt.Sprintf("%s-%s", params.Key, params.Targets)
 	}
 

@@ -213,26 +213,26 @@ func (worker *Worker) StreamServiceControl() {
 
 		}
 
+		// cpu cooling
 		time.Sleep(wait)
 	}
 }
 
 // Locker help to lock some tasks
 func (worker *Worker) startReturner(returner *broker.Returner) {
-	wait := 500 * time.Millisecond
+	wait := 1000 * time.Millisecond
 	log.Info().Msgf("starting the returner routine on %s", worker.name)
 	lockKey := "returner"
 	for {
 		// Try to obtain lock.
 		ok, err := worker.locker.Obtain(worker.ctx, lockKey, 10*time.Second)
-
 		if err != nil {
-			log.Error().Stack().Err(err).Msg("returner can't obtain lock")
+			log.Error().Stack().Err(err).Msg("can't obtain returner lock")
 		} else if ok {
 			defer func(locker locker.MyLockerInterface, ctx context.Context, key string) {
 				err = locker.Release(ctx, key)
 				if err != nil {
-					log.Error().Stack().Err(err).Msg("can't defer lock")
+					log.Error().Stack().Err(err).Msg("can't defer returner lock")
 				}
 			}(worker.locker, worker.ctx, lockKey)
 			// Sleep and check the remaining TTL.

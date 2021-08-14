@@ -323,13 +323,13 @@ func Test_Consumer_ConsumerIsStop(t *testing.T) {
 }
 
 func Test_Consumer_PayloadIsDefered(t *testing.T) {
+	ctx := context.Background()
+	conf := config.GetConfig()
 	mockLock := &mock.MockLocker{
 		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 			return true, nil
 		},
 	}
-	ctx := context.Background()
-	conf := config.GetConfig()
 	delivery := mock.MockDelivery{
 		PayloadImpl: func() string {
 			reqJSON, _ := json.Marshal(&req4)
@@ -362,14 +362,18 @@ func Test_Consumer_PayloadIsDefered(t *testing.T) {
 }
 
 func Test_Consumer_CantTakeALock(t *testing.T) {
-	mockLock := &mock.MockLocker{
-		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
-			// return false, errors.New("lock already taken")
-			return false, nil
-		},
-	}
 	ctx := context.Background()
 	conf := config.GetConfig()
+	triedToObtain := false
+	mockLock := &mock.MockLocker{
+		ObtainImpl: func(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+			if !triedToObtain {
+				triedToObtain = true
+				return false, nil // fail first time
+			}
+			return true, nil
+		},
+	}
 	delivery := mock.MockDelivery{
 		PayloadImpl: func() string {
 			reqJSON, _ := json.Marshal(&req4)
@@ -395,8 +399,10 @@ func Test_Consumer_CantTakeALock(t *testing.T) {
 	_, consumer := New(ctx, db, 1, "nmap", conf.NMAP, "incoming", mockLock, engine)
 	consumer.State.State = pb.ServiceStateValues_START
 	consumer.Consume(&delivery)
-	assert.Equal(t, 0, len(db.Contents), "it must be one")
+	assert.Equal(t, 0, len(db.Contents), "it must be zero")
 	assert.Equal(t, 1, delivery.Rejected, "it must return one rejected msg")
 	assert.Nil(t, engine.Started, "engine need to take requests params as params engine")
 	assert.Equal(t, db.Contents["9c68bb98-2ba9-412a-a6b1-06963b408e84"], "")
+	consumer.Consume(&delivery)
+	assert.Equal(t, 1, len(db.Contents), "it must be one")
 }
