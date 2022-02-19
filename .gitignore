@@ -9,3 +9,4 @@ coverage.out
 **/coverage.out
 cli
 .idea/*
+*.tar.*

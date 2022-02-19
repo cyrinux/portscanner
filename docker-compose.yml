@@ -2,8 +2,8 @@ version: "3.7"
 
 networks:
   backend:
-    external:
-      name: my-network
+    name: my-network
+    enable_ipv6: false
 
 volumes:
   redis_data:
@@ -51,10 +51,10 @@ services:
     depends_on:
       - redis-sentinel
     ports:
-      - "9000"
-      - "9001"
-      - "127.0.0.1:6061:6060"
-      - "127.0.0.1:2113:2112"
+      - "9000/tcp"
+      - "9001/tcp"
+      - "127.0.0.1:6061:6060/tcp"
+      - "127.0.0.1:2113:2112/tcp"
     volumes:
       - "./cert:/etc/scanner/cert:ro"
     networks:
@@ -67,7 +67,7 @@ services:
     image: grpcscanner
     env_file:
       - .env
-    command: "-worker -pprof"
+    command: "-worker"
     restart: always
     cap_add:
       - NET_ADMIN
@@ -77,7 +77,7 @@ services:
     networks:
       - backend
     ports:
-      - "127.0.0.1:16060-16070:6060"
+      - "16060-16063:6060/tcp"
     volumes:
       - "./cert:/etc/scanner/cert:ro"
     deploy:
@@ -93,7 +93,7 @@ services:
   redis-primary:
     image: docker.io/bitnami/redis:6.2
     ports:
-      - "6379"
+      - "6379/tcp"
     env_file:
       - .env
     environment:
@@ -155,7 +155,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
     ports:
-      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:9090:9090/tcp"
     networks:
       - backend
 
@@ -170,6 +170,6 @@ services:
       - server1
       - server2
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8080:8080/tcp"
     networks:
       - backend

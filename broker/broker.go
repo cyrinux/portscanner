@@ -48,7 +48,7 @@ func New(_ context.Context, taskType string, conf config.RMQConfig, redisClient 
 			MaxRetries:       3,
 			MinRetryBackoff:  100 * time.Millisecond,
 			MaxRetryBackoff:  1 * time.Second,
-			RouteByLatency: true,
+			RouteByLatency:   true,
 		})
 	}
 
