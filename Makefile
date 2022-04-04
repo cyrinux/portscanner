@@ -36,6 +36,7 @@ server:
 worker:
 	./grpcnmapscanner -worker
 
+.PHONY: graphviz
 graphviz:
 	@protodot -inc vendor,proto -src proto/v1/backend.proto -output graphviz
 	@dot -Tpng ~/protodot/generated/graphviz.dot -o graphviz.png
@@ -50,9 +51,8 @@ proto: generate
 
 deps:
 	@echo Fetching go deps
-	@go get -u github.com/golang/protobuf/proto
-	@go get -u github.com/golang/protobuf/protoc-gen-go
-	@go get -u google.golang.org/grpc
+	@go install github.com/seamia/protodot@latest
+	@go install github.com/golang/protobuf/protoc-gen-go@latest
 
 proto-docker:
 	@echo Generating protobuf code from docker
@@ -83,5 +83,5 @@ test:
 	go test -v ./...
 
 coverage:
-	go test -coverprofile=coverage.out
+	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out

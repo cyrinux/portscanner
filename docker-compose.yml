@@ -141,7 +141,7 @@ services:
       - backend
     deploy:
       mode: replicated
-      replicas: 3
+      replicas: 2
 
   prometheus:
     image: prom/prometheus:v2.26.0

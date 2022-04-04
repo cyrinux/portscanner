@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/signal"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/cyrinux/grpcnmapscanner/auth"
 	"github.com/cyrinux/grpcnmapscanner/broker"
 	"github.com/cyrinux/grpcnmapscanner/config"
@@ -13,7 +21,6 @@ import (
 	"github.com/cyrinux/grpcnmapscanner/locker"
 	"github.com/cyrinux/grpcnmapscanner/logger"
 	pb "github.com/cyrinux/grpcnmapscanner/proto/v1"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/google/uuid"
 	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
@@ -24,14 +31,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"io"
-	"net"
-	"os"
-	"os/signal"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -426,7 +427,7 @@ func (server *Server) GetScan(ctx context.Context, request *pb.GetScannerRequest
 }
 
 // GetAllScans return the engine scan result
-func (server *Server) GetAllScans(_ *empty.Empty, stream pb.ScannerService_GetAllScansServer) error {
+func (server *Server) GetAllScans(_ *emptypb.Empty, stream pb.ScannerService_GetAllScansServer) error {
 	allKeys, err := server.db.GetAll(server.ctx, "*")
 	if err != nil {
 		return err

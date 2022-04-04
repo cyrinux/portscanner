@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 // This is a dummy package for build tooling
